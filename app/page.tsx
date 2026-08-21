@@ -1,462 +1,284 @@
-'use client'
+'use client';
 
-import { useState, useEffect } from 'react'
-import { createClient } from '@supabase/supabase-js'
+import { useState, useEffect } from 'react';
+import { createClient } from '@supabase/supabase-js';
+import * as XLSX from 'xlsx';
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-const supabase = createClient(supabaseUrl, supabaseAnonKey)
+// Configuración de Supabase
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
+const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
+const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
 interface Documento {
-  id: number
-  tipo_movimiento: string
-  tipo_documento: string
-  numero_factura: string
-  codigo_proyecto: string
-  empresa_nombre: string
-  fecha_ingreso: string
-  dias_credito: number
-  fecha_vencimiento: string
-  moneda: string
-  monto: number
-  email_notificacion: string
-  estado: string
+  id?: number;
+  tipo_movimiento: string;
+  tipo_documento: string;
+  numero_documento: string;
+  codigo_proyecto: string;
+  empresa: string;
+  monto: number;
+  moneda: string;
+  fecha_emision: string;
+  fecha_vencimiento: string;
+  estado: string;
 }
 
 export default function Home() {
-  const [form, setForm] = useState({
-    tipo_movimiento: 'Por Pagar',
-    tipo_documento: 'Factura',
-    numero_factura: '',
-    codigo_proyecto: '',
-    empresa_nombre: '',
-    fecha_ingreso: '',
-    dias_credito: 30,
-    moneda: 'PEN',
-    monto: '',
-    email_notificacion: ''
-  })
+  const [documentos, setDocumentos] = useState<Documento[]>([]);
+  const [loading, setLoading] = useState<boolean>(true);
 
-  const [documentos, setDocumentos] = useState<Documento[]>([])
-  const [loading, setLoading] = useState(false)
-  const [filtroTipo, setFiltroTipo] = useState('Todos')
-
-  const calcularVencimiento = (fecha: string, dias: number) => {
-    if (!fecha) return ''
-    const date = new Date(fecha)
-    date.setDate(date.getDate() + Number(dias))
-    return date.toISOString().split('T')[0]
-  }
-
-  const fechaVencimiento = calcularVencimiento(form.fecha_ingreso, form.dias_credito)
-
-  const obtenerDiasRestantes = (fechaVencimientoStr: string) => {
-    if (!fechaVencimientoStr) return 0
-    const hoy = new Date()
-    hoy.setHours(0, 0, 0, 0)
-    const vencimiento = new Date(fechaVencimientoStr)
-    vencimiento.setHours(0, 0, 0, 0)
-    const diferenciaMs = vencimiento.getTime() - hoy.getTime()
-    return Math.ceil(diferenciaMs / (1000 * 60 * 60 * 24))
-  }
-
-  const cargarDocumentos = async () => {
-    setLoading(true)
-    const { data, error } = await supabase
-      .from('facturas')
-      .select('*')
-      .order('id', { ascending: false })
-
-    if (error) {
-      console.error('Error al cargar:', error)
-    } else {
-      setDocumentos(data || [])
-    }
-    setLoading(false)
-  }
+  // Formulario
+  const [tipoMovimiento, setTipoMovimiento] = useState<string>('Por Pagar (Proveedor)');
+  const [tipoDocumento, setTipoDocumento] = useState<string>('Factura');
+  const [numeroDocumento, setNumeroDocumento] = useState<string>('');
+  const [codigoProyecto, setCodigoProyecto] = useState<string>('');
+  const [empresa, setEmpresa] = useState<string>('');
+  const [monto, setMonto] = useState<string>('');
+  const [moneda, setMoneda] = useState<string>('PEN');
+  const [fechaEmision, setFechaEmision] = useState<string>('');
+  const [fechaVencimiento, setFechaVencimiento] = useState<string>('');
 
   useEffect(() => {
-    cargarDocumentos()
-  }, [])
+    cargarDocumentos();
+  }, []);
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    
-    const { error } = await supabase.from('facturas').insert([
-      {
-        ...form,
-        fecha_vencimiento: fechaVencimiento,
-        monto: Number(form.monto),
-        estado: 'Pendiente'
-      }
-    ])
+  const cargarDocumentos = async () => {
+    setLoading(true);
+    const { data, error } = await supabase
+      .from('documentos')
+      .select('*')
+      .order('fecha_vencimiento', { ascending: true });
 
     if (error) {
-      alert('Error al guardar: ' + error.message)
+      console.error('Error al cargar datos:', error);
     } else {
-      alert('¡Registro guardado con éxito!')
-      setForm({
-        tipo_movimiento: 'Por Pagar',
-        tipo_documento: 'Factura',
-        numero_factura: '',
-        codigo_proyecto: '',
-        empresa_nombre: '',
-        fecha_ingreso: '',
-        dias_credito: 30,
-        moneda: 'PEN',
-        monto: '',
-        email_notificacion: ''
-      })
-      cargarDocumentos()
+      setDocumentos(data || []);
     }
-  }
+    setLoading(false);
+  };
 
-  const cambiarEstado = async (id: number, estadoActual: string, movimiento: string) => {
-    let nuevoEstado = 'Pendiente'
-    
-    if (movimiento === 'Por Cobrar') {
-      nuevoEstado = estadoActual === 'Cobrada' ? 'Pendiente' : 'Cobrada'
-    } else {
-      nuevoEstado = estadoActual === 'Pagada' ? 'Pendiente' : 'Pagada'
+  const guardarDocumento = async (e: React.FormEvent) => {
+    e.preventDefault();
+
+    if (!numeroDocumento || !empresa || !monto || !fechaVencimiento) {
+      alert('Por favor completa los campos obligatorios.');
+      return;
     }
 
-    const { error } = await supabase
-      .from('facturas')
-      .update({ estado: nuevoEstado })
-      .eq('id', id)
+    const nuevoDoc: Documento = {
+      tipo_movimiento: tipoMovimiento,
+      tipo_documento: tipoDocumento,
+      numero_documento: numeroDocumento,
+      codigo_proyecto: codigoProyecto,
+      empresa,
+      monto: parseFloat(monto),
+      moneda,
+      fecha_emision: fechaEmision,
+      fecha_vencimiento: fechaVencimiento,
+      estado: 'Pendiente',
+    };
+
+    const { error } = await supabase.from('documentos').insert([nuevoDoc]);
 
     if (error) {
-      alert('Error al actualizar estado: ' + error.message)
+      alert('Error al guardar: ' + error.message);
     } else {
-      cargarDocumentos()
+      // Limpiar formulario
+      setNumeroDocumento('');
+      setCodigoProyecto('');
+      setEmpresa('');
+      setMonto('');
+      setFechaEmision('');
+      setFechaVencimiento('');
+      cargarDocumentos();
     }
-  }
+  };
 
-  const enviarAlerta = (d: Documento, dias: number) => {
-    const estadoAlerta = dias < 0 ? 'VENCIDO' : dias <= 5 ? 'PRÓXIMO A VENCER' : 'AL DÍA'
-    alert(
-      `🔔 ALERTA DE NOTIFICACIÓN\n\n` +
-      `Para: ${d.email_notificacion}\n` +
-      `Documento: ${d.tipo_documento} Nº ${d.numero_factura}\n` +
-      `Entidad: ${d.empresa_nombre}\n` +
-      `Monto: ${d.moneda === 'USD' ? '$' : 'S/'} ${d.monto}\n` +
-      `Fecha Vencimiento: ${d.fecha_vencimiento}\n` +
-      `Estado de Alerta: ${estadoAlerta} (${dias} días)`
-    )
-  }
+  const exportarAExcel = () => {
+    if (!documentos || documentos.length === 0) {
+      alert('No hay datos registrados para exportar.');
+      return;
+    }
 
-  const documentosFiltrados = documentos.filter(d => {
-    if (filtroTipo === 'Todos') return true
-    return d.tipo_movimiento === filtroTipo
-  })
+    const datosFormateados = documentos.map((doc) => ({
+      'Tipo Movimiento': doc.tipo_movimiento,
+      'Tipo Documento': doc.tipo_documento,
+      'N° Documento': doc.numero_documento,
+      'Código Proyecto': doc.codigo_proyecto,
+      'Empresa / Cliente / Proveedor': doc.empresa,
+      'Monto': doc.monto,
+      'Moneda': doc.moneda,
+      'Fecha Emisión': doc.fecha_emision,
+      'Fecha Vencimiento': doc.fecha_vencimiento,
+      'Estado': doc.estado,
+    }));
 
-  const vencidosCount = documentos.filter(d => d.estado === 'Pendiente' && obtenerDiasRestantes(d.fecha_vencimiento) < 0).length
-  const proximosCount = documentos.filter(d => d.estado === 'Pendiente' && obtenerDiasRestantes(d.fecha_vencimiento) >= 0 && obtenerDiasRestantes(d.fecha_vencimiento) <= 5).length
+    const worksheet = XLSX.utils.json_to_sheet(datosFormateados);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, 'Vencimientos');
+
+    const fechaHoy = new Date().toISOString().split('T')[0];
+    XLSX.writeFile(workbook, `Reporte_Vencimientos_VyA_${fechaHoy}.xlsx`);
+  };
+
+  // Cálculo de resumen
+  const hoy = new Date().toISOString().split('T')[0];
+  const vencidos = documentos.filter((d) => d.fecha_vencimiento < hoy).length;
+  const proximos = documentos.filter((d) => {
+    const difDias = (new Date(d.fecha_vencimiento).getTime() - new Date(hoy).getTime()) / (1000 * 3600 * 24);
+    return difDias >= 0 && difDias <= 5;
+  }).length;
 
   return (
-    <div style={{ maxWidth: '1150px', margin: '30px auto', fontFamily: 'sans-serif', padding: '0 20px' }}>
-      
-      {/* ENCABEZADO CON LOGO MÁS GRANDE */}
-      <div style={{ textAlign: 'center', marginBottom: '28px' }}>
-        <img 
-          src="/logo.jpeg" 
-          alt="Logo Empresa" 
-          style={{ height: '150px', width: 'auto', maxHeight: '180px', maxWidth: '400px', objectFit: 'contain', marginBottom: '16px' }} 
-        />
-        <h1 style={{ color: '#0f172a', margin: '0 0 8px 0' }}>Sistema de Control de Vencimientos y Alertas B2B</h1>
-        <p style={{ color: '#64748b', margin: 0 }}>Gestión integral de Facturas, Boletas y Tickets (Soles y Dólares)</p>
-      </div>
-
-      {/* TARJETAS RESUMEN */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '16px', marginBottom: '30px' }}>
-        <div style={{ background: '#fef2f2', border: '1px solid #fecaca', padding: '16px', borderRadius: '10px' }}>
-          <h4 style={{ margin: 0, color: '#991b1b', fontSize: '13px' }}>🚨 Documentos Vencidos</h4>
-          <p style={{ margin: '8px 0 0', fontSize: '24px', fontWeight: 'bold', color: '#dc2626' }}>{vencidosCount}</p>
-        </div>
-        <div style={{ background: '#fffbeb', border: '1px solid #fde68a', padding: '16px', borderRadius: '10px' }}>
-          <h4 style={{ margin: 0, color: '#92400e', fontSize: '13px' }}>⚠️ Próximos a Vencer (≤ 5 días)</h4>
-          <p style={{ margin: '8px 0 0', fontSize: '24px', fontWeight: 'bold', color: '#d97706' }}>{proximosCount}</p>
-        </div>
-        <div style={{ background: '#f0fdf4', border: '1px solid #bbf7d0', padding: '16px', borderRadius: '10px' }}>
-          <h4 style={{ margin: 0, color: '#166534', fontSize: '13px' }}>📊 Total Registros Almacenados</h4>
-          <p style={{ margin: '8px 0 0', fontSize: '24px', fontWeight: 'bold', color: '#16a34a' }}>{documentos.length}</p>
-        </div>
-      </div>
-
-      {/* FORMULARIO */}
-      <div style={{ background: '#f8fafc', padding: '24px', borderRadius: '12px', border: '1px solid #e2e8f0', marginBottom: '35px' }}>
-        <h2 style={{ fontSize: '18px', marginBottom: '16px', color: '#334155' }}>Ingresar Nuevo Documento</h2>
+    <main className="min-h-screen bg-gray-50 p-4 md:p-8">
+      <div className="max-w-6xl mx-auto space-y-6">
         
-        <form onSubmit={handleSubmit} style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px' }}>
-          <div>
-            <label style={{ fontSize: '12px', fontWeight: 'bold' }}>Tipo de Movimiento:</label>
-            <select
-              value={form.tipo_movimiento}
-              onChange={(e) => setForm({ ...form, tipo_movimiento: e.target.value })}
-              style={{ width: '100%', padding: '8px', borderRadius: '6px', border: '1px solid #cbd5e1', marginTop: '4px', background: '#fff' }}
-            >
-              <option value="Por Pagar">Por Pagar (Proveedor)</option>
-              <option value="Por Cobrar">Por Cobrar (Cliente)</option>
-            </select>
+        {/* Encabezado con Logo */}
+        <div className="bg-white p-6 rounded-xl shadow-sm border text-center flex flex-col items-center justify-center space-y-3">
+          <img src="/logo.jpeg" alt="VyA Consulting Logo" className="h-16 object-contain" />
+          <h1 className="text-2xl font-bold text-gray-800">Sistema de Control de Vencimientos y Alertas B2B</h1>
+          <p className="text-sm text-gray-500">Gestión Integral de Facturas, Boletas y Tickets (Soles y Dólares)</p>
+        </div>
+
+        {/* Tarjetas de Resumen */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="bg-red-50 border border-red-200 p-4 rounded-lg shadow-sm">
+            <span className="text-xs font-bold text-red-600 uppercase">Documentos Vencidos</span>
+            <p className="text-3xl font-extrabold text-red-700 mt-1">{vencidos}</p>
+          </div>
+          <div className="bg-amber-50 border border-amber-200 p-4 rounded-lg shadow-sm">
+            <span className="text-xs font-bold text-amber-600 uppercase">Próximos a Vencer (≤ 5 días)</span>
+            <p className="text-3xl font-extrabold text-amber-700 mt-1">{proximos}</p>
+          </div>
+          <div className="bg-emerald-50 border border-emerald-200 p-4 rounded-lg shadow-sm">
+            <span className="text-xs font-bold text-emerald-600 uppercase">Total Registros Almacenados</span>
+            <p className="text-3xl font-extrabold text-emerald-700 mt-1">{documentos.length}</p>
+          </div>
+        </div>
+
+        {/* Formulario de Registro */}
+        <form onSubmit={guardarDocumento} className="bg-white p-6 rounded-xl shadow-sm border space-y-4">
+          <h2 className="text-lg font-semibold text-gray-800 border-b pb-2">Ingresar Nuevo Documento</h2>
+          
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            <div>
+              <label className="block text-xs font-medium text-gray-700 mb-1">Tipo Movimiento</label>
+              <select value={tipoMovimiento} onChange={(e) => setTipoMovimiento(e.target.value)} className="w-full p-2 border rounded-lg text-sm bg-white">
+                <option>Por Pagar (Proveedor)</option>
+                <option>Por Cobrar (Cliente)</option>
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-xs font-medium text-gray-700 mb-1">Tipo Documento</label>
+              <select value={tipoDocumento} onChange={(e) => setTipoDocumento(e.target.value)} className="w-full p-2 border rounded-lg text-sm bg-white">
+                <option>Factura</option>
+                <option>Boleta</option>
+                <option>Ticket</option>
+                <option>RxH</option>
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-xs font-medium text-gray-700 mb-1">N° Documento *</label>
+              <input type="text" placeholder="Ej: F001-4589" value={numeroDocumento} onChange={(e) => setNumeroDocumento(e.target.value)} className="w-full p-2 border rounded-lg text-sm" required />
+            </div>
+
+            <div>
+              <label className="block text-xs font-medium text-gray-700 mb-1">Código Proyecto</label>
+              <input type="text" placeholder="Ej: PRJ-2026" value={codigoProyecto} onChange={(e) => setCodigoProyecto(e.target.value)} className="w-full p-2 border rounded-lg text-sm" />
+            </div>
+
+            <div className="md:col-span-2">
+              <label className="block text-xs font-medium text-gray-700 mb-1">Empresa / Cliente / Proveedor *</label>
+              <input type="text" placeholder="Razón Social o Nombre" value={empresa} onChange={(e) => setEmpresa(e.target.value)} className="w-full p-2 border rounded-lg text-sm" required />
+            </div>
+
+            <div>
+              <label className="block text-xs font-medium text-gray-700 mb-1">Monto *</label>
+              <input type="number" step="0.01" placeholder="0.00" value={monto} onChange={(e) => setMonto(e.target.value)} className="w-full p-2 border rounded-lg text-sm" required />
+            </div>
+
+            <div>
+              <label className="block text-xs font-medium text-gray-700 mb-1">Moneda</label>
+              <select value={moneda} onChange={(e) => setMoneda(e.target.value)} className="w-full p-2 border rounded-lg text-sm bg-white">
+                <option value="PEN">Soles (S/)</option>
+                <option value="USD">Dólares ($)</option>
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-xs font-medium text-gray-700 mb-1">Fecha Emisión</label>
+              <input type="date" value={fechaEmision} onChange={(e) => setFechaEmision(e.target.value)} className="w-full p-2 border rounded-lg text-sm" />
+            </div>
+
+            <div>
+              <label className="block text-xs font-medium text-gray-700 mb-1">Fecha Vencimiento *</label>
+              <input type="date" value={fechaVencimiento} onChange={(e) => setFechaVencimiento(e.target.value)} className="w-full p-2 border rounded-lg text-sm" required />
+            </div>
           </div>
 
-          <div>
-            <label style={{ fontSize: '12px', fontWeight: 'bold' }}>Tipo de Documento:</label>
-            <select
-              value={form.tipo_documento}
-              onChange={(e) => setForm({ ...form, tipo_documento: e.target.value })}
-              style={{ width: '100%', padding: '8px', borderRadius: '6px', border: '1px solid #cbd5e1', marginTop: '4px', background: '#fff' }}
-            >
-              <option value="Factura">Factura</option>
-              <option value="Boleta">Boleta</option>
-              <option value="Ticket">Ticket</option>
-            </select>
-          </div>
+          <button type="submit" className="w-full md:w-auto bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 px-6 rounded-lg shadow transition-colors">
+            ➕ Guardar Documento
+          </button>
+        </form>
 
-          <div>
-            <label style={{ fontSize: '12px', fontWeight: 'bold' }}>Nº Documento:</label>
-            <input
-              type="text"
-              required
-              placeholder="Ej: F001-4589"
-              value={form.numero_factura}
-              onChange={(e) => setForm({ ...form, numero_factura: e.target.value })}
-              style={{ width: '100%', padding: '8px', borderRadius: '6px', border: '1px solid #cbd5e1', marginTop: '4px' }}
-            />
-          </div>
-
-          <div>
-            <label style={{ fontSize: '12px', fontWeight: 'bold' }}>Código Proyecto:</label>
-            <input
-              type="text"
-              placeholder="Ej: PRJ-2026"
-              value={form.codigo_proyecto}
-              onChange={(e) => setForm({ ...form, codigo_proyecto: e.target.value })}
-              style={{ width: '100%', padding: '8px', borderRadius: '6px', border: '1px solid #cbd5e1', marginTop: '4px' }}
-            />
-          </div>
-
-          <div>
-            <label style={{ fontSize: '12px', fontWeight: 'bold' }}>Empresa / Cliente / Proveedor:</label>
-            <input
-              type="text"
-              required
-              placeholder="Nombre comercial"
-              value={form.empresa_nombre}
-              onChange={(e) => setForm({ ...form, empresa_nombre: e.target.value })}
-              style={{ width: '100%', padding: '8px', borderRadius: '6px', border: '1px solid #cbd5e1', marginTop: '4px' }}
-            />
-          </div>
-
-          <div>
-            <label style={{ fontSize: '12px', fontWeight: 'bold' }}>Fecha Emisión:</label>
-            <input
-              type="date"
-              required
-              value={form.fecha_ingreso}
-              onChange={(e) => setForm({ ...form, fecha_ingreso: e.target.value })}
-              style={{ width: '100%', padding: '8px', borderRadius: '6px', border: '1px solid #cbd5e1', marginTop: '4px' }}
-            />
-          </div>
-
-          <div>
-            <label style={{ fontSize: '12px', fontWeight: 'bold' }}>Días Crédito:</label>
-            <input
-              type="number"
-              value={form.dias_credito}
-              onChange={(e) => setForm({ ...form, dias_credito: Number(e.target.value) })}
-              style={{ width: '100%', padding: '8px', borderRadius: '6px', border: '1px solid #cbd5e1', marginTop: '4px' }}
-            />
-          </div>
-
-          <div>
-            <label style={{ fontSize: '12px', fontWeight: 'bold', color: '#2563eb' }}>Fecha Vencimiento:</label>
-            <input
-              type="date"
-              disabled
-              value={fechaVencimiento}
-              style={{ width: '100%', padding: '8px', borderRadius: '6px', border: '1px solid #93c5fd', backgroundColor: '#eff6ff', marginTop: '4px', fontWeight: 'bold' }}
-            />
-          </div>
-
-          <div>
-            <label style={{ fontSize: '12px', fontWeight: 'bold' }}>Moneda:</label>
-            <select
-              value={form.moneda}
-              onChange={(e) => setForm({ ...form, moneda: e.target.value })}
-              style={{ width: '100%', padding: '8px', borderRadius: '6px', border: '1px solid #cbd5e1', marginTop: '4px', background: '#fff' }}
-            >
-              <option value="PEN">Soles (S/)</option>
-              <option value="USD">Dólares ($)</option>
-            </select>
-          </div>
-
-          <div>
-            <label style={{ fontSize: '12px', fontWeight: 'bold' }}>Monto:</label>
-            <input
-              type="number"
-              step="0.01"
-              required
-              placeholder="0.00"
-              value={form.monto}
-              onChange={(e) => setForm({ ...form, monto: e.target.value })}
-              style={{ width: '100%', padding: '8px', borderRadius: '6px', border: '1px solid #cbd5e1', marginTop: '4px' }}
-            />
-          </div>
-
-          <div>
-            <label style={{ fontSize: '12px', fontWeight: 'bold' }}>Email Notificación:</label>
-            <input
-              type="email"
-              required
-              placeholder="ejemplo@correo.com"
-              value={form.email_notificacion}
-              onChange={(e) => setForm({ ...form, email_notificacion: e.target.value })}
-              style={{ width: '100%', padding: '8px', borderRadius: '6px', border: '1px solid #cbd5e1', marginTop: '4px' }}
-            />
-          </div>
-
-          <div style={{ gridColumn: '1 / -1', marginTop: '8px' }}>
+        {/* Tabla de Registros y Botón de Excel */}
+        <div className="bg-white p-6 rounded-xl shadow-sm border space-y-4">
+          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 border-b pb-3">
+            <h2 className="text-lg font-semibold text-gray-800">Registros de Documentos</h2>
             <button
-              type="submit"
-              style={{ width: '100%', padding: '12px', backgroundColor: '#2563eb', color: '#fff', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: 'bold', fontSize: '15px' }}
+              onClick={exportarAExcel}
+              className="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold py-2 px-4 rounded-lg shadow transition-colors flex items-center gap-2 text-sm"
             >
-              Guardar Documento
+              📊 Exportar a Excel
             </button>
           </div>
-        </form>
-      </div>
 
-      {/* TABLA Y FILTROS */}
-      <div>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', marginBottom: '16px', gap: '12px' }}>
-          <h2 style={{ fontSize: '20px', margin: 0, color: '#0f172a' }}>Panel de Control de Documentos</h2>
-          <div>
-            <span style={{ fontSize: '13px', fontWeight: 'bold', marginRight: '8px' }}>Filtrar vista:</span>
-            <select
-              value={filtroTipo}
-              onChange={(e) => setFiltroTipo(e.target.value)}
-              style={{ padding: '6px 12px', borderRadius: '6px', border: '1px solid #cbd5e1', background: '#fff', fontSize: '13px' }}
-            >
-              <option value="Todos">Todos los movimientos</option>
-              <option value="Por Pagar">Solo Por Pagar</option>
-              <option value="Por Cobrar">Solo Por Cobrar</option>
-            </select>
-          </div>
+          {loading ? (
+            <p className="text-center text-sm text-gray-500 py-4">Cargando datos desde la nube...</p>
+          ) : documentos.length === 0 ? (
+            <p className="text-center text-sm text-gray-500 py-4">No hay documentos registrados aún.</p>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-xs text-gray-600 border-collapse">
+                <thead>
+                  <tr className="bg-gray-100 text-gray-700 uppercase font-semibold">
+                    <th className="p-3">Movimiento</th>
+                    <th className="p-3">Documento</th>
+                    <th className="p-3">Empresa</th>
+                    <th className="p-3">Proyecto</th>
+                    <th className="p-3">Monto</th>
+                    <th className="p-3">Vencimiento</th>
+                    <th className="p-3">Estado</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y">
+                  {documentos.map((doc) => {
+                    const esVencido = doc.fecha_vencimiento < hoy;
+                    return (
+                      <tr key={doc.id} className="hover:bg-gray-50">
+                        <td className="p-3 font-medium">{doc.tipo_movimiento}</td>
+                        <td className="p-3">{doc.tipo_documento}: {doc.numero_documento}</td>
+                        <td className="p-3">{doc.empresa}</td>
+                        <td className="p-3">{doc.codigo_proyecto || '-'}</td>
+                        <td className="p-3 font-semibold">{doc.moneda === 'PEN' ? 'S/' : '$'} {doc.monto.toFixed(2)}</td>
+                        <td className="p-3">{doc.fecha_vencimiento}</td>
+                        <td className="p-3">
+                          <span className={`px-2 py-1 rounded-full text-[10px] font-bold ${esVencido ? 'bg-red-100 text-red-700' : 'bg-emerald-100 text-emerald-700'}`}>
+                            {esVencido ? 'VENCIDO' : 'AL DÍA'}
+                          </span>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
         </div>
-        
-        {loading ? (
-          <p>Cargando registros...</p>
-        ) : documentosFiltrados.length === 0 ? (
-          <p style={{ color: '#64748b' }}>No se encontraron registros para esta selección.</p>
-        ) : (
-          <div style={{ overflowX: 'auto' }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', backgroundColor: '#fff', border: '1px solid #e2e8f0', borderRadius: '8px' }}>
-              <thead>
-                <tr style={{ backgroundColor: '#f1f5f9', borderBottom: '2px solid #cbd5e1' }}>
-                  <th style={{ padding: '10px', fontSize: '12px' }}>Movimiento</th>
-                  <th style={{ padding: '10px', fontSize: '12px' }}>Tipo / Nº Doc</th>
-                  <th style={{ padding: '10px', fontSize: '12px' }}>Entidad</th>
-                  <th style={{ padding: '10px', fontSize: '12px' }}>F. Vencimiento</th>
-                  <th style={{ padding: '10px', fontSize: '12px' }}>Alerta Días</th>
-                  <th style={{ padding: '10px', fontSize: '12px' }}>Monto</th>
-                  <th style={{ padding: '10px', fontSize: '12px' }}>Estado</th>
-                  <th style={{ padding: '10px', fontSize: '12px' }}>Acción</th>
-                </tr>
-              </thead>
-              <tbody>
-                {documentosFiltrados.map((d) => {
-                  const diasRestantes = obtenerDiasRestantes(d.fecha_vencimiento)
-                  const estaCompletado = d.estado === 'Pagada' || d.estado === 'Cobrada'
 
-                  let colorAlertaBg = '#f0fdf4'
-                  let colorAlertaTexto = '#15803d'
-                  let textoAlerta = `${diasRestantes} días`
-
-                  if (!estaCompletado) {
-                    if (diasRestantes < 0) {
-                      colorAlertaBg = '#fef2f2'
-                      colorAlertaTexto = '#dc2626'
-                      textoAlerta = `Vencido (${Math.abs(diasRestantes)}d)`
-                    } else if (diasRestantes <= 5) {
-                      colorAlertaBg = '#fffbeb'
-                      colorAlertaTexto = '#b45309'
-                      textoAlerta = `Vence en ${diasRestantes}d`
-                    }
-                  } else {
-                    textoAlerta = 'Resuelto'
-                  }
-
-                  return (
-                    <tr key={d.id} style={{ borderBottom: '1px solid #e2e8f0' }}>
-                      <td style={{ padding: '10px', fontSize: '12px' }}>
-                        <span style={{
-                          padding: '4px 8px', borderRadius: '4px', fontWeight: 'bold', fontSize: '11px',
-                          backgroundColor: d.tipo_movimiento === 'Por Cobrar' ? '#e0e7ff' : '#ffe4e6',
-                          color: d.tipo_movimiento === 'Por Cobrar' ? '#3730a3' : '#9f1239'
-                        }}>
-                          {d.tipo_movimiento || 'Por Pagar'}
-                        </span>
-                      </td>
-                      <td style={{ padding: '10px', fontSize: '12px' }}>
-                        <strong>{d.tipo_documento || 'Factura'}:</strong> {d.numero_factura}
-                        {d.codigo_proyecto && <div style={{ fontSize: '11px', color: '#64748b' }}>Proj: {d.codigo_proyecto}</div>}
-                      </td>
-                      <td style={{ padding: '10px', fontSize: '12px' }}>{d.empresa_nombre}</td>
-                      <td style={{ padding: '10px', fontWeight: 'bold', fontSize: '12px' }}>{d.fecha_vencimiento}</td>
-                      <td style={{ padding: '10px' }}>
-                        <span style={{
-                          padding: '4px 8px', borderRadius: '12px', fontWeight: 'bold', fontSize: '11px',
-                          backgroundColor: colorAlertaBg, color: colorAlertaTexto
-                        }}>
-                          {textoAlerta}
-                        </span>
-                      </td>
-                      <td style={{ padding: '10px', fontSize: '12px', fontWeight: 'bold' }}>
-                        {d.moneda === 'USD' ? '$' : 'S/'} {d.monto}
-                      </td>
-                      <td style={{ padding: '10px' }}>
-                        <button
-                          onClick={() => cambiarEstado(d.id, d.estado || 'Pendiente', d.tipo_movimiento)}
-                          style={{
-                            padding: '4px 10px',
-                            borderRadius: '12px',
-                            border: 'none',
-                            cursor: 'pointer',
-                            fontWeight: 'bold',
-                            fontSize: '11px',
-                            backgroundColor: estaCompletado ? '#dcfce7' : '#fef3c7',
-                            color: estaCompletado ? '#15803d' : '#b45309'
-                          }}
-                        >
-                          {d.estado || 'Pendiente'}
-                        </button>
-                      </td>
-                      <td style={{ padding: '10px' }}>
-                        <button
-                          onClick={() => enviarAlerta(d, diasRestantes)}
-                          style={{
-                            padding: '4px 8px',
-                            borderRadius: '6px',
-                            border: '1px solid #cbd5e1',
-                            background: '#fff',
-                            cursor: 'pointer',
-                            fontSize: '11px',
-                            fontWeight: 'bold',
-                            color: '#0f172a'
-                          }}
-                        >
-                          🔔 Notificar
-                        </button>
-                      </td>
-                    </tr>
-                  )
-                })}
-              </tbody>
-            </table>
-          </div>
-        )}
       </div>
-    </div>
-  )
+    </main>
+  );
 }
