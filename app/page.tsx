@@ -4,7 +4,6 @@ import { useState, useEffect } from 'react';
 import { createClient } from '@supabase/supabase-js';
 import * as XLSX from 'xlsx';
 
-// Configuración de Supabase
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
 const supabase = createClient(supabaseUrl, supabaseAnonKey);
@@ -26,6 +25,7 @@ interface Documento {
 export default function Home() {
   const [documentos, setDocumentos] = useState<Documento[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
+  const [fechaHoy, setFechaHoy] = useState<string>('');
 
   // Formulario
   const [tipoMovimiento, setTipoMovimiento] = useState<string>('Por Pagar (Proveedor)');
@@ -39,6 +39,7 @@ export default function Home() {
   const [fechaVencimiento, setFechaVencimiento] = useState<string>('');
 
   useEffect(() => {
+    setFechaHoy(new Date().toISOString().split('T')[0]);
     cargarDocumentos();
   }, []);
 
@@ -83,7 +84,6 @@ export default function Home() {
     if (error) {
       alert('Error al guardar: ' + error.message);
     } else {
-      // Limpiar formulario
       setNumeroDocumento('');
       setCodigoProyecto('');
       setEmpresa('');
@@ -117,30 +117,29 @@ export default function Home() {
     const workbook = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(workbook, worksheet, 'Vencimientos');
 
-    const fechaHoy = new Date().toISOString().split('T')[0];
-    XLSX.writeFile(workbook, `Reporte_Vencimientos_VyA_${fechaHoy}.xlsx`);
+    const hoyStr = fechaHoy || new Date().toISOString().split('T')[0];
+    XLSX.writeFile(workbook, `Reporte_Vencimientos_VyA_${hoyStr}.xlsx`);
   };
 
-  // Cálculo de resumen
-  const hoy = new Date().toISOString().split('T')[0];
-  const vencidos = documentos.filter((d) => d.fecha_vencimiento < hoy).length;
-  const proximos = documentos.filter((d) => {
-    const difDias = (new Date(d.fecha_vencimiento).getTime() - new Date(hoy).getTime()) / (1000 * 3600 * 24);
+  // Resumen usando fecha controlada en cliente
+  const vencidos = fechaHoy ? documentos.filter((d) => d.fecha_vencimiento < fechaHoy).length : 0;
+  const proximos = fechaHoy ? documentos.filter((d) => {
+    const difDias = (new Date(d.fecha_vencimiento).getTime() - new Date(fechaHoy).getTime()) / (1000 * 3600 * 24);
     return difDias >= 0 && difDias <= 5;
-  }).length;
+  }).length : 0;
 
   return (
     <main className="min-h-screen bg-gray-50 p-4 md:p-8">
       <div className="max-w-6xl mx-auto space-y-6">
         
-        {/* Encabezado con Logo */}
+        {/* Encabezado */}
         <div className="bg-white p-6 rounded-xl shadow-sm border text-center flex flex-col items-center justify-center space-y-3">
           <img src="/logo.jpeg" alt="VyA Consulting Logo" className="h-16 object-contain" />
           <h1 className="text-2xl font-bold text-gray-800">Sistema de Control de Vencimientos y Alertas B2B</h1>
           <p className="text-sm text-gray-500">Gestión Integral de Facturas, Boletas y Tickets (Soles y Dólares)</p>
         </div>
 
-        {/* Tarjetas de Resumen */}
+        {/* Resumen */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <div className="bg-red-50 border border-red-200 p-4 rounded-lg shadow-sm">
             <span className="text-xs font-bold text-red-600 uppercase">Documentos Vencidos</span>
@@ -156,7 +155,7 @@ export default function Home() {
           </div>
         </div>
 
-        {/* Formulario de Registro */}
+        {/* Formulario */}
         <form onSubmit={guardarDocumento} className="bg-white p-6 rounded-xl shadow-sm border space-y-4">
           <h2 className="text-lg font-semibold text-gray-800 border-b pb-2">Ingresar Nuevo Documento</h2>
           
@@ -223,7 +222,7 @@ export default function Home() {
           </button>
         </form>
 
-        {/* Tabla de Registros y Botón de Excel */}
+        {/* Tabla */}
         <div className="bg-white p-6 rounded-xl shadow-sm border space-y-4">
           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 border-b pb-3">
             <h2 className="text-lg font-semibold text-gray-800">Registros de Documentos</h2>
@@ -255,7 +254,7 @@ export default function Home() {
                 </thead>
                 <tbody className="divide-y">
                   {documentos.map((doc) => {
-                    const esVencido = doc.fecha_vencimiento < hoy;
+                    const esVencido = fechaHoy ? doc.fecha_vencimiento < fechaHoy : false;
                     return (
                       <tr key={doc.id} className="hover:bg-gray-50">
                         <td className="p-3 font-medium">{doc.tipo_movimiento}</td>
