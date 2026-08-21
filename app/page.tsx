@@ -36,12 +36,34 @@ export default function Home() {
   const [monto, setMonto] = useState<string>('');
   const [moneda, setMoneda] = useState<string>('PEN');
   const [fechaEmision, setFechaEmision] = useState<string>('');
+  const [diasCredito, setDiasCredito] = useState<number>(0);
   const [fechaVencimiento, setFechaVencimiento] = useState<string>('');
 
   useEffect(() => {
     setFechaHoy(new Date().toISOString().split('T')[0]);
     cargarDocumentos();
   }, []);
+
+  // Función para calcular la fecha de vencimiento automáticamente
+  const manejarCambioFechaOCredito = (nuevaFecha: string, nuevosDias: number) => {
+    setFechaEmision(nuevaFecha);
+    setDiasCredito(nuevosDias);
+
+    if (nuevaFecha) {
+      const [year, month, day] = nuevaFecha.split('-').map(Number);
+      const fecha = new Date(year, month - 1, day);
+      
+      fecha.setDate(fecha.getDate() + Number(nuevosDias || 0));
+      
+      const yyyy = fecha.getFullYear();
+      const mm = String(fecha.getMonth() + 1).padStart(2, '0');
+      const dd = String(fecha.getDate()).padStart(2, '0');
+      
+      setFechaVencimiento(`${yyyy}-${mm}-${dd}`);
+    } else {
+      setFechaVencimiento('');
+    }
+  };
 
   const cargarDocumentos = async () => {
     setLoading(true);
@@ -89,6 +111,7 @@ export default function Home() {
       setEmpresa('');
       setMonto('');
       setFechaEmision('');
+      setDiasCredito(0);
       setFechaVencimiento('');
       cargarDocumentos();
     }
@@ -208,12 +231,39 @@ export default function Home() {
 
             <div>
               <label className="block text-xs font-medium text-gray-700 mb-1">Fecha Emisión</label>
-              <input type="date" value={fechaEmision} onChange={(e) => setFechaEmision(e.target.value)} className="w-full p-2 border rounded-lg text-sm" />
+              <input 
+                type="date" 
+                value={fechaEmision} 
+                onChange={(e) => manejarCambioFechaOCredito(e.target.value, diasCredito)} 
+                className="w-full p-2 border rounded-lg text-sm" 
+              />
             </div>
 
             <div>
-              <label className="block text-xs font-medium text-gray-700 mb-1">Fecha Vencimiento *</label>
-              <input type="date" value={fechaVencimiento} onChange={(e) => setFechaVencimiento(e.target.value)} className="w-full p-2 border rounded-lg text-sm" required />
+              <label className="block text-xs font-medium text-gray-700 mb-1">Días de Crédito</label>
+              <select 
+                value={diasCredito} 
+                onChange={(e) => manejarCambioFechaOCredito(fechaEmision, Number(e.target.value))} 
+                className="w-full p-2 border rounded-lg text-sm bg-white"
+              >
+                <option value={0}>Contado (0 días)</option>
+                <option value={15}>15 días</option>
+                <option value={30}>30 días</option>
+                <option value={45}>45 días</option>
+                <option value={60}>60 días</option>
+                <option value={90}>90 días</option>
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-xs font-medium text-gray-700 mb-1">Fecha Vencimiento (Autocalculada) *</label>
+              <input 
+                type="date" 
+                value={fechaVencimiento} 
+                readOnly 
+                className="w-full p-2 border rounded-lg text-sm bg-gray-100 text-gray-600 cursor-not-allowed font-semibold" 
+                required 
+              />
             </div>
           </div>
 
