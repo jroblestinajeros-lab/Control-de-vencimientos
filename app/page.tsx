@@ -38,6 +38,7 @@ export default function Home() {
   const [fechaEmision, setFechaEmision] = useState<string>('');
   const [diasCredito, setDiasCredito] = useState<number>(0);
   const [fechaVencimiento, setFechaVencimiento] = useState<string>('');
+  const [estado, setEstado] = useState<string>('Pendiente');
 
   useEffect(() => {
     setFechaHoy(new Date().toISOString().split('T')[0]);
@@ -98,7 +99,7 @@ export default function Home() {
       moneda,
       fecha_emision: fechaEmision,
       fecha_vencimiento: fechaVencimiento,
-      estado: 'Pendiente',
+      estado,
     };
 
     const { error } = await supabase.from('documentos').insert([nuevoDoc]);
@@ -113,6 +114,20 @@ export default function Home() {
       setFechaEmision('');
       setDiasCredito(0);
       setFechaVencimiento('');
+      setEstado('Pendiente');
+      cargarDocumentos();
+    }
+  };
+
+  const cambiarEstado = async (id: number, nuevoEstado: string) => {
+    const { error } = await supabase
+      .from('documentos')
+      .update({ estado: nuevoEstado })
+      .eq('id', id);
+
+    if (error) {
+      alert('Error al actualizar estado: ' + error.message);
+    } else {
       cargarDocumentos();
     }
   };
@@ -144,12 +159,18 @@ export default function Home() {
     XLSX.writeFile(workbook, `Reporte_Vencimientos_VyA_${hoyStr}.xlsx`);
   };
 
-  // Resumen usando fecha controlada en cliente
-  const vencidos = fechaHoy ? documentos.filter((d) => d.fecha_vencimiento < fechaHoy).length : 0;
-  const proximos = fechaHoy ? documentos.filter((d) => {
-    const difDias = (new Date(d.fecha_vencimiento).getTime() - new Date(fechaHoy).getTime()) / (1000 * 3600 * 24);
-    return difDias >= 0 && difDias <= 5;
-  }).length : 0;
+  // Resumen usando fecha controlada en cliente y considerando solo pendientes
+  const vencidos = fechaHoy 
+    ? documentos.filter((d) => d.estado === 'Pendiente' && d.fecha_vencimiento < fechaHoy).length 
+    : 0;
+
+  const proximos = fechaHoy 
+    ? documentos.filter((d) => {
+        if (d.estado !== 'Pendiente') return false;
+        const difDias = (new Date(d.fecha_vencimiento).getTime() - new Date(fechaHoy).getTime()) / (1000 * 3600 * 24);
+        return difDias >= 0 && difDias <= 5;
+      }).length 
+    : 0;
 
   return (
     <main className="min-h-screen bg-gray-50 p-4 md:p-8">
@@ -165,7 +186,7 @@ export default function Home() {
         {/* Resumen */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <div className="bg-red-50 border border-red-200 p-4 rounded-lg shadow-sm">
-            <span className="text-xs font-bold text-red-600 uppercase">Documentos Vencidos</span>
+            <span className="text-xs font-bold text-red-600 uppercase">Pendientes Vencidos</span>
             <p className="text-3xl font-extrabold text-red-700 mt-1">{vencidos}</p>
           </div>
           <div className="bg-amber-50 border border-amber-200 p-4 rounded-lg shadow-sm">
@@ -256,7 +277,7 @@ export default function Home() {
             </div>
 
             <div>
-              <label className="block text-xs font-medium text-gray-700 mb-1">Fecha Vencimiento (Autocalculada) *</label>
+              <label className="block text-xs font-medium text-gray-700 mb-1">Fecha Vencimiento *</label>
               <input 
                 type="date" 
                 value={fechaVencimiento} 
@@ -264,6 +285,14 @@ export default function Home() {
                 className="w-full p-2 border rounded-lg text-sm bg-gray-100 text-gray-600 cursor-not-allowed font-semibold" 
                 required 
               />
+            </div>
+
+            <div>
+              <label className="block text-xs font-medium text-gray-700 mb-1">Estado de Pago</label>
+              <select value={estado} onChange={(e) => setEstado(e.target.value)} className="w-full p-2 border rounded-lg text-sm bg-white font-semibold">
+                <option value="Pendiente">Pendiente</option>
+                <option value="Pagado / Cobrado">Pagado / Cobrado</option>
+              </select>
             </div>
           </div>
 
@@ -300,11 +329,14 @@ export default function Home() {
                     <th className="p-3">Monto</th>
                     <th className="p-3">Vencimiento</th>
                     <th className="p-3">Estado</th>
+                    <th className="p-3 text-center">Acción</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y">
                   {documentos.map((doc) => {
-                    const esVencido = fechaHoy ? doc.fecha_vencimiento < fechaHoy : false;
+                    const esPendiente = doc.estado === 'Pendiente';
+                    const esVencido = esPendiente && fechaHoy ? doc.fecha_vencimiento < fechaHoy : false;
+
                     return (
                       <tr key={doc.id} className="hover:bg-gray-50">
                         <td className="p-3 font-medium">{doc.tipo_movimiento}</td>
@@ -314,9 +346,29 @@ export default function Home() {
                         <td className="p-3 font-semibold">{doc.moneda === 'PEN' ? 'S/' : '$'} {doc.monto.toFixed(2)}</td>
                         <td className="p-3">{doc.fecha_vencimiento}</td>
                         <td className="p-3">
-                          <span className={`px-2 py-1 rounded-full text-[10px] font-bold ${esVencido ? 'bg-red-100 text-red-700' : 'bg-emerald-100 text-emerald-700'}`}>
-                            {esVencido ? 'VENCIDO' : 'AL DÍA'}
-                          </span>
+                          {!esPendiente ? (
+                            <span className="px-2 py-1 rounded-full text-[10px] font-bold bg-blue-100 text-blue-700">
+                              PAGADO / COBRADO
+                            </span>
+                          ) : esVencido ? (
+                            <span className="px-2 py-1 rounded-full text-[10px] font-bold bg-red-100 text-red-700">
+                              VENCIDO
+                            </span>
+                          ) : (
+                            <span className="px-2 py-1 rounded-full text-[10px] font-bold bg-amber-100 text-amber-700">
+                              PENDIENTE
+                            </span>
+                          )}
+                        </td>
+                        <td className="p-3 text-center">
+                          {doc.id && (
+                            <button
+                              onClick={() => cambiarEstado(doc.id!, esPendiente ? 'Pagado / Cobrado' : 'Pendiente')}
+                              className="text-[11px] underline font-semibold text-gray-600 hover:text-blue-600"
+                            >
+                              {esPendiente ? 'Marcar Pagado' : 'Revertir'}
+                            </button>
+                          )}
                         </td>
                       </tr>
                     );
