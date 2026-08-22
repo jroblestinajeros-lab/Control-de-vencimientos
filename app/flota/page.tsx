@@ -152,9 +152,10 @@ export default function FlotaHome() {
       <div className="max-w-7xl mx-auto space-y-6">
         
         {/* Encabezado */}
-        <div className="bg-white p-6 rounded-xl shadow-sm border text-center flex flex-col items-center">
+        <div className="bg-white p-6 rounded-xl shadow-sm border text-center flex flex-col items-center justify-center space-y-3">
+          <img src="/logo.jpeg" alt="VyA Consulting Logo" className="h-16 object-contain" />
           <h1 className="text-2xl font-bold text-gray-800">🚛 Sistema de Mantenimiento de Flota & Control Legal</h1>
-          <p className="text-sm text-gray-500">Gestión de Kilometraje, Pautas Mecánicas y Vencimientos Legales (SOAT, Seguro, RTV)</p>
+          <p className="text-sm text-gray-500">Gestión Integral de Kilometraje, Pautas Mecánicas y Vencimientos Legales (SOAT, Seguro, RTV)</p>
         </div>
 
         {/* Formulario */}
