@@ -23,6 +23,7 @@ interface RegistroCaja {
   numero_documento?: string;
   tipo_gasto?: string;
   monto_gasto?: number;
+  ruc_proveedor?: string;
   proveedor_detalle?: string;
   observaciones?: string;
   estado_caja?: string;
@@ -50,6 +51,7 @@ export default function CajaChicaHome() {
   const [numeroDocumento, setNumeroDocumento] = useState<string>('');
   const [tipoGasto, setTipoGasto] = useState<string>('Combustible');
   const [montoGasto, setMontoGasto] = useState<string>('');
+  const [rucProveedor, setRucProveedor] = useState<string>('');
   const [proveedorDetalle, setProveedorDetalle] = useState<string>('');
   const [observaciones, setObservaciones] = useState<string>('');
 
@@ -96,7 +98,7 @@ export default function CajaChicaHome() {
     const pass = prompt('Ingresa la contraseña de Administrador (vya2026):');
     if (pass === CLAVE_ADMIN) {
       setEsAdmin(true);
-      alert('Modo Administrador ACTIVADO. Ahora puedes ver y gestionar todos los proyectos.');
+      alert('Modo Administrador ACTIVADO. Puedes gestionar todos los proyectos.');
     } else if (pass !== null) {
       alert('Contraseña incorrecta.');
     }
@@ -152,6 +154,7 @@ export default function CajaChicaHome() {
     setFechaDocumento('');
     setNumeroDocumento('');
     setMontoGasto('');
+    setRucProveedor('');
     setProveedorDetalle('');
     setObservaciones('');
   };
@@ -180,6 +183,7 @@ export default function CajaChicaHome() {
       numero_documento: numeroDocumento,
       tipo_gasto: tipoGasto,
       monto_gasto: parseFloat(montoGasto) || 0,
+      ruc_proveedor: rucProveedor.trim(),
       proveedor_detalle: proveedorDetalle,
       observaciones,
       estado_caja: 'Abierta',
@@ -242,6 +246,7 @@ export default function CajaChicaHome() {
     setNumeroDocumento(r.numero_documento || '');
     setTipoGasto(r.tipo_gasto || 'Combustible');
     setMontoGasto(r.monto_gasto?.toString() || '');
+    setRucProveedor(r.ruc_proveedor || '');
     setProveedorDetalle(r.proveedor_detalle || '');
     setObservaciones(r.observaciones || '');
     window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -274,7 +279,8 @@ export default function CajaChicaHome() {
       'Tipo Doc.': r.tipo_documento,
       'N° Comprobante': r.numero_documento,
       'Tipo Gasto': r.tipo_gasto,
-      'Proveedor / Detalle': r.proveedor_detalle,
+      'RUC Proveedor': r.ruc_proveedor || '-',
+      'Razón Social / Empresa': r.proveedor_detalle,
       'Monto Gasto': r.monto_gasto,
       'Observaciones': r.observaciones,
       'Estado Caja': r.estado_caja || 'Abierta'
@@ -287,9 +293,6 @@ export default function CajaChicaHome() {
     XLSX.writeFile(workbook, `Rendicion_Proyecto_${proyectoSeleccionado || 'General'}.xlsx`);
   };
 
-  // PRIVACIDAD Y FILTRADO:
-  // Si es Admin ve todo lo del proyecto seleccionado.
-  // Si es Usuario normal, se filtra estrictamente por su Nombre de Responsable y Proyecto.
   const registrosFiltrados = registros.filter((r) => {
     const coincideProyecto = proyectoSeleccionado 
       ? (r.codigo_proyecto || '').toUpperCase().trim() === proyectoSeleccionado.toUpperCase().trim()
@@ -540,9 +543,14 @@ export default function CajaChicaHome() {
                 <input type="number" step="0.01" placeholder="0.00" value={montoGasto} onChange={(e) => setMontoGasto(e.target.value)} className="w-full p-2 border rounded-lg text-sm font-bold text-red-600" required disabled={cajaEstaCerrada} />
               </div>
 
-              <div className="md:col-span-2">
-                <label className="block text-xs font-medium text-gray-700 mb-1">Proveedor / Detalle del Consumo</label>
-                <input type="text" placeholder="Ej: Grifo Primax / Estación Peaje" value={proveedorDetalle} onChange={(e) => setProveedorDetalle(e.target.value)} className="w-full p-2 border rounded-lg text-sm" disabled={cajaEstaCerrada} />
+              <div>
+                <label className="block text-xs font-medium text-gray-700 mb-1">RUC Proveedor (Opcional)</label>
+                <input type="text" placeholder="Ej: 20502073401" value={rucProveedor} onChange={(e) => setRucProveedor(e.target.value)} className="w-full p-2 border rounded-lg text-sm" disabled={cajaEstaCerrada} />
+              </div>
+
+              <div>
+                <label className="block text-xs font-medium text-gray-700 mb-1">Razón Social / Empresa *</label>
+                <input type="text" placeholder="Ej: Primax S.A. / Hostal Los Pinos" value={proveedorDetalle} onChange={(e) => setProveedorDetalle(e.target.value)} className="w-full p-2 border rounded-lg text-sm" disabled={cajaEstaCerrada} />
               </div>
 
               <div>
@@ -579,7 +587,7 @@ export default function CajaChicaHome() {
                     <th className="p-3">Fecha</th>
                     <th className="p-3">Documento</th>
                     <th className="p-3">Tipo Gasto</th>
-                    <th className="p-3">Proveedor / Detalle</th>
+                    <th className="p-3">RUC / Empresa Proveedor</th>
                     <th className="p-3">Monto Gasto</th>
                     <th className="p-3 text-center">Acciones</th>
                   </tr>
@@ -592,7 +600,10 @@ export default function CajaChicaHome() {
                       <td className="p-3">{r.fecha_documento || '-'}</td>
                       <td className="p-3"><span className="font-semibold">{r.tipo_documento}:</span> {r.numero_documento || 'S/N'}</td>
                       <td className="p-3 font-medium text-blue-700">{r.tipo_gasto}</td>
-                      <td className="p-3">{r.proveedor_detalle || '-'}</td>
+                      <td className="p-3">
+                        {r.ruc_proveedor ? <span className="font-semibold text-gray-800">RUC: {r.ruc_proveedor}<br/></span> : null}
+                        {r.proveedor_detalle || '-'}
+                      </td>
                       <td className="p-3 font-bold text-red-600">{r.moneda === 'PEN' ? 'S/' : '$'} {(r.monto_gasto || 0).toFixed(2)}</td>
                       <td className="p-3 text-center space-x-2">
                         {r.id && (
