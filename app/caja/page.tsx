@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { createClient } from '@supabase/supabase-js';
 import * as XLSX from 'xlsx';
 
-// Conexión directa con credenciales de Supabase
+// Conexión directa con Supabase
 const supabaseUrl = 'https://cxqwzbfbffarrlgbhtuv.supabase.co';
 const supabaseAnonKey = 'sb_publishable_tLRrpt_XooefWWZp-xXDaQ_eNyXO_zE';
 const supabase = createClient(supabaseUrl, supabaseAnonKey);
@@ -34,16 +34,17 @@ export default function CajaChicaHome() {
   const [idEditando, setIdEditando] = useState<number | null>(null);
   const [esAdmin, setEsAdmin] = useState<boolean>(false);
 
-  // Filtro por Código de Proyecto Activo
+  // Filtro de usuario activo
+  const [responsableFiltro, setResponsableFiltro] = useState<string>('');
   const [proyectoSeleccionado, setProyectoSeleccionado] = useState<string>('');
 
-  // Formulario 1: Apertura de Caja por Proyecto
+  // Formulario 1: Apertura
   const [numeroCaja, setNumeroCaja] = useState<string>('');
   const [responsable, setResponsable] = useState<string>('');
   const [saldoInicial, setSaldoInicial] = useState<string>('');
   const [moneda, setMoneda] = useState<string>('PEN');
 
-  // Formulario 2: Registro de Comprobante / Gasto
+  // Formulario 2: Gasto
   const [fechaDocumento, setFechaDocumento] = useState<string>('');
   const [tipoDocumento, setTipoDocumento] = useState<string>('Factura');
   const [numeroDocumento, setNumeroDocumento] = useState<string>('');
@@ -56,7 +57,6 @@ export default function CajaChicaHome() {
     cargarRegistros();
   }, []);
 
-  // Autocompletar datos al seleccionar/escribir Código de Proyecto
   useEffect(() => {
     if (!proyectoSeleccionado) {
       setNumeroCaja('');
@@ -96,7 +96,7 @@ export default function CajaChicaHome() {
     const pass = prompt('Ingresa la contraseña de Administrador (vya2026):');
     if (pass === CLAVE_ADMIN) {
       setEsAdmin(true);
-      alert('Modo Administrador ACTIVADO.');
+      alert('Modo Administrador ACTIVADO. Ahora puedes ver y gestionar todos los proyectos.');
     } else if (pass !== null) {
       alert('Contraseña incorrecta.');
     }
@@ -287,9 +287,22 @@ export default function CajaChicaHome() {
     XLSX.writeFile(workbook, `Rendicion_Proyecto_${proyectoSeleccionado || 'General'}.xlsx`);
   };
 
-  const registrosFiltrados = proyectoSeleccionado 
-    ? registros.filter((r) => (r.codigo_proyecto || '').toUpperCase().trim() === proyectoSeleccionado.toUpperCase().trim())
-    : [];
+  // PRIVACIDAD Y FILTRADO:
+  // Si es Admin ve todo lo del proyecto seleccionado.
+  // Si es Usuario normal, se filtra estrictamente por su Nombre de Responsable y Proyecto.
+  const registrosFiltrados = registros.filter((r) => {
+    const coincideProyecto = proyectoSeleccionado 
+      ? (r.codigo_proyecto || '').toUpperCase().trim() === proyectoSeleccionado.toUpperCase().trim()
+      : false;
+    
+    if (esAdmin) return coincideProyecto;
+
+    const coincideResponsable = responsableFiltro 
+      ? (r.responsable || '').toLowerCase().includes(responsableFiltro.toLowerCase().trim())
+      : false;
+
+    return coincideProyecto && coincideResponsable;
+  });
 
   const primerRegistro = registrosFiltrados[0];
   const saldoInicialAsignado = primerRegistro ? primerRegistro.saldo_inicial : (parseFloat(saldoInicial) || 0);
@@ -308,7 +321,7 @@ export default function CajaChicaHome() {
           <div className="text-center sm:text-left flex flex-col items-center sm:items-start space-y-2">
             <img src="/logo.jpeg" alt="VyA Consulting Logo" className="h-14 object-contain" />
             <h1 className="text-xl font-bold text-gray-800">💵 Sistema de Rendición de Caja Chica por Proyecto</h1>
-            <p className="text-xs text-gray-500">Asignación de Fondos y Control de Comprobantes por Código de Proyecto</p>
+            <p className="text-xs text-gray-500">Gestión Privada de Entregas a Rendir y Comprobantes de Gasto</p>
           </div>
 
           <button
@@ -317,88 +330,111 @@ export default function CajaChicaHome() {
               esAdmin ? 'bg-amber-100 text-amber-800 border border-amber-300' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
             }`}
           >
-            {esAdmin ? '🔓 Modo Admin Activo' : '🔒 Acceso Administrador'}
+            {esAdmin ? '🔓 Modo Admin Activo (Vista Global)' : '🔒 Acceso Administrador'}
           </button>
         </div>
 
-        {/* Control Principal por Código de Proyecto */}
+        {/* Identificación de Usuario y Selección de Proyecto */}
         <div className="bg-white p-4 rounded-xl shadow-sm border flex flex-col md:flex-row justify-between items-center gap-4">
-          <div className="flex items-center gap-3 w-full md:w-auto">
-            <label className="text-xs font-bold text-gray-700 uppercase">Código de Proyecto:</label>
-            <input 
-              type="text" 
-              placeholder="Ej: PR-SHA-001" 
-              value={proyectoSeleccionado} 
-              onChange={(e) => setProyectoSeleccionado(e.target.value)}
-              className="p-2 border rounded-lg text-sm font-extrabold text-blue-900 bg-blue-50/50 uppercase w-48"
-            />
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3 w-full md:w-auto">
+            {!esAdmin && (
+              <div>
+                <label className="block text-[11px] font-bold text-gray-600 uppercase mb-1">Tu Nombre / Responsable:</label>
+                <input 
+                  type="text" 
+                  placeholder="Ej: Jorge Robles" 
+                  value={responsableFiltro} 
+                  onChange={(e) => setResponsableFiltro(e.target.value)}
+                  className="p-2 border rounded-lg text-xs font-bold text-gray-800 w-full"
+                />
+              </div>
+            )}
+            <div>
+              <label className="block text-[11px] font-bold text-gray-600 uppercase mb-1">Código de Proyecto:</label>
+              <input 
+                type="text" 
+                placeholder="Ej: PR-SHA-001" 
+                value={proyectoSeleccionado} 
+                onChange={(e) => setProyectoSeleccionado(e.target.value)}
+                className="p-2 border rounded-lg text-xs font-extrabold text-blue-900 bg-blue-50/50 uppercase w-full"
+              />
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2 w-full md:w-auto justify-end">
             {proyectoSeleccionado && (
               cajaEstaCerrada ? (
-                <span className="px-3 py-1 rounded-full text-xs font-extrabold bg-red-100 text-red-700">
+                <span className="px-3 py-1.5 rounded-full text-xs font-extrabold bg-red-100 text-red-700">
                   🔒 CERRADA
                 </span>
               ) : (
-                <span className="px-3 py-1 rounded-full text-xs font-extrabold bg-emerald-100 text-emerald-700">
+                <span className="px-3 py-1.5 rounded-full text-xs font-extrabold bg-emerald-100 text-emerald-700">
                   🔓 ABIERTA
                 </span>
               )
             )}
-          </div>
 
-          <div className="flex items-center gap-2 w-full md:w-auto justify-end">
-            {cajaEstaCerrada ? (
-              <button
-                type="button"
-                onClick={() => cambiarEstadoCaja('Abierta')}
-                className="bg-amber-600 hover:bg-amber-700 text-white font-semibold py-2 px-4 rounded-lg text-xs shadow transition-colors"
-              >
-                🔓 Reabrir Caja Proyecto
-              </button>
-            ) : (
-              <button
-                type="button"
-                onClick={() => cambiarEstadoCaja('Cerrada')}
-                className="bg-red-600 hover:bg-red-700 text-white font-semibold py-2 px-4 rounded-lg text-xs shadow transition-colors"
-              >
-                🔒 Cerrar y Liquidar Proyecto
-              </button>
+            {esAdmin && (
+              cajaEstaCerrada ? (
+                <button
+                  type="button"
+                  onClick={() => cambiarEstadoCaja('Abierta')}
+                  className="bg-amber-600 hover:bg-amber-700 text-white font-semibold py-2 px-3 rounded-lg text-xs shadow transition-colors"
+                >
+                  🔓 Reabrir
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => cambiarEstadoCaja('Cerrada')}
+                  className="bg-red-600 hover:bg-red-700 text-white font-semibold py-2 px-3 rounded-lg text-xs shadow transition-colors"
+                >
+                  🔒 Cerrar Caja
+                </button>
+              )
             )}
 
             <button
               type="button"
               onClick={exportarAExcel}
-              className="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold py-2 px-4 rounded-lg text-xs shadow transition-colors"
+              className="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold py-2 px-3 rounded-lg text-xs shadow transition-colors"
             >
               📊 Exportar Excel
             </button>
           </div>
         </div>
 
-        {/* Resumen Financiero */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <div className="bg-blue-50 border border-blue-200 p-4 rounded-lg shadow-sm">
-            <span className="text-xs font-bold text-blue-600 uppercase">
-              Monto Asignado {proyectoSeleccionado ? `(${proyectoSeleccionado})` : ''}
-            </span>
-            <p className="text-3xl font-extrabold text-blue-800 mt-1">
-              {moneda === 'PEN' ? 'S/' : '$'} {saldoInicialAsignado.toFixed(2)}
-            </p>
+        {/* Resumen Financiero Privado */}
+        {!esAdmin && (!responsableFiltro || !proyectoSeleccionado) ? (
+          <div className="bg-amber-50 border border-amber-200 p-4 rounded-xl text-center text-xs font-semibold text-amber-800">
+            🔒 Para ver tus saldos y rendición, ingresa **Tu Nombre de Responsable** y tu **Código de Proyecto** arriba.
           </div>
-          <div className="bg-amber-50 border border-amber-200 p-4 rounded-lg shadow-sm">
-            <span className="text-xs font-bold text-amber-600 uppercase">Total Gastos Consumidos</span>
-            <p className="text-3xl font-extrabold text-amber-800 mt-1">
-              {moneda === 'PEN' ? 'S/' : '$'} {totalGastosRendidos.toFixed(2)}
-            </p>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="bg-blue-50 border border-blue-200 p-4 rounded-lg shadow-sm">
+              <span className="text-xs font-bold text-blue-600 uppercase">
+                Monto Asignado {proyectoSeleccionado ? `(${proyectoSeleccionado})` : ''}
+              </span>
+              <p className="text-3xl font-extrabold text-blue-800 mt-1">
+                {moneda === 'PEN' ? 'S/' : '$'} {saldoInicialAsignado.toFixed(2)}
+              </p>
+            </div>
+            <div className="bg-amber-50 border border-amber-200 p-4 rounded-lg shadow-sm">
+              <span className="text-xs font-bold text-amber-600 uppercase">Total Gastos Consumidos</span>
+              <p className="text-3xl font-extrabold text-amber-800 mt-1">
+                {moneda === 'PEN' ? 'S/' : '$'} {totalGastosRendidos.toFixed(2)}
+              </p>
+            </div>
+            <div className={`border p-4 rounded-lg shadow-sm ${saldoFinalCaja >= 0 ? 'bg-emerald-50 border-emerald-200' : 'bg-red-50 border-red-200'}`}>
+              <span className={`text-xs font-bold uppercase ${saldoFinalCaja >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
+                {saldoFinalCaja >= 0 ? 'Saldo Restante (Devolver a Empresa)' : 'Saldo en Contra (Reembolsar a Trabajador)'}
+              </span>
+              <p className={`text-3xl font-extrabold mt-1 ${saldoFinalCaja >= 0 ? 'text-emerald-800' : 'text-red-800'}`}>
+                {moneda === 'PEN' ? 'S/' : '$'} {Math.abs(saldoFinalCaja).toFixed(2)}
+              </p>
+            </div>
           </div>
-          <div className={`border p-4 rounded-lg shadow-sm ${saldoFinalCaja >= 0 ? 'bg-emerald-50 border-emerald-200' : 'bg-red-50 border-red-200'}`}>
-            <span className={`text-xs font-bold uppercase ${saldoFinalCaja >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
-              {saldoFinalCaja >= 0 ? 'Saldo Restante (Devolver a Empresa)' : 'Saldo en Contra (Reembolsar a Trabajador)'}
-            </span>
-            <p className={`text-3xl font-extrabold mt-1 ${saldoFinalCaja >= 0 ? 'text-emerald-800' : 'text-red-800'}`}>
-              {moneda === 'PEN' ? 'S/' : '$'} {Math.abs(saldoFinalCaja).toFixed(2)}
-            </p>
-          </div>
-        </div>
+        )}
 
         {/* Formulario */}
         <form onSubmit={guardarGasto} className={`p-6 rounded-xl shadow-sm border space-y-4 ${cajaEstaCerrada ? 'bg-gray-100 opacity-60 pointer-events-none' : idEditando ? 'bg-amber-50/50 border-amber-300' : 'bg-white'}`}>
@@ -521,7 +557,7 @@ export default function CajaChicaHome() {
           </button>
         </form>
 
-        {/* Tabla de Comprobantes por Proyecto */}
+        {/* Tabla de Comprobantes Filtrados */}
         <div className="bg-white p-6 rounded-xl shadow-sm border space-y-4">
           <h2 className="text-lg font-semibold text-gray-800 border-b pb-2">
             Comprobantes Rendidos {proyectoSeleccionado ? <>en Proyecto <span className="text-blue-600 font-extrabold">{proyectoSeleccionado}</span></> : ''}
@@ -529,10 +565,10 @@ export default function CajaChicaHome() {
 
           {loading ? (
             <p className="text-center text-sm text-gray-500 py-4">Cargando rendición...</p>
-          ) : !proyectoSeleccionado ? (
-            <p className="text-center text-sm text-gray-500 py-4">Ingresa o selecciona un Código de Proyecto en la barra superior para ver sus detalles.</p>
+          ) : !esAdmin && (!responsableFiltro || !proyectoSeleccionado) ? (
+            <p className="text-center text-sm text-gray-500 py-4">Ingresa tu Nombre de Responsable y Código de Proyecto arriba para visualizar los comprobantes.</p>
           ) : registrosFiltrados.length === 0 ? (
-            <p className="text-center text-sm text-gray-500 py-4">No hay comprobantes registrados aún para el proyecto {proyectoSeleccionado}.</p>
+            <p className="text-center text-sm text-gray-500 py-4">No hay comprobantes autorizados o registrados para los datos ingresados.</p>
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full text-left text-xs text-gray-600 border-collapse">
