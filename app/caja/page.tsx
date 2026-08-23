@@ -8,7 +8,7 @@ const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
 const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
-// Clave maestra para administración de montos iniciales y cierres de caja
+// Clave de administración
 const CLAVE_ADMIN = 'vya2026';
 
 interface RegistroCaja {
@@ -34,16 +34,16 @@ export default function CajaChicaHome() {
   const [idEditando, setIdEditando] = useState<number | null>(null);
   const [esAdmin, setEsAdmin] = useState<boolean>(false);
 
-  // Selección de Caja Activa
-  const [cajaSeleccionada, setCajaSeleccionada] = useState<string>('');
+  // Filtro por Código de Proyecto Activo
+  const [proyectoSeleccionado, setProyectoSeleccionado] = useState<string>('');
 
-  // Formulario 1: Apertura de Caja
+  // Formulario 1: Apertura de Caja por Proyecto
+  const [numeroCaja, setNumeroCaja] = useState<string>('');
   const [responsable, setResponsable] = useState<string>('');
-  const [codigoProyecto, setCodigoProyecto] = useState<string>('');
   const [saldoInicial, setSaldoInicial] = useState<string>('');
   const [moneda, setMoneda] = useState<string>('PEN');
 
-  // Formulario 2: Gasto
+  // Formulario 2: Registro de Comprobante / Gasto
   const [fechaDocumento, setFechaDocumento] = useState<string>('');
   const [tipoDocumento, setTipoDocumento] = useState<string>('Factura');
   const [numeroDocumento, setNumeroDocumento] = useState<string>('');
@@ -56,24 +56,24 @@ export default function CajaChicaHome() {
     cargarRegistros();
   }, []);
 
-  // Al seleccionar/escribir N° de caja, autocompletar si existe en la base de datos
+  // Al seleccionar/escribir el Código de Proyecto, autocompletar la cabecera asignada por el Admin
   useEffect(() => {
-    if (!cajaSeleccionada) {
+    if (!proyectoSeleccionado) {
+      setNumeroCaja('');
       setResponsable('');
-      setCodigoProyecto('');
       setSaldoInicial('');
       return;
     }
     const cajaExistente = registros.find(
-      (r) => r.numero_caja.toUpperCase() === cajaSeleccionada.toUpperCase().trim()
+      (r) => (r.codigo_proyecto || '').toUpperCase().trim() === proyectoSeleccionado.toUpperCase().trim()
     );
     if (cajaExistente) {
+      setNumeroCaja(cajaExistente.numero_caja || '');
       setResponsable(cajaExistente.responsable || '');
-      setCodigoProyecto(cajaExistente.codigo_proyecto || '');
       setSaldoInicial(cajaExistente.saldo_inicial?.toString() || '0');
       setMoneda(cajaExistente.moneda || 'PEN');
     }
-  }, [cajaSeleccionada, registros]);
+  }, [proyectoSeleccionado, registros]);
 
   const cargarRegistros = async () => {
     setLoading(true);
@@ -93,7 +93,7 @@ export default function CajaChicaHome() {
       alert('Modo Administrador desactivado.');
       return;
     }
-    const pass = prompt('Ingresa la contraseña de Administrador para modificar montos iniciales y realizar cierres:');
+    const pass = prompt('Ingresa la contraseña de Administrador (vya2026) para asignar saldos iniciales por proyecto y realizar cierres:');
     if (pass === CLAVE_ADMIN) {
       setEsAdmin(true);
       alert('Modo Administrador ACTIVADO.');
@@ -115,19 +115,19 @@ export default function CajaChicaHome() {
     e.preventDefault();
 
     if (cajaEstaCerrada) {
-      alert('Esta caja chica se encuentra CERRADA. No se pueden agregar nuevos gastos.');
+      alert('La caja chica de este proyecto se encuentra CERRADA / LIQUIDADA.');
       return;
     }
 
-    if (!cajaSeleccionada || !responsable || !montoGasto) {
-      alert('Por favor selecciona el N° de Caja, Responsable y Monto del Gasto.');
+    if (!proyectoSeleccionado || !responsable || !montoGasto) {
+      alert('Por favor especifica el Código de Proyecto, Responsable y Monto del Gasto.');
       return;
     }
 
     const payload: RegistroCaja = {
-      numero_caja: cajaSeleccionada.toUpperCase().trim(),
+      codigo_proyecto: proyectoSeleccionado.toUpperCase().trim(),
+      numero_caja: numeroCaja.toUpperCase().trim() || `CCH-${proyectoSeleccionado.toUpperCase().trim()}`,
       responsable,
-      codigo_proyecto: codigoProyecto.toUpperCase().trim(),
       saldo_inicial: parseFloat(saldoInicial) || 0,
       moneda,
       fecha_documento: fechaDocumento,
@@ -153,25 +153,25 @@ export default function CajaChicaHome() {
 
   const cambiarEstadoCaja = async (nuevoEstado: string) => {
     if (!esAdmin) {
-      alert('Acceso denegado. Activa el MODO ADMINISTRADOR para cerrar o reabrir cajas.');
+      alert('Acceso denegado. Activa el MODO ADMINISTRADOR para cerrar o reabrir la caja del proyecto.');
       return;
     }
 
-    if (!cajaSeleccionada) {
-      alert('Ingresa o selecciona el N° de Caja Chica.');
+    if (!proyectoSeleccionado) {
+      alert('Ingresa o selecciona un Código de Proyecto.');
       return;
     }
 
-    const cajaTarget = cajaSeleccionada.toUpperCase().trim();
+    const prjTarget = proyectoSeleccionado.toUpperCase().trim();
 
-    if (!confirm(`¿Estás seguro de cambiar el estado de la caja ${cajaTarget} a "${nuevoEstado}"?`)) {
+    if (!confirm(`¿Estás seguro de cambiar el estado de la caja del proyecto ${prjTarget} a "${nuevoEstado}"?`)) {
       return;
     }
 
     const { error } = await supabase
       .from('cajas_chicas')
       .update({ estado_caja: nuevoEstado })
-      .eq('numero_caja', cajaTarget);
+      .eq('codigo_proyecto', prjTarget);
 
     if (error) {
       alert('Error al actualizar el estado: ' + error.message);
@@ -187,9 +187,9 @@ export default function CajaChicaHome() {
     }
     if (!r.id) return;
     setIdEditando(r.id);
-    setCajaSeleccionada(r.numero_caja);
+    setProyectoSeleccionado(r.codigo_proyecto);
+    setNumeroCaja(r.numero_caja || '');
     setResponsable(r.responsable);
-    setCodigoProyecto(r.codigo_proyecto || '');
     setSaldoInicial(r.saldo_inicial.toString());
     setMoneda(r.moneda);
     setFechaDocumento(r.fecha_documento || '');
@@ -215,16 +215,16 @@ export default function CajaChicaHome() {
 
   const exportarAExcel = () => {
     if (!registrosFiltrados || registrosFiltrados.length === 0) {
-      alert('No hay comprobantes cargados en esta caja.');
+      alert('No hay comprobantes cargados para este proyecto.');
       return;
     }
 
     const datosExcel = registrosFiltrados.map((r) => ({
+      'Código Proyecto': r.codigo_proyecto,
       'N° Caja': r.numero_caja,
       'Responsable': r.responsable,
-      'Proyecto': r.codigo_proyecto,
       'Moneda': r.moneda,
-      'Saldo Inicial': r.saldo_inicial,
+      'Saldo Inicial Asignado': r.saldo_inicial,
       'Fecha Doc.': r.fecha_documento,
       'Tipo Doc.': r.tipo_documento,
       'N° Comprobante': r.numero_documento,
@@ -237,13 +237,14 @@ export default function CajaChicaHome() {
 
     const worksheet = XLSX.utils.json_to_sheet(datosExcel);
     const workbook = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(workbook, worksheet, 'Liquidacion_Caja');
+    XLSX.utils.book_append_sheet(workbook, worksheet, 'Liquidacion_Proyecto');
 
-    XLSX.writeFile(workbook, `Rendicion_Caja_${cajaSeleccionada || 'General'}.xlsx`);
+    XLSX.writeFile(workbook, `Rendicion_Proyecto_${proyectoSeleccionado || 'General'}.xlsx`);
   };
 
-  const registrosFiltrados = cajaSeleccionada 
-    ? registros.filter((r) => r.numero_caja.toUpperCase() === cajaSeleccionada.toUpperCase().trim())
+  // Filtrar comprobantes por Código de Proyecto
+  const registrosFiltrados = proyectoSeleccionado 
+    ? registros.filter((r) => (r.codigo_proyecto || '').toUpperCase().trim() === proyectoSeleccionado.toUpperCase().trim())
     : [];
 
   const primerRegistro = registrosFiltrados[0];
@@ -258,12 +259,12 @@ export default function CajaChicaHome() {
     <main className="min-h-screen bg-gray-50 p-4 md:p-8">
       <div className="max-w-7xl mx-auto space-y-6">
         
-        {/* Encabezado con Logo VyA y Acceso Admin */}
+        {/* Encabezado */}
         <div className="bg-white p-6 rounded-xl shadow-sm border flex flex-col sm:flex-row justify-between items-center gap-4">
           <div className="text-center sm:text-left flex flex-col items-center sm:items-start space-y-2">
             <img src="/logo.jpeg" alt="VyA Consulting Logo" className="h-14 object-contain" />
-            <h1 className="text-xl font-bold text-gray-800">💵 Sistema de Rendición de Caja Chica</h1>
-            <p className="text-xs text-gray-500">Gestión de Entregas a Rendir y Liquidación de Gastos por Proyecto</p>
+            <h1 className="text-xl font-bold text-gray-800">💵 Sistema de Rendición de Caja Chica por Proyecto</h1>
+            <p className="text-xs text-gray-500">Asignación de Fondos y Control de Comprobantes por Código de Proyecto</p>
           </div>
 
           <button
@@ -276,18 +277,18 @@ export default function CajaChicaHome() {
           </button>
         </div>
 
-        {/* Control de Caja Chica */}
+        {/* Control Principal por Código de Proyecto */}
         <div className="bg-white p-4 rounded-xl shadow-sm border flex flex-col md:flex-row justify-between items-center gap-4">
           <div className="flex items-center gap-3 w-full md:w-auto">
-            <label className="text-xs font-bold text-gray-700 uppercase">Seleccionar N° Caja:</label>
+            <label className="text-xs font-bold text-gray-700 uppercase">Código de Proyecto:</label>
             <input 
               type="text" 
-              placeholder="Ej: CCH-001" 
-              value={cajaSeleccionada} 
-              onChange={(e) => setCajaSeleccionada(e.target.value)}
-              className="p-2 border rounded-lg text-sm font-extrabold text-blue-900 bg-blue-50/50 uppercase w-40"
+              placeholder="Ej: PRJ-2026-LIMA" 
+              value={proyectoSeleccionado} 
+              onChange={(e) => setProyectoSeleccionado(e.target.value)}
+              className="p-2 border rounded-lg text-sm font-extrabold text-blue-900 bg-blue-50/50 uppercase w-48"
             />
-            {cajaSeleccionada && (
+            {proyectoSeleccionado && (
               cajaEstaCerrada ? (
                 <span className="px-3 py-1 rounded-full text-xs font-extrabold bg-red-100 text-red-700">
                   🔒 CERRADA
@@ -307,7 +308,7 @@ export default function CajaChicaHome() {
                 onClick={() => cambiarEstadoCaja('Abierta')}
                 className="bg-amber-600 hover:bg-amber-700 text-white font-semibold py-2 px-4 rounded-lg text-xs shadow transition-colors"
               >
-                🔓 Reabrir Caja
+                🔓 Reabrir Caja Proyecto
               </button>
             ) : (
               <button
@@ -315,7 +316,7 @@ export default function CajaChicaHome() {
                 onClick={() => cambiarEstadoCaja('Cerrada')}
                 className="bg-red-600 hover:bg-red-700 text-white font-semibold py-2 px-4 rounded-lg text-xs shadow transition-colors"
               >
-                🔒 Cerrar y Liquidar Caja
+                🔒 Cerrar y Liquidar Proyecto
               </button>
             )}
 
@@ -329,11 +330,11 @@ export default function CajaChicaHome() {
           </div>
         </div>
 
-        {/* Resumen Financiero Detección Automática por Código */}
+        {/* Resumen Financiero del Proyecto */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <div className="bg-blue-50 border border-blue-200 p-4 rounded-lg shadow-sm">
             <span className="text-xs font-bold text-blue-600 uppercase">
-              Monto Asignado Oficial {cajaSeleccionada ? `(${cajaSeleccionada})` : ''}
+              Monto Asignado {proyectoSeleccionado ? `(${proyectoSeleccionado})` : ''}
             </span>
             <p className="text-3xl font-extrabold text-blue-800 mt-1">
               {moneda === 'PEN' ? 'S/' : '$'} {saldoInicialAsignado.toFixed(2)}
@@ -360,20 +361,20 @@ export default function CajaChicaHome() {
           
           <div className="border-b pb-3 space-y-2">
             <div className="flex justify-between items-center">
-              <h2 className="text-xs font-bold text-gray-500 uppercase tracking-wider">1. Apertura / Datos de la Caja</h2>
+              <h2 className="text-xs font-bold text-gray-500 uppercase tracking-wider">1. Asignación de Proyecto y Saldo Inicial</h2>
               {!esAdmin && <span className="text-[11px] text-amber-700 font-semibold bg-amber-50 px-2 py-0.5 rounded border border-amber-200">🔒 El Saldo Inicial solo puede modificarlo el Administrador</span>}
             </div>
             <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
               <div>
-                <label className="block text-xs font-medium text-gray-700 mb-1">Responsable *</label>
+                <label className="block text-xs font-medium text-gray-700 mb-1">Responsable del Proyecto *</label>
                 <input type="text" placeholder="Ej: Juan Pérez" value={responsable} onChange={(e) => setResponsable(e.target.value)} className="w-full p-2 border rounded-lg text-sm" required disabled={cajaEstaCerrada} />
               </div>
               <div>
-                <label className="block text-xs font-medium text-gray-700 mb-1">Código Proyecto</label>
-                <input type="text" placeholder="Ej: PRJ-2026" value={codigoProyecto} onChange={(e) => setCodigoProyecto(e.target.value)} className="w-full p-2 border rounded-lg text-sm" disabled={cajaEstaCerrada} />
+                <label className="block text-xs font-medium text-gray-700 mb-1">N° Interno / Identificador de Caja</label>
+                <input type="text" placeholder="Ej: CCH-001" value={numeroCaja} onChange={(e) => setNumeroCaja(e.target.value)} className="w-full p-2 border rounded-lg text-sm uppercase" disabled={cajaEstaCerrada} />
               </div>
               <div>
-                <label className="block text-xs font-medium text-gray-700 mb-1">Monto Asignado (Saldo Inicial) *</label>
+                <label className="block text-xs font-medium text-gray-700 mb-1">Monto Asignado al Proyecto *</label>
                 <input 
                   type="number" 
                   step="0.01" 
@@ -386,7 +387,7 @@ export default function CajaChicaHome() {
                 />
               </div>
               <div>
-                <label className="block text-xs font-medium text-gray-700 mb-1">Moneda</label>
+                <label className="block text-xs font-medium text-gray-700 mb-1">Moneda del Fondo</label>
                 <select value={moneda} onChange={(e) => setMoneda(e.target.value)} className="w-full p-2 border rounded-lg text-sm bg-white font-semibold" disabled={!esAdmin || cajaEstaCerrada}>
                   <option value="PEN">Soles (S/)</option>
                   <option value="USD">Dólares ($)</option>
@@ -397,7 +398,7 @@ export default function CajaChicaHome() {
 
           <div className="space-y-2 pt-2">
             <div className="flex justify-between items-center">
-              <h2 className="text-xs font-bold text-gray-500 uppercase tracking-wider">2. Cargar Comprobante / Gasto</h2>
+              <h2 className="text-xs font-bold text-gray-500 uppercase tracking-wider">2. Cargar Comprobante / Gasto del Proyecto</h2>
               {idEditando && (
                 <button type="button" onClick={limpiarFormularioGasto} className="text-xs text-red-600 underline font-semibold">
                   ✖ Cancelar Edición
@@ -459,28 +460,28 @@ export default function CajaChicaHome() {
           </div>
 
           <button type="submit" disabled={cajaEstaCerrada} className={`font-semibold py-2 px-6 rounded-lg shadow text-white ${idEditando ? 'bg-amber-600 hover:bg-amber-700' : 'bg-blue-600 hover:bg-blue-700'}`}>
-            {idEditando ? '💾 Actualizar Comprobante' : `➕ Agregar Gasto a Rendición`}
+            {idEditando ? '💾 Actualizar Comprobante' : `➕ Agregar Gasto al Proyecto`}
           </button>
         </form>
 
-        {/* Tabla de Comprobantes */}
+        {/* Tabla de Comprobantes por Proyecto */}
         <div className="bg-white p-6 rounded-xl shadow-sm border space-y-4">
           <h2 className="text-lg font-semibold text-gray-800 border-b pb-2">
-            Comprobantes Rendidos {cajaSeleccionada ? <>en Caja <span className="text-blue-600 font-extrabold">{cajaSeleccionada}</span></> : ''}
+            Comprobantes Rendidos {proyectoSeleccionado ? <>en Proyecto <span className="text-blue-600 font-extrabold">{proyectoSeleccionado}</span></> : ''}
           </h2>
 
           {loading ? (
             <p className="text-center text-sm text-gray-500 py-4">Cargando rendición...</p>
-          ) : !cajaSeleccionada ? (
-            <p className="text-center text-sm text-gray-500 py-4">Ingresa o selecciona un N° de Caja Chica arriba para ver sus detalles.</p>
+          ) : !proyectoSeleccionado ? (
+            <p className="text-center text-sm text-gray-500 py-4">Ingresa o selecciona un Código de Proyecto en la barra superior para ver sus detalles.</p>
           ) : registrosFiltrados.length === 0 ? (
-            <p className="text-center text-sm text-gray-500 py-4">No hay comprobantes registrados aún para la caja {cajaSeleccionada}.</p>
+            <p className="text-center text-sm text-gray-500 py-4">No hay comprobantes registrados aún para el proyecto {proyectoSeleccionado}.</p>
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full text-left text-xs text-gray-600 border-collapse">
                 <thead>
                   <tr className="bg-gray-100 text-gray-700 uppercase font-semibold">
-                    <th className="p-3">N° Caja</th>
+                    <th className="p-3">Código Proyecto</th>
                     <th className="p-3">Responsable</th>
                     <th className="p-3">Fecha</th>
                     <th className="p-3">Documento</th>
@@ -493,8 +494,8 @@ export default function CajaChicaHome() {
                 <tbody className="divide-y">
                   {registrosFiltrados.map((r) => (
                     <tr key={r.id} className="hover:bg-gray-50">
-                      <td className="p-3 font-bold text-gray-900">{r.numero_caja}</td>
-                      <td className="p-3 font-medium">{r.responsable}<br/><span className="text-[10px] text-gray-400">{r.codigo_proyecto || 'Sin proyecto'}</span></td>
+                      <td className="p-3 font-bold text-gray-900">{r.codigo_proyecto}</td>
+                      <td className="p-3 font-medium">{r.responsable}<br/><span className="text-[10px] text-gray-400">{r.numero_caja || 'Sin N° Caja'}</span></td>
                       <td className="p-3">{r.fecha_documento || '-'}</td>
                       <td className="p-3"><span className="font-semibold">{r.tipo_documento}:</span> {r.numero_documento || 'S/N'}</td>
                       <td className="p-3 font-medium text-blue-700">{r.tipo_gasto}</td>
