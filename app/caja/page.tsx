@@ -8,7 +8,6 @@ const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
 const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
-// Clave de administración
 const CLAVE_ADMIN = 'vya2026';
 
 interface RegistroCaja {
@@ -56,7 +55,7 @@ export default function CajaChicaHome() {
     cargarRegistros();
   }, []);
 
-  // Al seleccionar/escribir el Código de Proyecto, autocompletar la cabecera asignada por el Admin
+  // Al seleccionar/escribir el Código de Proyecto, autocompletar la cabecera asignada
   useEffect(() => {
     if (!proyectoSeleccionado) {
       setNumeroCaja('');
@@ -93,12 +92,60 @@ export default function CajaChicaHome() {
       alert('Modo Administrador desactivado.');
       return;
     }
-    const pass = prompt('Ingresa la contraseña de Administrador (vya2026) para asignar saldos iniciales por proyecto y realizar cierres:');
+    const pass = prompt('Ingresa la contraseña de Administrador (vya2026):');
     if (pass === CLAVE_ADMIN) {
       setEsAdmin(true);
       alert('Modo Administrador ACTIVADO.');
     } else if (pass !== null) {
       alert('Contraseña incorrecta.');
+    }
+  };
+
+  // Función exclusiva para que el Administrador cree o actualice el Fondo Inicial del Proyecto
+  const guardarAperturaProyecto = async () => {
+    if (!esAdmin) {
+      alert('Debes ingresar con la clave de Administrador.');
+      return;
+    }
+    if (!proyectoSeleccionado || !responsable || !saldoInicial) {
+      alert('Ingresa el Código de Proyecto, Responsable y Monto Asignado.');
+      return;
+    }
+
+    const prjTarget = proyectoSeleccionado.toUpperCase().trim();
+    const existe = registros.filter((r) => (r.codigo_proyecto || '').toUpperCase().trim() === prjTarget);
+
+    if (existe.length > 0) {
+      // Actualizar saldo inicial y responsable en todos los registros de este proyecto
+      const { error } = await supabase
+        .from('cajas_chicas')
+        .update({
+          responsable,
+          numero_caja: numeroCaja.toUpperCase().trim() || `CCH-${prjTarget}`,
+          saldo_inicial: parseFloat(saldoInicial) || 0,
+          moneda,
+        })
+        .eq('codigo_proyecto', prjTarget);
+
+      if (error) alert('Error al actualizar el fondo: ' + error.message);
+      else { alert(`✅ Fondo del proyecto ${prjTarget} actualizado a S/ ${saldoInicial}`); cargarRegistros(); }
+    } else {
+      // Crear primer registro de apertura sin gasto asignado (monto_gasto = 0)
+      const payload: RegistroCaja = {
+        codigo_proyecto: prjTarget,
+        numero_caja: numeroCaja.toUpperCase().trim() || `CCH-${prjTarget}`,
+        responsable,
+        saldo_inicial: parseFloat(saldoInicial) || 0,
+        moneda,
+        tipo_documento: 'Apertura',
+        monto_gasto: 0,
+        proveedor_detalle: 'Apertura de Fondo de Caja Chica',
+        estado_caja: 'Abierta',
+      };
+
+      const { error } = await supabase.from('cajas_chicas').insert([payload]);
+      if (error) alert('Error al aperturar caja: ' + error.message);
+      else { alert(`✅ Fondo del proyecto ${prjTarget} aperturado correctamente.`); cargarRegistros(); }
     }
   };
 
@@ -115,7 +162,7 @@ export default function CajaChicaHome() {
     e.preventDefault();
 
     if (cajaEstaCerrada) {
-      alert('La caja chica de este proyecto se encuentra CERRADA / LIQUIDADA.');
+      alert('La caja chica de este proyecto se encuentra CERRADA.');
       return;
     }
 
@@ -153,7 +200,7 @@ export default function CajaChicaHome() {
 
   const cambiarEstadoCaja = async (nuevoEstado: string) => {
     if (!esAdmin) {
-      alert('Acceso denegado. Activa el MODO ADMINISTRADOR para cerrar o reabrir la caja del proyecto.');
+      alert('Acceso denegado. Activa el MODO ADMINISTRADOR.');
       return;
     }
 
@@ -242,7 +289,6 @@ export default function CajaChicaHome() {
     XLSX.writeFile(workbook, `Rendicion_Proyecto_${proyectoSeleccionado || 'General'}.xlsx`);
   };
 
-  // Filtrar comprobantes por Código de Proyecto
   const registrosFiltrados = proyectoSeleccionado 
     ? registros.filter((r) => (r.codigo_proyecto || '').toUpperCase().trim() === proyectoSeleccionado.toUpperCase().trim())
     : [];
@@ -283,7 +329,7 @@ export default function CajaChicaHome() {
             <label className="text-xs font-bold text-gray-700 uppercase">Código de Proyecto:</label>
             <input 
               type="text" 
-              placeholder="Ej: PRJ-2026-LIMA" 
+              placeholder="Ej: PR-SHA-001" 
               value={proyectoSeleccionado} 
               onChange={(e) => setProyectoSeleccionado(e.target.value)}
               className="p-2 border rounded-lg text-sm font-extrabold text-blue-900 bg-blue-50/50 uppercase w-48"
@@ -330,7 +376,7 @@ export default function CajaChicaHome() {
           </div>
         </div>
 
-        {/* Resumen Financiero del Proyecto */}
+        {/* Resumen Financiero */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <div className="bg-blue-50 border border-blue-200 p-4 rounded-lg shadow-sm">
             <span className="text-xs font-bold text-blue-600 uppercase">
@@ -356,18 +402,19 @@ export default function CajaChicaHome() {
           </div>
         </div>
 
-        {/* Formulario de Entrada */}
+        {/* Formulario */}
         <form onSubmit={guardarGasto} className={`p-6 rounded-xl shadow-sm border space-y-4 ${cajaEstaCerrada ? 'bg-gray-100 opacity-60 pointer-events-none' : idEditando ? 'bg-amber-50/50 border-amber-300' : 'bg-white'}`}>
           
-          <div className="border-b pb-3 space-y-2">
+          <div className="border-b pb-4 space-y-3">
             <div className="flex justify-between items-center">
               <h2 className="text-xs font-bold text-gray-500 uppercase tracking-wider">1. Asignación de Proyecto y Saldo Inicial</h2>
               {!esAdmin && <span className="text-[11px] text-amber-700 font-semibold bg-amber-50 px-2 py-0.5 rounded border border-amber-200">🔒 El Saldo Inicial solo puede modificarlo el Administrador</span>}
             </div>
+            
             <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
               <div>
                 <label className="block text-xs font-medium text-gray-700 mb-1">Responsable del Proyecto *</label>
-                <input type="text" placeholder="Ej: Juan Pérez" value={responsable} onChange={(e) => setResponsable(e.target.value)} className="w-full p-2 border rounded-lg text-sm" required disabled={cajaEstaCerrada} />
+                <input type="text" placeholder="Ej: Jorge Robles" value={responsable} onChange={(e) => setResponsable(e.target.value)} className="w-full p-2 border rounded-lg text-sm" required disabled={cajaEstaCerrada} />
               </div>
               <div>
                 <label className="block text-xs font-medium text-gray-700 mb-1">N° Interno / Identificador de Caja</label>
@@ -394,6 +441,19 @@ export default function CajaChicaHome() {
                 </select>
               </div>
             </div>
+
+            {/* BOTÓN OK EXCLUSIVO PARA ADMINISTRADOR */}
+            {esAdmin && !cajaEstaCerrada && (
+              <div className="pt-2 flex justify-end">
+                <button
+                  type="button"
+                  onClick={guardarAperturaProyecto}
+                  className="bg-emerald-700 hover:bg-emerald-800 text-white font-bold py-2 px-5 rounded-lg text-xs shadow flex items-center gap-1.5"
+                >
+                  💾 OK: Guardar / Asignar Fondo Inicial
+                </button>
+              </div>
+            )}
           </div>
 
           <div className="space-y-2 pt-2">
