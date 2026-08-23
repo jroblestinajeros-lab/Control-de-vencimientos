@@ -410,7 +410,7 @@ export default function CajaChicaHome() {
         {/* Resumen Financiero Privado */}
         {!esAdmin && (!responsableFiltro || !proyectoSeleccionado) ? (
           <div className="bg-amber-50 border border-amber-200 p-4 rounded-xl text-center text-xs font-semibold text-amber-800">
-            🔒 Para ver tus saldos y rendición, ingresa **Tu Nombre de Responsable** y tu **Código de Proyecto** arriba.
+            🔒 Para ver tus saldos y rendición, ingresa Tu Nombre de Responsable y tu Código de Proyecto arriba.
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
