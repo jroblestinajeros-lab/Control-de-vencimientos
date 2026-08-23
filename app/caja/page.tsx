@@ -4,8 +4,9 @@ import { useState, useEffect } from 'react';
 import { createClient } from '@supabase/supabase-js';
 import * as XLSX from 'xlsx';
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
+// Conexión directa con credenciales de Supabase
+const supabaseUrl = 'https://cxqwzbfbffarrlgbhtuv.supabase.co';
+const supabaseAnonKey = 'sb_publishable_tLRrpt_XooefWWZp-xXDaQ_eNyXO_zE';
 const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
 const CLAVE_ADMIN = 'vya2026';
@@ -55,7 +56,7 @@ export default function CajaChicaHome() {
     cargarRegistros();
   }, []);
 
-  // Al seleccionar/escribir el Código de Proyecto, autocompletar la cabecera asignada
+  // Autocompletar datos al seleccionar/escribir Código de Proyecto
   useEffect(() => {
     if (!proyectoSeleccionado) {
       setNumeroCaja('');
@@ -101,7 +102,6 @@ export default function CajaChicaHome() {
     }
   };
 
-  // Función exclusiva para que el Administrador cree o actualice el Fondo Inicial del Proyecto
   const guardarAperturaProyecto = async () => {
     if (!esAdmin) {
       alert('Debes ingresar con la clave de Administrador.');
@@ -116,7 +116,6 @@ export default function CajaChicaHome() {
     const existe = registros.filter((r) => (r.codigo_proyecto || '').toUpperCase().trim() === prjTarget);
 
     if (existe.length > 0) {
-      // Actualizar saldo inicial y responsable en todos los registros de este proyecto
       const { error } = await supabase
         .from('cajas_chicas')
         .update({
@@ -130,7 +129,6 @@ export default function CajaChicaHome() {
       if (error) alert('Error al actualizar el fondo: ' + error.message);
       else { alert(`✅ Fondo del proyecto ${prjTarget} actualizado a S/ ${saldoInicial}`); cargarRegistros(); }
     } else {
-      // Crear primer registro de apertura sin gasto asignado (monto_gasto = 0)
       const payload: RegistroCaja = {
         codigo_proyecto: prjTarget,
         numero_caja: numeroCaja.toUpperCase().trim() || `CCH-${prjTarget}`,
@@ -442,7 +440,6 @@ export default function CajaChicaHome() {
               </div>
             </div>
 
-            {/* BOTÓN OK EXCLUSIVO PARA ADMINISTRADOR */}
             {esAdmin && !cajaEstaCerrada && (
               <div className="pt-2 flex justify-end">
                 <button
