@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { createClient } from '@supabase/supabase-js';
+import * as XLSX from 'xlsx';
 
 const supabaseUrl = 'https://cxqwzbfbffarrlgbhtuv.supabase.co';
 const supabaseAnonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImN4cXd6YmZiZmZhcnJsZ2JodHV2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODc0MzM4NjMsImV4cCI6MjEwMzAwOTg2M30.aoD9lfz_j6cv34DiQju8-FL7LnDUgfzojtMbY4FG8UE';
@@ -98,7 +99,6 @@ export default function FlotaHome() {
       return;
     }
 
-    // Se omite fecha_mantenimiento para compatibilidad con la estructura actual de Supabase
     const payload: Omit<Unidad, 'fecha_mantenimiento'> = {
       placa: placa.toUpperCase().trim(),
       marca_modelo: marcaModelo,
@@ -153,20 +153,61 @@ export default function FlotaHome() {
     else cargarUnidades();
   };
 
+  // Semáforo legal con alerta anticipada de 30 DÍAS
   const evaluarFechaLegal = (fecha: string) => {
-    if (!fecha || !fechaHoy) return { texto: 'Sin registro', color: 'bg-gray-100 text-gray-600' };
+    if (!fecha) return { texto: 'Sin registro', color: 'bg-gray-100 text-gray-600' };
 
+    const hoy = new Date(fechaHoy || new Date().toISOString().split('T')[0]).getTime();
     const fechaTimestamp = new Date(fecha).getTime();
     const limiteHistorico = new Date('2026-03-01').getTime();
 
     if (fechaTimestamp < limiteHistorico) {
-      return { texto: 'HISTÓRICO', color: 'bg-slate-200 text-slate-700' };
+      return { texto: `HISTÓRICO (${fecha})`, color: 'bg-slate-200 text-slate-700' };
     }
 
-    const difDias = (fechaTimestamp - new Date(fechaHoy).getTime()) / (1000 * 3600 * 24);
-    if (difDias < 0) return { texto: 'VENCIDO', color: 'bg-red-100 text-red-700' };
-    if (difDias <= 15) return { texto: 'POR VENCER', color: 'bg-amber-100 text-amber-700' };
-    return { texto: 'AL DÍA', color: 'bg-emerald-100 text-emerald-700' };
+    const difDias = Math.ceil((fechaTimestamp - hoy) / (1000 * 3600 * 24));
+
+    if (difDias < 0) {
+      return { texto: `VENCIDO (${fecha})`, color: 'bg-red-100 text-red-700 font-bold' };
+    }
+    if (difDias <= 30) { // Alerta activa a los 30 días o menos
+      return { texto: `POR VENCER en ${difDias}d (${fecha})`, color: 'bg-amber-100 text-amber-800 font-bold' };
+    }
+    return { texto: `AL DÍA (${fecha})`, color: 'bg-emerald-100 text-emerald-700 font-semibold' };
+  };
+
+  // Exportar datos a Excel
+  const exportarAExcel = () => {
+    const datosExcel = unidades.map((u) => {
+      const proxKm = u.km_ultimo_mantenimiento + u.pauta_km;
+      const faltanKm = proxKm - u.km_actual;
+
+      return {
+        'Placa': u.placa,
+        'Marca / Modelo': u.marca_modelo,
+        'Km Actual': u.km_actual,
+        'Km Último Mant.': u.km_ultimo_mantenimiento,
+        'Pauta (Km)': u.pauta_km,
+        'Próximo Mant. (Km)': proxKm,
+        'Faltan (Km)': faltanKm,
+        'Taller': u.taller_asignado,
+        'Costo (S/)': u.costo_mantenimiento,
+        'Factura': u.numero_factura_asociada,
+        'Estado SOAT': evaluarFechaLegal(u.vencimiento_soat).texto,
+        'Vencimiento SOAT': u.vencimiento_soat || 'N/A',
+        'Estado Seguro': evaluarFechaLegal(u.vencimiento_seguro).texto,
+        'Vencimiento Seguro': u.vencimiento_seguro || 'N/A',
+        'Estado RTV': evaluarFechaLegal(u.vencimiento_revision_tecnica).texto,
+        'Vencimiento RTV': u.vencimiento_revision_tecnica || 'N/A',
+        'Lunas Polarizadas': u.lunas_polarizadas ? 'Sí' : 'No',
+        'Observaciones': u.observaciones,
+      };
+    });
+
+    const worksheet = XLSX.utils.json_to_sheet(datosExcel);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, 'Flota');
+    XLSX.writeFile(workbook, `Reporte_Flota_${new Date().toISOString().split('T')[0]}.xlsx`);
   };
 
   return (
@@ -279,7 +320,17 @@ export default function FlotaHome() {
 
         {/* Tabla de Unidades */}
         <div className="bg-white p-6 rounded-xl shadow-sm border space-y-4">
-          <h2 className="text-lg font-semibold text-gray-800 border-b pb-2">Estado de la Flota</h2>
+          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center border-b pb-2 gap-2">
+            <h2 className="text-lg font-semibold text-gray-800">Estado de la Flota</h2>
+            {unidades.length > 0 && (
+              <button 
+                onClick={exportarAExcel} 
+                className="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-xs py-2 px-4 rounded-lg shadow flex items-center gap-1"
+              >
+                📊 Exportar a Excel
+              </button>
+            )}
+          </div>
 
           {loading ? (
             <p className="text-center text-sm text-gray-500 py-4">Cargando flota...</p>
@@ -341,9 +392,21 @@ export default function FlotaHome() {
                             {estadoMecanico.texto}
                           </span>
                         </td>
-                        <td className="p-3"><span className={`px-2 py-0.5 rounded text-[10px] font-bold ${soat.color}`}>{soat.texto}</span></td>
-                        <td className="p-3"><span className={`px-2 py-0.5 rounded text-[10px] font-bold ${seguro.color}`}>{seguro.texto}</span></td>
-                        <td className="p-3"><span className={`px-2 py-0.5 rounded text-[10px] font-bold ${rtv.color}`}>{rtv.texto}</span></td>
+                        <td className="p-3">
+                          <span className={`px-2 py-1 rounded text-[10px] ${soat.color}`}>
+                            {soat.texto}
+                          </span>
+                        </td>
+                        <td className="p-3">
+                          <span className={`px-2 py-1 rounded text-[10px] ${seguro.color}`}>
+                            {seguro.texto}
+                          </span>
+                        </td>
+                        <td className="p-3">
+                          <span className={`px-2 py-1 rounded text-[10px] ${rtv.color}`}>
+                            {rtv.texto}
+                          </span>
+                        </td>
                         <td className="p-3 font-bold">{u.lunas_polarizadas ? '✔️ Sí' : '❌ No'}</td>
                         <td className="p-3 text-center space-x-2">
                           {u.id && (
