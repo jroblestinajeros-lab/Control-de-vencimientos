@@ -3,8 +3,8 @@
 import { useState, useEffect } from 'react';
 import { createClient } from '@supabase/supabase-js';
 
-// Conexión directa a Supabase (URL y Anon Key)
-const supabaseUrl = 'https://cxqwzbfbfarrlgbhtuv.supabase.co';
+// Conexión corregida con la URL exacta de tu proyecto
+const supabaseUrl = 'https://cxqwzbfbffarrlgbhtuv.supabase.co';
 const supabaseAnonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImN4cXd6YmZiZmZhcnJsZ2JodHV2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODc0MzM4NjMsImV4cCI6MjEwMzAwOTg2M30.aoD9lfz_j6cv34DiQju8-FL7LnDUgfzojtMbY4FG8UE';
 
 const supabase = createClient(supabaseUrl, supabaseAnonKey);
