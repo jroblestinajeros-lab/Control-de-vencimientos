@@ -3,8 +3,9 @@
 import { useState, useEffect } from 'react';
 import { createClient } from '@supabase/supabase-js';
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://cxqwzbfbfarrlgbhtuv.supabase.co';
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImN4cXd6YmZiZmZhcnJsZ2JodHV2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODc0MzM4NjMsImV4cCI6MjEwMzAwOTg2M30.aoD9lfz_j6cv34DiQju8-FL7LnDUgfzojtMbY4FG8UE';
+// Conexión directa a Supabase (URL y Anon Key)
+const supabaseUrl = 'https://cxqwzbfbfarrlgbhtuv.supabase.co';
+const supabaseAnonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImN4cXd6YmZiZmZhcnJsZ2JodHV2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODc0MzM4NjMsImV4cCI6MjEwMzAwOTg2M30.aoD9lfz_j6cv34DiQju8-FL7LnDUgfzojtMbY4FG8UE';
 
 const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
@@ -83,7 +84,7 @@ export default function FlotaHome() {
     setObservaciones('');
   };
 
-  // Evalúa si alguna fecha ingresada (Mantenimiento, SOAT, Seguro, RTV) es anterior a Marzo de 2026
+  // Evalúa si alguna fecha ingresada es anterior a Marzo de 2026
   const esRegistroHistoricoAntiguo = () => {
     const limiteHistorico = new Date('2026-03-01').getTime();
     const fechasAEvaluar = [fechaMantenimiento, vencimientoSoat, vencimientoSeguro, vencimientoRevisionTecnica].filter(Boolean);
