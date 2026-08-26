@@ -59,7 +59,7 @@ export default function FlotaHome() {
     const { data, error } = await supabase
       .from('unidades')
       .select('*')
-      .order('placa', { ascending: true });
+      .order('id', { ascending: false });
 
     if (error) console.error('Error al cargar unidades:', error);
     else setUnidades(data || []);
@@ -153,7 +153,7 @@ export default function FlotaHome() {
     else cargarUnidades();
   };
 
-  // Semáforo legal con alerta anticipada de 30 DÍAS
+  // Semáforo legal con alerta anticipada de 30 días
   const evaluarFechaLegal = (fecha: string) => {
     if (!fecha) return { texto: 'Sin registro', color: 'bg-gray-100 text-gray-600' };
 
@@ -170,19 +170,32 @@ export default function FlotaHome() {
     if (difDias < 0) {
       return { texto: `VENCIDO (${fecha})`, color: 'bg-red-100 text-red-700 font-bold' };
     }
-    if (difDias <= 30) { // Alerta activa a los 30 días o menos
+    if (difDias <= 30) {
       return { texto: `POR VENCER en ${difDias}d (${fecha})`, color: 'bg-amber-100 text-amber-800 font-bold' };
     }
     return { texto: `AL DÍA (${fecha})`, color: 'bg-emerald-100 text-emerald-700 font-semibold' };
   };
 
-  // Exportar datos a Excel
+  // Filtrado para la pantalla: conserva solo el último registro ingresado de cada placa
+  const obtenerUltimosRegistrosPorPlaca = () => {
+    const mapaUnicas = new Map<string, Unidad>();
+    unidades.forEach((u) => {
+      const placaNorm = u.placa.toUpperCase().trim();
+      if (!mapaUnicas.has(placaNorm)) {
+        mapaUnicas.set(placaNorm, u);
+      }
+    });
+    return Array.from(mapaUnicas.values()).sort((a, b) => a.placa.localeCompare(b.placa));
+  };
+
+  // Exportar el HISTORIAL COMPLETO a Excel
   const exportarAExcel = () => {
     const datosExcel = unidades.map((u) => {
       const proxKm = u.km_ultimo_mantenimiento + u.pauta_km;
       const faltanKm = proxKm - u.km_actual;
 
       return {
+        'ID Registro': u.id,
         'Placa': u.placa,
         'Marca / Modelo': u.marca_modelo,
         'Km Actual': u.km_actual,
@@ -206,9 +219,11 @@ export default function FlotaHome() {
 
     const worksheet = XLSX.utils.json_to_sheet(datosExcel);
     const workbook = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(workbook, worksheet, 'Flota');
-    XLSX.writeFile(workbook, `Reporte_Flota_${new Date().toISOString().split('T')[0]}.xlsx`);
+    XLSX.utils.book_append_sheet(workbook, worksheet, 'Historial Flota');
+    XLSX.writeFile(workbook, `Historial_Flota_Completo_${new Date().toISOString().split('T')[0]}.xlsx`);
   };
+
+  const unidadesPantalla = obtenerUltimosRegistrosPorPlaca();
 
   return (
     <main className="min-h-screen bg-gray-50 p-4 md:p-8">
@@ -321,20 +336,23 @@ export default function FlotaHome() {
         {/* Tabla de Unidades */}
         <div className="bg-white p-6 rounded-xl shadow-sm border space-y-4">
           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center border-b pb-2 gap-2">
-            <h2 className="text-lg font-semibold text-gray-800">Estado de la Flota</h2>
+            <div>
+              <h2 className="text-lg font-semibold text-gray-800">Estado de la Flota (Último Registro)</h2>
+              <p className="text-xs text-gray-500">Muestra la unidad en su estado más reciente. Descarga Excel para ver todo el historial.</p>
+            </div>
             {unidades.length > 0 && (
               <button 
                 onClick={exportarAExcel} 
                 className="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-xs py-2 px-4 rounded-lg shadow flex items-center gap-1"
               >
-                📊 Exportar a Excel
+                📊 Exportar Historial a Excel
               </button>
             )}
           </div>
 
           {loading ? (
             <p className="text-center text-sm text-gray-500 py-4">Cargando flota...</p>
-          ) : unidades.length === 0 ? (
+          ) : unidadesPantalla.length === 0 ? (
             <p className="text-center text-sm text-gray-500 py-4">No hay unidades registradas.</p>
           ) : (
             <div className="overflow-x-auto">
@@ -354,7 +372,7 @@ export default function FlotaHome() {
                   </tr>
                 </thead>
                 <tbody className="divide-y">
-                  {unidades.map((u) => {
+                  {unidadesPantalla.map((u) => {
                     const proxKm = u.km_ultimo_mantenimiento + u.pauta_km;
                     const faltanKm = proxKm - u.km_actual;
                     
