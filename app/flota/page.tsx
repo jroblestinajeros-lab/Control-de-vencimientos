@@ -3,7 +3,6 @@
 import { useState, useEffect } from 'react';
 import { createClient } from '@supabase/supabase-js';
 
-// Conexión corregida con la URL exacta de tu proyecto
 const supabaseUrl = 'https://cxqwzbfbffarrlgbhtuv.supabase.co';
 const supabaseAnonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImN4cXd6YmZiZmZhcnJsZ2JodHV2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODc0MzM4NjMsImV4cCI6MjEwMzAwOTg2M30.aoD9lfz_j6cv34DiQju8-FL7LnDUgfzojtMbY4FG8UE';
 
@@ -84,7 +83,6 @@ export default function FlotaHome() {
     setObservaciones('');
   };
 
-  // Evalúa si alguna fecha ingresada es anterior a Marzo de 2026
   const esRegistroHistoricoAntiguo = () => {
     const limiteHistorico = new Date('2026-03-01').getTime();
     const fechasAEvaluar = [fechaMantenimiento, vencimientoSoat, vencimientoSeguro, vencimientoRevisionTecnica].filter(Boolean);
@@ -100,12 +98,12 @@ export default function FlotaHome() {
       return;
     }
 
-    const payload: Unidad = {
+    // Se omite fecha_mantenimiento para compatibilidad con la estructura actual de Supabase
+    const payload: Omit<Unidad, 'fecha_mantenimiento'> = {
       placa: placa.toUpperCase().trim(),
       marca_modelo: marcaModelo,
       km_actual: kmActual !== '' ? parseInt(kmActual) : 0,
       km_ultimo_mantenimiento: kmUltimoMantenimiento !== '' ? parseInt(kmUltimoMantenimiento) : 0,
-      fecha_mantenimiento: fechaMantenimiento,
       pauta_km: parseInt(pautaKm) || 5000,
       taller_asignado: tallerAsignado,
       costo_mantenimiento: parseFloat(costoMantenimiento) || 0,
@@ -155,7 +153,6 @@ export default function FlotaHome() {
     else cargarUnidades();
   };
 
-  // Lógica del semáforo legal con reconocimiento de fechas históricas
   const evaluarFechaLegal = (fecha: string) => {
     if (!fecha || !fechaHoy) return { texto: 'Sin registro', color: 'bg-gray-100 text-gray-600' };
 
