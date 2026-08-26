@@ -79,19 +79,28 @@ export default function FlotaHome() {
     setObservaciones('');
   };
 
+  // Evalúa si algún registro legal corresponde a gestiones previas a Marzo de 2026
+  const esRegistroHistoricoAntiguo = () => {
+    const limiteHistorico = new Date('2026-03-01').getTime();
+    const fechasAEvaluar = [vencimientoSoat, vencimientoSeguro, vencimientoRevisionTecnica].filter(Boolean);
+    if (fechasAEvaluar.length === 0) return false;
+    return fechasAEvaluar.some((f) => new Date(f).getTime() < limiteHistorico);
+  };
+
   const guardarUnidad = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!placa || !kmActual) {
-      alert('Por favor ingresa la placa y el kilometraje actual.');
+
+    if (!placa) {
+      alert('Por favor ingresa la placa.');
       return;
     }
 
     const payload: Unidad = {
       placa: placa.toUpperCase().trim(),
       marca_modelo: marcaModelo,
-      km_actual: parseInt(kmActual) || 0,
-      km_ultimo_mantenimiento: parseInt(kmUltimoMantenimiento) || 0,
-      pauta_km: parseInt(pautaKm),
+      km_actual: kmActual !== '' ? parseInt(kmActual) : 0,
+      km_ultimo_mantenimiento: kmUltimoMantenimiento !== '' ? parseInt(kmUltimoMantenimiento) : 0,
+      pauta_km: parseInt(pautaKm) || 5000,
       taller_asignado: tallerAsignado,
       costo_mantenimiento: parseFloat(costoMantenimiento) || 0,
       vencimiento_soat: vencimientoSoat,
@@ -118,9 +127,9 @@ export default function FlotaHome() {
     setIdEditando(u.id);
     setPlaca(u.placa);
     setMarcaModelo(u.marca_modelo || '');
-    setKmActual(u.km_actual.toString());
-    setKmUltimoMantenimiento(u.km_ultimo_mantenimiento.toString());
-    setPautaKm(u.pauta_km.toString());
+    setKmActual(u.km_actual ? u.km_actual.toString() : '');
+    setKmUltimoMantenimiento(u.km_ultimo_mantenimiento ? u.km_ultimo_mantenimiento.toString() : '');
+    setPautaKm(u.pauta_km ? u.pauta_km.toString() : '5000');
     setTallerAsignado(u.taller_asignado || '');
     setCostoMantenimiento(u.costo_mantenimiento?.toString() || '');
     setVencimientoSoat(u.vencimiento_soat || '');
@@ -139,9 +148,19 @@ export default function FlotaHome() {
     else cargarUnidades();
   };
 
+  // Lógica del semáforo legal con reconocimiento de fechas históricas
   const evaluarFechaLegal = (fecha: string) => {
     if (!fecha || !fechaHoy) return { texto: 'Sin registro', color: 'bg-gray-100 text-gray-600' };
-    const difDias = (new Date(fecha).getTime() - new Date(fechaHoy).getTime()) / (1000 * 3600 * 24);
+
+    const fechaTimestamp = new Date(fecha).getTime();
+    const limiteHistorico = new Date('2026-03-01').getTime();
+
+    // Si la fecha es anterior a Marzo del 2026, se identifica como histórico cerrado
+    if (fechaTimestamp < limiteHistorico) {
+      return { texto: 'HISTÓRICO', color: 'bg-slate-200 text-slate-700' };
+    }
+
+    const difDias = (fechaTimestamp - new Date(fechaHoy).getTime()) / (1000 * 3600 * 24);
     if (difDias < 0) return { texto: 'VENCIDO', color: 'bg-red-100 text-red-700' };
     if (difDias <= 15) return { texto: 'POR VENCER', color: 'bg-amber-100 text-amber-700' };
     return { texto: 'AL DÍA', color: 'bg-emerald-100 text-emerald-700' };
@@ -177,8 +196,16 @@ export default function FlotaHome() {
             </div>
 
             <div>
-              <label className="block text-xs font-medium text-gray-700 mb-1">Km Actual *</label>
-              <input type="number" placeholder="Ej: 45000" value={kmActual} onChange={(e) => setKmActual(e.target.value)} className="w-full p-2 border rounded-lg text-sm font-semibold" required />
+              <label className="block text-xs font-medium text-gray-700 mb-1">
+                Km Actual {esRegistroHistoricoAntiguo() ? '(Opcional - Histórico)' : ''}
+              </label>
+              <input 
+                type="number" 
+                placeholder="Ej: 45000" 
+                value={kmActual} 
+                onChange={(e) => setKmActual(e.target.value)} 
+                className="w-full p-2 border rounded-lg text-sm font-semibold" 
+              />
             </div>
 
             <div>
@@ -259,7 +286,7 @@ export default function FlotaHome() {
                     <th className="p-3">Km Actual</th>
                     <th className="p-3">Pauta Mecánica</th>
                     <th className="p-3">Próximo Mantenimiento</th>
-                    <th className="p-3">Semaforo Mecánico</th>
+                    <th className="p-3">Semáforo Mecánico</th>
                     <th className="p-3">SOAT</th>
                     <th className="p-3">Seguro</th>
                     <th className="p-3">Rev. Técnica</th>
@@ -272,9 +299,17 @@ export default function FlotaHome() {
                     const proxKm = u.km_ultimo_mantenimiento + u.pauta_km;
                     const faltanKm = proxKm - u.km_actual;
                     
-                    let estadoMecanico = { texto: `Ok (Faltan ${faltanKm} km)`, color: 'bg-emerald-100 text-emerald-700' };
-                    if (faltanKm < 0) estadoMecanico = { texto: `VENCIDO (${Math.abs(faltanKm)} km pasados)`, color: 'bg-red-100 text-red-700' };
-                    else if (faltanKm <= 1000) estadoMecanico = { texto: `ALERTA (Faltan ${faltanKm} km)`, color: 'bg-amber-100 text-amber-700' };
+                    let estadoMecanico = { texto: `Ok (Faltan ${faltanKm.toLocaleString()} km)`, color: 'bg-emerald-100 text-emerald-700' };
+                    
+                    if (u.km_actual === 0 && u.km_ultimo_mantenimiento === 0) {
+                      estadoMecanico = { texto: 'Sin registro de Km (Histórico)', color: 'bg-gray-100 text-gray-600' };
+                    } else if (u.km_actual === 0) {
+                      estadoMecanico = { texto: 'Histórico (Sin Km Actual)', color: 'bg-blue-100 text-blue-700' };
+                    } else if (faltanKm < 0) {
+                      estadoMecanico = { texto: `VENCIDO (${Math.abs(faltanKm).toLocaleString()} km pasados)`, color: 'bg-red-100 text-red-700' };
+                    } else if (faltanKm <= 1000) {
+                      estadoMecanico = { texto: `ALERTA (Faltan ${faltanKm.toLocaleString()} km)`, color: 'bg-amber-100 text-amber-700' };
+                    }
 
                     const soat = evaluarFechaLegal(u.vencimiento_soat);
                     const seguro = evaluarFechaLegal(u.vencimiento_seguro);
@@ -283,9 +318,9 @@ export default function FlotaHome() {
                     return (
                       <tr key={u.id} className="hover:bg-gray-50">
                         <td className="p-3 font-bold text-gray-900">{u.placa}<br/><span className="font-normal text-gray-500 text-[10px]">{u.marca_modelo}</span></td>
-                        <td className="p-3 font-semibold">{u.km_actual.toLocaleString()} km</td>
-                        <td className="p-3">{u.pauta_km.toLocaleString()} km</td>
-                        <td className="p-3 font-medium">{proxKm.toLocaleString()} km</td>
+                        <td className="p-3 font-semibold">{u.km_actual > 0 ? `${u.km_actual.toLocaleString()} km` : 'Sin registro'}</td>
+                        <td className="p-3">{u.pauta_km ? `${u.pauta_km.toLocaleString()} km` : '5,000 km'}</td>
+                        <td className="p-3 font-medium">{proxKm > 0 ? `${proxKm.toLocaleString()} km` : 'Sin registro'}</td>
                         <td className="p-3">
                           <span className={`px-2 py-1 rounded-full text-[10px] font-bold ${estadoMecanico.color}`}>
                             {estadoMecanico.texto}
