@@ -13,6 +13,7 @@ interface Unidad {
   marca_modelo: string;
   km_actual: number;
   km_ultimo_mantenimiento: number;
+  fecha_mantenimiento?: string;
   pauta_km: number;
   taller_asignado: string;
   costo_mantenimiento: number;
@@ -35,6 +36,7 @@ export default function FlotaHome() {
   const [marcaModelo, setMarcaModelo] = useState('');
   const [kmActual, setKmActual] = useState('');
   const [kmUltimoMantenimiento, setKmUltimoMantenimiento] = useState('');
+  const [fechaMantenimiento, setFechaMantenimiento] = useState('');
   const [pautaKm, setPautaKm] = useState('5000');
   const [tallerAsignado, setTallerAsignado] = useState('');
   const [costoMantenimiento, setCostoMantenimiento] = useState('');
@@ -68,6 +70,7 @@ export default function FlotaHome() {
     setMarcaModelo('');
     setKmActual('');
     setKmUltimoMantenimiento('');
+    setFechaMantenimiento('');
     setPautaKm('5000');
     setTallerAsignado('');
     setCostoMantenimiento('');
@@ -79,10 +82,10 @@ export default function FlotaHome() {
     setObservaciones('');
   };
 
-  // Evalúa si algún registro legal corresponde a gestiones previas a Marzo de 2026
+  // Evalúa si alguna fecha ingresada (Mantenimiento, SOAT, Seguro, RTV) es anterior a Marzo de 2026
   const esRegistroHistoricoAntiguo = () => {
     const limiteHistorico = new Date('2026-03-01').getTime();
-    const fechasAEvaluar = [vencimientoSoat, vencimientoSeguro, vencimientoRevisionTecnica].filter(Boolean);
+    const fechasAEvaluar = [fechaMantenimiento, vencimientoSoat, vencimientoSeguro, vencimientoRevisionTecnica].filter(Boolean);
     if (fechasAEvaluar.length === 0) return false;
     return fechasAEvaluar.some((f) => new Date(f).getTime() < limiteHistorico);
   };
@@ -100,6 +103,7 @@ export default function FlotaHome() {
       marca_modelo: marcaModelo,
       km_actual: kmActual !== '' ? parseInt(kmActual) : 0,
       km_ultimo_mantenimiento: kmUltimoMantenimiento !== '' ? parseInt(kmUltimoMantenimiento) : 0,
+      fecha_mantenimiento: fechaMantenimiento,
       pauta_km: parseInt(pautaKm) || 5000,
       taller_asignado: tallerAsignado,
       costo_mantenimiento: parseFloat(costoMantenimiento) || 0,
@@ -129,6 +133,7 @@ export default function FlotaHome() {
     setMarcaModelo(u.marca_modelo || '');
     setKmActual(u.km_actual ? u.km_actual.toString() : '');
     setKmUltimoMantenimiento(u.km_ultimo_mantenimiento ? u.km_ultimo_mantenimiento.toString() : '');
+    setFechaMantenimiento(u.fecha_mantenimiento || '');
     setPautaKm(u.pauta_km ? u.pauta_km.toString() : '5000');
     setTallerAsignado(u.taller_asignado || '');
     setCostoMantenimiento(u.costo_mantenimiento?.toString() || '');
@@ -155,7 +160,6 @@ export default function FlotaHome() {
     const fechaTimestamp = new Date(fecha).getTime();
     const limiteHistorico = new Date('2026-03-01').getTime();
 
-    // Si la fecha es anterior a Marzo del 2026, se identifica como histórico cerrado
     if (fechaTimestamp < limiteHistorico) {
       return { texto: 'HISTÓRICO', color: 'bg-slate-200 text-slate-700' };
     }
@@ -211,6 +215,11 @@ export default function FlotaHome() {
             <div>
               <label className="block text-xs font-medium text-gray-700 mb-1">Km Último Mantenimiento</label>
               <input type="number" placeholder="Ej: 40000" value={kmUltimoMantenimiento} onChange={(e) => setKmUltimoMantenimiento(e.target.value)} className="w-full p-2 border rounded-lg text-sm" />
+            </div>
+
+            <div>
+              <label className="block text-xs font-medium text-gray-700 mb-1">Fecha del Mantenimiento</label>
+              <input type="date" value={fechaMantenimiento} onChange={(e) => setFechaMantenimiento(e.target.value)} className="w-full p-2 border rounded-lg text-sm" />
             </div>
 
             <div>
@@ -320,7 +329,14 @@ export default function FlotaHome() {
                         <td className="p-3 font-bold text-gray-900">{u.placa}<br/><span className="font-normal text-gray-500 text-[10px]">{u.marca_modelo}</span></td>
                         <td className="p-3 font-semibold">{u.km_actual > 0 ? `${u.km_actual.toLocaleString()} km` : 'Sin registro'}</td>
                         <td className="p-3">{u.pauta_km ? `${u.pauta_km.toLocaleString()} km` : '5,000 km'}</td>
-                        <td className="p-3 font-medium">{proxKm > 0 ? `${proxKm.toLocaleString()} km` : 'Sin registro'}</td>
+                        <td className="p-3 font-medium">
+                          {proxKm > 0 ? `${proxKm.toLocaleString()} km` : 'Sin registro'}
+                          {u.fecha_mantenimiento && (
+                            <div className="text-[10px] text-gray-400 font-normal">
+                              Último: {u.fecha_mantenimiento}
+                            </div>
+                          )}
+                        </td>
                         <td className="p-3">
                           <span className={`px-2 py-1 rounded-full text-[10px] font-bold ${estadoMecanico.color}`}>
                             {estadoMecanico.texto}
