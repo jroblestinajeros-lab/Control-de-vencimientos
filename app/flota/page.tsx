@@ -15,13 +15,13 @@ interface Unidad {
   marca_modelo: string;
   km_actual: number;
   km_ultimo_mantenimiento: number;
-  fecha_mantenimiento?: string;
+  fecha_mantenimiento?: string | null;
   pauta_km: number;
   taller_asignado: string;
   costo_mantenimiento: number;
-  vencimiento_soat: string;
-  vencimiento_seguro: string;
-  vencimiento_revision_tecnica: string;
+  vencimiento_soat?: string | null;
+  vencimiento_seguro?: string | null;
+  vencimiento_revision_tecnica?: string | null;
   lunas_polarizadas: boolean;
   numero_factura_asociada: string;
   observaciones: string;
@@ -99,17 +99,19 @@ export default function FlotaHome() {
       return;
     }
 
-    const payload: Omit<Unidad, 'fecha_mantenimiento'> = {
+    // Convertir fechas vacías ("") a NULL para evitar error de PostgreSQL
+    const payload = {
       placa: placa.toUpperCase().trim(),
       marca_modelo: marcaModelo,
       km_actual: kmActual !== '' ? parseInt(kmActual) : 0,
       km_ultimo_mantenimiento: kmUltimoMantenimiento !== '' ? parseInt(kmUltimoMantenimiento) : 0,
+      fecha_mantenimiento: fechaMantenimiento ? fechaMantenimiento : null,
       pauta_km: parseInt(pautaKm) || 5000,
       taller_asignado: tallerAsignado,
       costo_mantenimiento: parseFloat(costoMantenimiento) || 0,
-      vencimiento_soat: vencimientoSoat,
-      vencimiento_seguro: vencimientoSeguro,
-      vencimiento_revision_tecnica: vencimientoRevisionTecnica,
+      vencimiento_soat: vencimientoSoat ? vencimientoSoat : null,
+      vencimiento_seguro: vencimientoSeguro ? vencimientoSeguro : null,
+      vencimiento_revision_tecnica: vencimientoRevisionTecnica ? vencimientoRevisionTecnica : null,
       lunas_polarizadas: lunasPolarizadas,
       numero_factura_asociada: numeroFactura,
       observaciones,
@@ -154,8 +156,8 @@ export default function FlotaHome() {
   };
 
   // Semáforo legal con alerta anticipada de 30 días
-  const evaluarFechaLegal = (fecha: string) => {
-    if (!fecha) return { texto: 'Sin registro', color: 'bg-gray-100 text-gray-600' };
+  const evaluarFechaLegal = (fecha?: string | null) => {
+    if (!fecha) return { texto: 'No aplica / Sin registro', color: 'bg-gray-100 text-gray-600' };
 
     const hoy = new Date(fechaHoy || new Date().toISOString().split('T')[0]).getTime();
     const fechaTimestamp = new Date(fecha).getTime();
