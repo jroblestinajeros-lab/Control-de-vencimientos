@@ -99,7 +99,7 @@ export default function FlotaHome() {
       return;
     }
 
-    // Convertir fechas vacías ("") a NULL para evitar error de PostgreSQL
+    // Convertir strings vacíos ("") a null para evitar invalid input syntax for type date
     const payload = {
       placa: placa.toUpperCase().trim(),
       marca_modelo: marcaModelo,
@@ -202,6 +202,7 @@ export default function FlotaHome() {
         'Marca / Modelo': u.marca_modelo,
         'Km Actual': u.km_actual,
         'Km Último Mant.': u.km_ultimo_mantenimiento,
+        'Fecha Mant.': u.fecha_mantenimiento || 'N/A',
         'Pauta (Km)': u.pauta_km,
         'Próximo Mant. (Km)': proxKm,
         'Faltan (Km)': faltanKm,
