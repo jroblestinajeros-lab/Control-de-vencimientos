@@ -99,7 +99,7 @@ export default function FlotaHome() {
       return;
     }
 
-    // Convertir strings vacíos ("") a null para evitar invalid input syntax for type date
+    // Convertir cadenas vacías ("") a NULL para prevenir errores de sintaxis en tipos DATE
     const payload = {
       placa: placa.toUpperCase().trim(),
       marca_modelo: marcaModelo,
