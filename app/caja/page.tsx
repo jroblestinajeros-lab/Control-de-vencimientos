@@ -242,6 +242,7 @@ export default function CajaChicaHome() {
     }
   };
 
+  // ACCIÓN ADMIN: Cambiar estado de la caja (Cierre / Reapertura)
   const cambiarEstadoCaja = async (nuevoEstado: string) => {
     if (!esAdmin) {
       alert('Acceso denegado. Activa el MODO ADMINISTRADOR.');
@@ -253,17 +254,25 @@ export default function CajaChicaHome() {
       return;
     }
 
-    const idUnico = generarIdUnico(proyectoSeleccionado, cajaSeleccionada);
+    const prjTarget = proyectoSeleccionado.toUpperCase().trim();
+    const cajaTarget = cajaSeleccionada.toUpperCase().trim();
+    const idUnico = generarIdUnico(prjTarget, cajaTarget);
 
-    if (!confirm(`¿Cambiar estado de la caja ${cajaSeleccionada} a "${nuevoEstado}"?`)) return;
+    if (!confirm(`¿Estás seguro de cambiar el estado de la caja "${cajaTarget}" a "${nuevoEstado}"?`)) {
+      return;
+    }
 
     const { error } = await supabase
       .from('cajas_chicas')
       .update({ estado_caja: nuevoEstado })
-      .eq('id_caja_unica', idUnico);
+      .or(`id_caja_unica.eq.${idUnico},and(codigo_proyecto.ilike.${prjTarget},numero_caja.ilike.${cajaTarget})`);
 
-    if (error) alert('Error al actualizar estado: ' + error.message);
-    else cargarRegistros();
+    if (error) {
+      alert('Error al actualizar el estado en la base de datos: ' + error.message);
+    } else {
+      alert(`✅ Caja ${cajaTarget} cambiada a estado: ${nuevoEstado}`);
+      cargarRegistros();
+    }
   };
 
   const prepararEdicion = (r: RegistroCaja) => {
@@ -353,7 +362,7 @@ export default function CajaChicaHome() {
 
     if (cajaSeleccionada !== 'TODAS' && cajaSeleccionada) {
       const idUnico = generarIdUnico(prjTarget, cajaSeleccionada);
-      const registroCaja = registros.find((r) => r.id_caja_unica === idUnico);
+      const registroCaja = registros.find((r) => r.id_caja_unica === idUnico || (r.codigo_proyecto.toUpperCase() === prjTarget && r.numero_caja.toUpperCase() === cajaSeleccionada.toUpperCase()));
       return registroCaja ? registroCaja.saldo_inicial : 0;
     } else {
       const cajasProcesadas = new Set<string>();
@@ -375,8 +384,10 @@ export default function CajaChicaHome() {
   const totalGastosRendidos = registrosFiltrados.reduce((acc, r) => acc + (r.monto_gasto || 0), 0);
   const saldoFinalCaja = saldoInicialCalculado - totalGastosRendidos;
 
-  const primerRegistro = registrosFiltrados[0];
-  const estadoActualCaja = primerRegistro ? (primerRegistro.estado_caja || 'Abierta') : 'Abierta';
+  // Evaluación directa del estado de la caja activa
+  const idUnicoActivo = generarIdUnico(proyectoSeleccionado, cajaSeleccionada);
+  const registroCajaActiva = registros.find((r) => r.id_caja_unica === idUnicoActivo || (r.codigo_proyecto?.toUpperCase() === proyectoSeleccionado.toUpperCase() && r.numero_caja?.toUpperCase() === cajaSeleccionada.toUpperCase()));
+  const estadoActualCaja = registroCajaActiva ? (registroCajaActiva.estado_caja || 'Abierta') : 'Abierta';
   const cajaEstaCerrada = cajaSeleccionada !== 'TODAS' && estadoActualCaja === 'Cerrada';
 
   return (
@@ -460,13 +471,27 @@ export default function CajaChicaHome() {
 
             {esAdmin && cajaSeleccionada !== 'TODAS' && (
               cajaEstaCerrada ? (
-                <button type="button" onClick={() => cambiarEstadoCaja('Abierta')} className="bg-amber-600 text-white font-semibold py-2 px-3 rounded-lg text-xs shadow">🔓 Reabrir</button>
+                <button 
+                  type="button" 
+                  onClick={() => cambiarEstadoCaja('Abierta')} 
+                  className="bg-amber-600 hover:bg-amber-700 text-white font-semibold py-2 px-3 rounded-lg text-xs shadow cursor-pointer transition-colors"
+                >
+                  🔓 Reabrir
+                </button>
               ) : (
-                <button type="button" onClick={() => cambiarEstadoCaja('Cerrada')} className="bg-red-600 text-white font-semibold py-2 px-3 rounded-lg text-xs shadow">🔒 Cerrar Caja</button>
+                <button 
+                  type="button" 
+                  onClick={() => cambiarEstadoCaja('Cerrada')} 
+                  className="bg-red-600 hover:bg-red-700 text-white font-semibold py-2 px-3 rounded-lg text-xs shadow cursor-pointer transition-colors"
+                >
+                  🔒 Cerrar Caja
+                </button>
               )
             )}
 
-            <button type="button" onClick={exportarAExcel} className="bg-emerald-600 text-white font-semibold py-2 px-3 rounded-lg text-xs shadow">📊 Exportar Excel</button>
+            <button type="button" onClick={exportarAExcel} className="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold py-2 px-3 rounded-lg text-xs shadow cursor-pointer transition-colors">
+              📊 Exportar Excel
+            </button>
           </div>
         </div>
 
@@ -547,7 +572,7 @@ export default function CajaChicaHome() {
               </div>
             </div>
             <div className="pt-2 flex justify-end">
-              <button type="button" onClick={guardarAperturaProyecto} className="bg-emerald-700 hover:bg-emerald-800 text-white font-bold py-2 px-5 rounded-lg text-xs shadow">
+              <button type="button" onClick={guardarAperturaProyecto} className="bg-emerald-700 hover:bg-emerald-800 text-white font-bold py-2 px-5 rounded-lg text-xs shadow cursor-pointer transition-colors">
                 💾 OK: Aperturar / Actualizar Caja Chica
               </button>
             </div>
@@ -622,7 +647,7 @@ export default function CajaChicaHome() {
             </div>
           </div>
 
-          <button type="submit" disabled={cajaEstaCerrada || cajaSeleccionada === 'TODAS'} className={`font-semibold py-2 px-6 rounded-lg shadow text-white ${cajaSeleccionada === 'TODAS' ? 'bg-gray-400 cursor-not-allowed' : idEditando ? 'bg-amber-600 hover:bg-amber-700' : 'bg-blue-600 hover:bg-blue-700'}`}>
+          <button type="submit" disabled={cajaEstaCerrada || cajaSeleccionada === 'TODAS'} className={`font-semibold py-2 px-6 rounded-lg shadow text-white cursor-pointer transition-colors ${cajaSeleccionada === 'TODAS' ? 'bg-gray-400 cursor-not-allowed' : idEditando ? 'bg-amber-600 hover:bg-amber-700' : 'bg-blue-600 hover:bg-blue-700'}`}>
             {cajaSeleccionada === 'TODAS' ? '⚠️ Selecciona una Caja Chica arriba para rendir' : idEditando ? '💾 Actualizar Comprobante' : `➕ Agregar Gasto a Caja ${cajaSeleccionada}`}
           </button>
         </form>
@@ -672,9 +697,9 @@ export default function CajaChicaHome() {
                       <td className="p-3 text-center space-x-2">
                         {r.id && (
                           <>
-                            <button onClick={() => prepararEdicion(r)} className="text-amber-600 font-semibold hover:underline">✏️ Editar</button>
+                            <button onClick={() => prepararEdicion(r)} className="text-amber-600 font-semibold hover:underline cursor-pointer">✏️ Editar</button>
                             <span className="text-gray-300">|</span>
-                            <button onClick={() => eliminarRegistro(r)} className="text-red-600 font-semibold hover:underline">🗑️ Borrar</button>
+                            <button onClick={() => eliminarRegistro(r)} className="text-red-600 font-semibold hover:underline cursor-pointer">🗑️ Borrar</button>
                           </>
                         )}
                       </td>
