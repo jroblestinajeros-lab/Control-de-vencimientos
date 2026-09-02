@@ -4,7 +4,6 @@ import { useState, useEffect } from 'react';
 import { createClient } from '@supabase/supabase-js';
 import * as XLSX from 'xlsx';
 
-// Conexión directa con Supabase
 const supabaseUrl = 'https://cxqwzbfbffarrlgbhtuv.supabase.co';
 const supabaseAnonKey = 'sb_publishable_tLRrpt_XooefWWZp-xXDaQ_eNyXO_zE';
 const supabase = createClient(supabaseUrl, supabaseAnonKey);
@@ -13,6 +12,7 @@ const CLAVE_ADMIN = 'vya2026';
 
 interface RegistroCaja {
   id?: number;
+  id_caja_unica?: string; // ID Enlace Compuesto (PROYECTO_CAJA)
   numero_caja: string;
   responsable: string;
   codigo_proyecto: string;
@@ -35,17 +35,18 @@ export default function CajaChicaHome() {
   const [idEditando, setIdEditando] = useState<number | null>(null);
   const [esAdmin, setEsAdmin] = useState<boolean>(false);
 
-  // Filtro de usuario activo
+  // Filtros de Usuario
   const [responsableFiltro, setResponsableFiltro] = useState<string>('');
   const [proyectoSeleccionado, setProyectoSeleccionado] = useState<string>('');
+  const [cajaSeleccionada, setCajaSeleccionada] = useState<string>('TODAS');
 
-  // Formulario 1: Apertura
-  const [numeroCaja, setNumeroCaja] = useState<string>('');
-  const [responsable, setResponsable] = useState<string>('');
-  const [saldoInicial, setSaldoInicial] = useState<string>('');
-  const [moneda, setMoneda] = useState<string>('PEN');
+  // Formulario 1: Apertura (Admin)
+  const [numeroCajaApertura, setNumeroCajaApertura] = useState<string>('');
+  const [responsableApertura, setResponsableApertura] = useState<string>('');
+  const [saldoInicialApertura, setSaldoInicialApertura] = useState<string>('');
+  const [monedaApertura, setMonedaApertura] = useState<string>('PEN');
 
-  // Formulario 2: Gasto
+  // Formulario 2: Gasto (Responsable)
   const [fechaDocumento, setFechaDocumento] = useState<string>('');
   const [tipoDocumento, setTipoDocumento] = useState<string>('Factura');
   const [numeroDocumento, setNumeroDocumento] = useState<string>('');
@@ -59,23 +60,35 @@ export default function CajaChicaHome() {
     cargarRegistros();
   }, []);
 
+  const generarIdUnico = (prj: string, caja: string) => {
+    return `${prj.toUpperCase().trim()}_${caja.toUpperCase().trim()}`;
+  };
+
+  // Obtener lista de cajas existentes para el proyecto ingresado
+  const cajasDelProyecto = Array.from(
+    new Set(
+      registros
+        .filter((r) => (r.codigo_proyecto || '').toUpperCase().trim() === proyectoSeleccionado.toUpperCase().trim())
+        .map((r) => r.numero_caja)
+        .filter(Boolean)
+    )
+  );
+
+  // Al seleccionar una caja específica en el filtro, precargar datos de la caja
   useEffect(() => {
-    if (!proyectoSeleccionado) {
-      setNumeroCaja('');
-      setResponsable('');
-      setSaldoInicial('');
+    if (!proyectoSeleccionado || cajaSeleccionada === 'TODAS' || !cajaSeleccionada) {
       return;
     }
-    const cajaExistente = registros.find(
-      (r) => (r.codigo_proyecto || '').toUpperCase().trim() === proyectoSeleccionado.toUpperCase().trim()
-    );
-    if (cajaExistente) {
-      setNumeroCaja(cajaExistente.numero_caja || '');
-      setResponsable(cajaExistente.responsable || '');
-      setSaldoInicial(cajaExistente.saldo_inicial?.toString() || '0');
-      setMoneda(cajaExistente.moneda || 'PEN');
+    const idTarget = generarIdUnico(proyectoSeleccionado, cajaSeleccionada);
+    const aperturaExistente = registros.find((r) => r.id_caja_unica === idTarget);
+
+    if (aperturaExistente) {
+      setNumeroCajaApertura(aperturaExistente.numero_caja || '');
+      setResponsableApertura(aperturaExistente.responsable || '');
+      setSaldoInicialApertura(aperturaExistente.saldo_inicial?.toString() || '0');
+      setMonedaApertura(aperturaExistente.moneda || 'PEN');
     }
-  }, [proyectoSeleccionado, registros]);
+  }, [cajaSeleccionada, proyectoSeleccionado, registros]);
 
   const cargarRegistros = async () => {
     setLoading(true);
@@ -84,7 +97,7 @@ export default function CajaChicaHome() {
       .select('*')
       .order('created_at', { ascending: true });
 
-    if (error) console.error('Error al cargar caja chica:', error);
+    if (error) console.error('Error al cargar datos:', error);
     else setRegistros(data || []);
     setLoading(false);
   };
@@ -98,54 +111,66 @@ export default function CajaChicaHome() {
     const pass = prompt('Ingresa la contraseña de Administrador (vya2026):');
     if (pass === CLAVE_ADMIN) {
       setEsAdmin(true);
-      alert('Modo Administrador ACTIVADO. Puedes gestionar todos los proyectos.');
+      alert('Modo Administrador ACTIVADO. Puedes aperturar cajas y modificar fondos.');
     } else if (pass !== null) {
       alert('Contraseña incorrecta.');
     }
   };
 
+  // ACCIÓN ADMIN: Aperturar o actualizar fondo de caja chica por proyecto
   const guardarAperturaProyecto = async () => {
     if (!esAdmin) {
-      alert('Debes ingresar con la clave de Administrador.');
+      alert('Acceso restringido. Activa el Modo Administrador.');
       return;
     }
-    if (!proyectoSeleccionado || !responsable || !saldoInicial) {
-      alert('Ingresa el Código de Proyecto, Responsable y Monto Asignado.');
+    if (!proyectoSeleccionado || !numeroCajaApertura || !responsableApertura || !saldoInicialApertura) {
+      alert('Completa el Código de Proyecto, Código de Caja, Responsable y Fondo Asignado.');
       return;
     }
 
     const prjTarget = proyectoSeleccionado.toUpperCase().trim();
-    const existe = registros.filter((r) => (r.codigo_proyecto || '').toUpperCase().trim() === prjTarget);
+    const cajaTarget = numeroCajaApertura.toUpperCase().trim();
+    const idUnico = generarIdUnico(prjTarget, cajaTarget);
 
-    if (existe.length > 0) {
+    const existe = registros.some((r) => r.id_caja_unica === idUnico);
+
+    if (existe) {
       const { error } = await supabase
         .from('cajas_chicas')
         .update({
-          responsable,
-          numero_caja: numeroCaja.toUpperCase().trim() || `CCH-${prjTarget}`,
-          saldo_inicial: parseFloat(saldoInicial) || 0,
-          moneda,
+          responsable: responsableApertura,
+          saldo_inicial: parseFloat(saldoInicialApertura) || 0,
+          moneda: monedaApertura,
         })
-        .eq('codigo_proyecto', prjTarget);
+        .eq('id_caja_unica', idUnico);
 
-      if (error) alert('Error al actualizar el fondo: ' + error.message);
-      else { alert(`✅ Fondo del proyecto ${prjTarget} actualizado a S/ ${saldoInicial}`); cargarRegistros(); }
+      if (error) alert('Error al actualizar caja: ' + error.message);
+      else {
+        alert(`✅ Caja ${cajaTarget} del proyecto ${prjTarget} actualizada.`);
+        setCajaSeleccionada(cajaTarget);
+        cargarRegistros();
+      }
     } else {
       const payload: RegistroCaja = {
+        id_caja_unica: idUnico,
         codigo_proyecto: prjTarget,
-        numero_caja: numeroCaja.toUpperCase().trim() || `CCH-${prjTarget}`,
-        responsable,
-        saldo_inicial: parseFloat(saldoInicial) || 0,
-        moneda,
+        numero_caja: cajaTarget,
+        responsable: responsableApertura,
+        saldo_inicial: parseFloat(saldoInicialApertura) || 0,
+        moneda: monedaApertura,
         tipo_documento: 'Apertura',
         monto_gasto: 0,
-        proveedor_detalle: 'Apertura de Fondo de Caja Chica',
+        proveedor_detalle: `Apertura de Caja ${cajaTarget} (${prjTarget})`,
         estado_caja: 'Abierta',
       };
 
       const { error } = await supabase.from('cajas_chicas').insert([payload]);
       if (error) alert('Error al aperturar caja: ' + error.message);
-      else { alert(`✅ Fondo del proyecto ${prjTarget} aperturado correctamente.`); cargarRegistros(); }
+      else {
+        alert(`✅ Caja ${cajaTarget} aperturada para el proyecto ${prjTarget}.`);
+        setCajaSeleccionada(cajaTarget);
+        cargarRegistros();
+      }
     }
   };
 
@@ -159,25 +184,42 @@ export default function CajaChicaHome() {
     setObservaciones('');
   };
 
+  // ACCIÓN RESPONSABLE: Cargar gastos a la caja seleccionada
   const guardarGasto = async (e: React.FormEvent) => {
     e.preventDefault();
 
     if (cajaEstaCerrada) {
-      alert('La caja chica de este proyecto se encuentra CERRADA.');
+      alert('La caja seleccionada se encuentra CERRADA.');
       return;
     }
 
-    if (!proyectoSeleccionado || !responsable || !montoGasto) {
-      alert('Por favor especifica el Código de Proyecto, Responsable y Monto del Gasto.');
+    if (cajaSeleccionada === 'TODAS' || !cajaSeleccionada) {
+      alert('Selecciona la Caja Chica específica en la que rendirás el gasto.');
+      return;
+    }
+
+    const prjTarget = proyectoSeleccionado.toUpperCase().trim();
+    const cajaTarget = cajaSeleccionada.toUpperCase().trim();
+    const idUnico = generarIdUnico(prjTarget, cajaTarget);
+
+    // Obtener responsable y saldo inicial de la apertura de esa caja
+    const registroApertura = registros.find((r) => r.id_caja_unica === idUnico);
+    const responsableActual = registroApertura ? registroApertura.responsable : responsableFiltro;
+    const saldoInicialActual = registroApertura ? registroApertura.saldo_inicial : 0;
+    const monedaActual = registroApertura ? registroApertura.moneda : 'PEN';
+
+    if (!prjTarget || !cajaTarget || !montoGasto) {
+      alert('Especifica Código de Proyecto, Código de Caja y Monto.');
       return;
     }
 
     const payload: RegistroCaja = {
-      codigo_proyecto: proyectoSeleccionado.toUpperCase().trim(),
-      numero_caja: numeroCaja.toUpperCase().trim() || `CCH-${proyectoSeleccionado.toUpperCase().trim()}`,
-      responsable,
-      saldo_inicial: parseFloat(saldoInicial) || 0,
-      moneda,
+      id_caja_unica: idUnico,
+      codigo_proyecto: prjTarget,
+      numero_caja: cajaTarget,
+      responsable: responsableActual,
+      saldo_inicial: saldoInicialActual,
+      moneda: monedaActual,
       fecha_documento: fechaDocumento,
       tipo_documento: tipoDocumento,
       numero_documento: numeroDocumento,
@@ -191,11 +233,11 @@ export default function CajaChicaHome() {
 
     if (idEditando) {
       const { error } = await supabase.from('cajas_chicas').update(payload).eq('id', idEditando);
-      if (error) alert('Error al actualizar: ' + error.message);
+      if (error) alert('Error al actualizar comprobante: ' + error.message);
       else { limpiarFormularioGasto(); cargarRegistros(); }
     } else {
       const { error } = await supabase.from('cajas_chicas').insert([payload]);
-      if (error) alert('Error al guardar: ' + error.message);
+      if (error) alert('Error al registrar gasto: ' + error.message);
       else { limpiarFormularioGasto(); cargarRegistros(); }
     }
   };
@@ -206,27 +248,22 @@ export default function CajaChicaHome() {
       return;
     }
 
-    if (!proyectoSeleccionado) {
-      alert('Ingresa o selecciona un Código de Proyecto.');
+    if (!proyectoSeleccionado || cajaSeleccionada === 'TODAS' || !cajaSeleccionada) {
+      alert('Selecciona una Caja Chica específica para cambiar su estado.');
       return;
     }
 
-    const prjTarget = proyectoSeleccionado.toUpperCase().trim();
+    const idUnico = generarIdUnico(proyectoSeleccionado, cajaSeleccionada);
 
-    if (!confirm(`¿Estás seguro de cambiar el estado de la caja del proyecto ${prjTarget} a "${nuevoEstado}"?`)) {
-      return;
-    }
+    if (!confirm(`¿Cambiar estado de la caja ${cajaSeleccionada} a "${nuevoEstado}"?`)) return;
 
     const { error } = await supabase
       .from('cajas_chicas')
       .update({ estado_caja: nuevoEstado })
-      .eq('codigo_proyecto', prjTarget);
+      .eq('id_caja_unica', idUnico);
 
-    if (error) {
-      alert('Error al actualizar el estado: ' + error.message);
-    } else {
-      cargarRegistros();
-    }
+    if (error) alert('Error al actualizar estado: ' + error.message);
+    else cargarRegistros();
   };
 
   const prepararEdicion = (r: RegistroCaja) => {
@@ -237,10 +274,7 @@ export default function CajaChicaHome() {
     if (!r.id) return;
     setIdEditando(r.id);
     setProyectoSeleccionado(r.codigo_proyecto);
-    setNumeroCaja(r.numero_caja || '');
-    setResponsable(r.responsable);
-    setSaldoInicial(r.saldo_inicial.toString());
-    setMoneda(r.moneda);
+    setCajaSeleccionada(r.numero_caja);
     setFechaDocumento(r.fecha_documento || '');
     setTipoDocumento(r.tipo_documento || 'Factura');
     setNumeroDocumento(r.numero_documento || '');
@@ -257,7 +291,7 @@ export default function CajaChicaHome() {
       alert('No se puede eliminar un comprobante de una caja CERRADA.');
       return;
     }
-    if (!confirm('¿Seguro de que deseas borrar este gasto?')) return;
+    if (!confirm('¿Deseas borrar este gasto?')) return;
     const { error } = await supabase.from('cajas_chicas').delete().eq('id', r.id!);
     if (error) alert('Error al eliminar: ' + error.message);
     else cargarRegistros();
@@ -265,11 +299,12 @@ export default function CajaChicaHome() {
 
   const exportarAExcel = () => {
     if (!registrosFiltrados || registrosFiltrados.length === 0) {
-      alert('No hay comprobantes cargados para este proyecto.');
+      alert('No hay comprobantes para exportar.');
       return;
     }
 
     const datosExcel = registrosFiltrados.map((r) => ({
+      'ID Enlace': r.id_caja_unica || `${r.codigo_proyecto}_${r.numero_caja}`,
       'Código Proyecto': r.codigo_proyecto,
       'N° Caja': r.numero_caja,
       'Responsable': r.responsable,
@@ -288,32 +323,61 @@ export default function CajaChicaHome() {
 
     const worksheet = XLSX.utils.json_to_sheet(datosExcel);
     const workbook = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(workbook, worksheet, 'Liquidacion_Proyecto');
-
-    XLSX.writeFile(workbook, `Rendicion_Proyecto_${proyectoSeleccionado || 'General'}.xlsx`);
+    XLSX.utils.book_append_sheet(workbook, worksheet, 'Liquidacion');
+    XLSX.writeFile(workbook, `Rendicion_${proyectoSeleccionado}_${cajaSeleccionada}.xlsx`);
   };
 
+  // Filtrado de la tabla de comprobantes
   const registrosFiltrados = registros.filter((r) => {
     const coincideProyecto = proyectoSeleccionado 
       ? (r.codigo_proyecto || '').toUpperCase().trim() === proyectoSeleccionado.toUpperCase().trim()
       : false;
-    
-    if (esAdmin) return coincideProyecto;
+
+    const coincideCaja = cajaSeleccionada === 'TODAS' || !cajaSeleccionada
+      ? true
+      : (r.numero_caja || '').toUpperCase().trim() === cajaSeleccionada.toUpperCase().trim();
+
+    if (esAdmin) return coincideProyecto && coincideCaja;
 
     const coincideResponsable = responsableFiltro 
       ? (r.responsable || '').toLowerCase().includes(responsableFiltro.toLowerCase().trim())
       : false;
 
-    return coincideProyecto && coincideResponsable;
+    return coincideProyecto && coincideCaja && coincideResponsable;
   });
 
-  const primerRegistro = registrosFiltrados[0];
-  const saldoInicialAsignado = primerRegistro ? primerRegistro.saldo_inicial : (parseFloat(saldoInicial) || 0);
-  const totalGastosRendidos = registrosFiltrados.reduce((acc, r) => acc + (r.monto_gasto || 0), 0);
-  const saldoFinalCaja = saldoInicialAsignado - totalGastosRendidos;
+  // Cálculo Dinámico de Fondo Inicial y Saldos
+  const totalSaldoInicial = () => {
+    if (!proyectoSeleccionado) return 0;
+    const prjTarget = proyectoSeleccionado.toUpperCase().trim();
 
+    if (cajaSeleccionada !== 'TODAS' && cajaSeleccionada) {
+      const idUnico = generarIdUnico(prjTarget, cajaSeleccionada);
+      const registroCaja = registros.find((r) => r.id_caja_unica === idUnico);
+      return registroCaja ? registroCaja.saldo_inicial : 0;
+    } else {
+      const cajasProcesadas = new Set<string>();
+      let sumaSaldos = 0;
+      registros
+        .filter((r) => (r.codigo_proyecto || '').toUpperCase().trim() === prjTarget)
+        .forEach((r) => {
+          const keyUnica = r.id_caja_unica || generarIdUnico(prjTarget, r.numero_caja);
+          if (keyUnica && !cajasProcesadas.has(keyUnica)) {
+            cajasProcesadas.add(keyUnica);
+            sumaSaldos += r.saldo_inicial || 0;
+          }
+        });
+      return sumaSaldos;
+    }
+  };
+
+  const saldoInicialCalculado = totalSaldoInicial();
+  const totalGastosRendidos = registrosFiltrados.reduce((acc, r) => acc + (r.monto_gasto || 0), 0);
+  const saldoFinalCaja = saldoInicialCalculado - totalGastosRendidos;
+
+  const primerRegistro = registrosFiltrados[0];
   const estadoActualCaja = primerRegistro ? (primerRegistro.estado_caja || 'Abierta') : 'Abierta';
-  const cajaEstaCerrada = estadoActualCaja === 'Cerrada';
+  const cajaEstaCerrada = cajaSeleccionada !== 'TODAS' && estadoActualCaja === 'Cerrada';
 
   return (
     <main className="min-h-screen bg-gray-50 p-4 md:p-8">
@@ -324,7 +388,7 @@ export default function CajaChicaHome() {
           <div className="text-center sm:text-left flex flex-col items-center sm:items-start space-y-2">
             <img src="/logo.jpeg" alt="VyA Consulting Logo" className="h-14 object-contain" />
             <h1 className="text-xl font-bold text-gray-800">💵 Sistema de Rendición de Caja Chica por Proyecto</h1>
-            <p className="text-xs text-gray-500">Gestión Privada de Entregas a Rendir y Comprobantes de Gasto</p>
+            <p className="text-xs text-gray-500">Gestión Multi-Caja para Proyectos VyA Consulting S.A.C.</p>
           </div>
 
           <button
@@ -333,13 +397,13 @@ export default function CajaChicaHome() {
               esAdmin ? 'bg-amber-100 text-amber-800 border border-amber-300' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
             }`}
           >
-            {esAdmin ? '🔓 Modo Admin Activo (Vista Global)' : '🔒 Acceso Administrador'}
+            {esAdmin ? '🔓 Modo Admin Activo' : '🔒 Acceso Administrador'}
           </button>
         </div>
 
-        {/* Identificación de Usuario y Selección de Proyecto */}
-        <div className="bg-white p-4 rounded-xl shadow-sm border flex flex-col md:flex-row justify-between items-center gap-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3 w-full md:w-auto">
+        {/* Barra de Filtros y Selección de Proyecto */}
+        <div className="bg-white p-4 rounded-xl shadow-sm border flex flex-col lg:flex-row justify-between items-center gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3 w-full lg:w-auto">
             {!esAdmin && (
               <div>
                 <label className="block text-[11px] font-bold text-gray-600 uppercase mb-1">Tu Nombre / Responsable:</label>
@@ -352,80 +416,79 @@ export default function CajaChicaHome() {
                 />
               </div>
             )}
+
             <div>
               <label className="block text-[11px] font-bold text-gray-600 uppercase mb-1">Código de Proyecto:</label>
               <input 
                 type="text" 
                 placeholder="Ej: PR-SHA-001" 
                 value={proyectoSeleccionado} 
-                onChange={(e) => setProyectoSeleccionado(e.target.value)}
+                onChange={(e) => {
+                  setProyectoSeleccionado(e.target.value);
+                  setCajaSeleccionada('TODAS');
+                }}
                 className="p-2 border rounded-lg text-xs font-extrabold text-blue-900 bg-blue-50/50 uppercase w-full"
               />
             </div>
+
+            <div>
+              <label className="block text-[11px] font-bold text-gray-600 uppercase mb-1">Seleccionar Caja Chica Asignada:</label>
+              <select
+                value={cajaSeleccionada}
+                onChange={(e) => setCajaSeleccionada(e.target.value)}
+                className="p-2 border rounded-lg text-xs font-bold text-gray-800 bg-white w-full uppercase"
+                disabled={!proyectoSeleccionado}
+              >
+                <option value="TODAS">📂 (Todas las Cajas / Consolidado)</option>
+                {cajasDelProyecto.map((caja) => (
+                  <option key={caja} value={caja}>
+                    📦 Caja: {caja}
+                  </option>
+                ))}
+              </select>
+            </div>
           </div>
 
-          <div className="flex items-center gap-2 w-full md:w-auto justify-end">
-            {proyectoSeleccionado && (
+          <div className="flex items-center gap-2 w-full lg:w-auto justify-end">
+            {proyectoSeleccionado && cajaSeleccionada !== 'TODAS' && (
               cajaEstaCerrada ? (
-                <span className="px-3 py-1.5 rounded-full text-xs font-extrabold bg-red-100 text-red-700">
-                  🔒 CERRADA
-                </span>
+                <span className="px-3 py-1.5 rounded-full text-xs font-extrabold bg-red-100 text-red-700">🔒 CERRADA</span>
               ) : (
-                <span className="px-3 py-1.5 rounded-full text-xs font-extrabold bg-emerald-100 text-emerald-700">
-                  🔓 ABIERTA
-                </span>
+                <span className="px-3 py-1.5 rounded-full text-xs font-extrabold bg-emerald-100 text-emerald-700">🔓 ABIERTA</span>
               )
             )}
 
-            {esAdmin && (
+            {esAdmin && cajaSeleccionada !== 'TODAS' && (
               cajaEstaCerrada ? (
-                <button
-                  type="button"
-                  onClick={() => cambiarEstadoCaja('Abierta')}
-                  className="bg-amber-600 hover:bg-amber-700 text-white font-semibold py-2 px-3 rounded-lg text-xs shadow transition-colors"
-                >
-                  🔓 Reabrir
-                </button>
+                <button type="button" onClick={() => cambiarEstadoCaja('Abierta')} className="bg-amber-600 text-white font-semibold py-2 px-3 rounded-lg text-xs shadow">🔓 Reabrir</button>
               ) : (
-                <button
-                  type="button"
-                  onClick={() => cambiarEstadoCaja('Cerrada')}
-                  className="bg-red-600 hover:bg-red-700 text-white font-semibold py-2 px-3 rounded-lg text-xs shadow transition-colors"
-                >
-                  🔒 Cerrar Caja
-                </button>
+                <button type="button" onClick={() => cambiarEstadoCaja('Cerrada')} className="bg-red-600 text-white font-semibold py-2 px-3 rounded-lg text-xs shadow">🔒 Cerrar Caja</button>
               )
             )}
 
-            <button
-              type="button"
-              onClick={exportarAExcel}
-              className="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold py-2 px-3 rounded-lg text-xs shadow transition-colors"
-            >
-              📊 Exportar Excel
-            </button>
+            <button type="button" onClick={exportarAExcel} className="bg-emerald-600 text-white font-semibold py-2 px-3 rounded-lg text-xs shadow">📊 Exportar Excel</button>
           </div>
         </div>
 
-        {/* Resumen Financiero Privado */}
+        {/* Resumen Financiero */}
         {!esAdmin && (!responsableFiltro || !proyectoSeleccionado) ? (
           <div className="bg-amber-50 border border-amber-200 p-4 rounded-xl text-center text-xs font-semibold text-amber-800">
-            🔒 Para ver tus saldos y rendición, ingresa Tu Nombre de Responsable y tu Código de Proyecto arriba.
+            🔒 Ingresa Tu Nombre de Responsable y Código de Proyecto arriba para consultar saldos y movimientos.
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div className="bg-blue-50 border border-blue-200 p-4 rounded-lg shadow-sm">
               <span className="text-xs font-bold text-blue-600 uppercase">
-                Monto Asignado {proyectoSeleccionado ? `(${proyectoSeleccionado})` : ''}
+                Fondo Asignado {cajaSeleccionada !== 'TODAS' ? `(Caja ${cajaSeleccionada})` : `(Consolidado ${proyectoSeleccionado})`}
               </span>
               <p className="text-3xl font-extrabold text-blue-800 mt-1">
-                {moneda === 'PEN' ? 'S/' : '$'} {saldoInicialAsignado.toFixed(2)}
+                S/ {saldoInicialCalculado.toFixed(2)}
               </p>
             </div>
             <div className="bg-amber-50 border border-amber-200 p-4 rounded-lg shadow-sm">
               <span className="text-xs font-bold text-amber-600 uppercase">Total Gastos Consumidos</span>
               <p className="text-3xl font-extrabold text-amber-800 mt-1">
-                {moneda === 'PEN' ? 'S/' : '$'} {totalGastosRendidos.toFixed(2)}
+                S/ {totalGastosRendidos.toFixed(2)}
               </p>
             </div>
             <div className={`border p-4 rounded-lg shadow-sm ${saldoFinalCaja >= 0 ? 'bg-emerald-50 border-emerald-200' : 'bg-red-50 border-red-200'}`}>
@@ -433,156 +496,156 @@ export default function CajaChicaHome() {
                 {saldoFinalCaja >= 0 ? 'Saldo Restante (Devolver a Empresa)' : 'Saldo en Contra (Reembolsar a Trabajador)'}
               </span>
               <p className={`text-3xl font-extrabold mt-1 ${saldoFinalCaja >= 0 ? 'text-emerald-800' : 'text-red-800'}`}>
-                {moneda === 'PEN' ? 'S/' : '$'} {Math.abs(saldoFinalCaja).toFixed(2)}
+                S/ {Math.abs(saldoFinalCaja).toFixed(2)}
               </p>
             </div>
           </div>
         )}
 
-        {/* Formulario */}
-        <form onSubmit={guardarGasto} className={`p-6 rounded-xl shadow-sm border space-y-4 ${cajaEstaCerrada ? 'bg-gray-100 opacity-60 pointer-events-none' : idEditando ? 'bg-amber-50/50 border-amber-300' : 'bg-white'}`}>
-          
-          <div className="border-b pb-4 space-y-3">
-            <div className="flex justify-between items-center">
-              <h2 className="text-xs font-bold text-gray-500 uppercase tracking-wider">1. Asignación de Proyecto y Saldo Inicial</h2>
-              {!esAdmin && <span className="text-[11px] text-amber-700 font-semibold bg-amber-50 px-2 py-0.5 rounded border border-amber-200">🔒 El Saldo Inicial solo puede modificarlo el Administrador</span>}
-            </div>
-            
+        {/* SECCIÓN 1: APERTURA Y ASIGNACIÓN DE CAJAS (Solo Administrador) */}
+        {esAdmin && (
+          <div className="bg-amber-50/60 p-6 rounded-xl border border-amber-300 space-y-3">
+            <h2 className="text-xs font-bold text-amber-900 uppercase tracking-wider">🛠️ Panel Admin: Apertura y Asignación de Cajas a Proyectos</h2>
             <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
               <div>
-                <label className="block text-xs font-medium text-gray-700 mb-1">Responsable del Proyecto *</label>
-                <input type="text" placeholder="Ej: Jorge Robles" value={responsable} onChange={(e) => setResponsable(e.target.value)} className="w-full p-2 border rounded-lg text-sm" required disabled={cajaEstaCerrada} />
+                <label className="block text-xs font-medium text-amber-900 mb-1">Código de Caja Chica *</label>
+                <input 
+                  type="text" 
+                  placeholder="Ej: SHA-001, SHA-002" 
+                  value={numeroCajaApertura} 
+                  onChange={(e) => setNumeroCajaApertura(e.target.value)} 
+                  className="w-full p-2 border rounded-lg text-sm uppercase font-bold text-blue-900 bg-white" 
+                />
               </div>
               <div>
-                <label className="block text-xs font-medium text-gray-700 mb-1">N° Interno / Identificador de Caja</label>
-                <input type="text" placeholder="Ej: CCH-001" value={numeroCaja} onChange={(e) => setNumeroCaja(e.target.value)} className="w-full p-2 border rounded-lg text-sm uppercase" disabled={cajaEstaCerrada} />
+                <label className="block text-xs font-medium text-amber-900 mb-1">Nombre del Responsable *</label>
+                <input 
+                  type="text" 
+                  placeholder="Ej: Jorge Robles" 
+                  value={responsableApertura} 
+                  onChange={(e) => setResponsableApertura(e.target.value)} 
+                  className="w-full p-2 border rounded-lg text-sm bg-white" 
+                />
               </div>
               <div>
-                <label className="block text-xs font-medium text-gray-700 mb-1">Monto Asignado al Proyecto *</label>
+                <label className="block text-xs font-medium text-amber-900 mb-1">Fondo Asignado (Monto Inicial) *</label>
                 <input 
                   type="number" 
                   step="0.01" 
                   placeholder="0.00" 
-                  value={saldoInicial} 
-                  onChange={(e) => setSaldoInicial(e.target.value)} 
-                  className={`w-full p-2 border rounded-lg text-sm font-bold ${esAdmin ? 'bg-amber-50 text-amber-900 border-amber-400' : 'bg-gray-100 text-gray-500 cursor-not-allowed'}`}
-                  required 
-                  disabled={!esAdmin || cajaEstaCerrada} 
+                  value={saldoInicialApertura} 
+                  onChange={(e) => setSaldoInicialApertura(e.target.value)} 
+                  className="w-full p-2 border border-amber-400 rounded-lg text-sm font-bold text-amber-950 bg-white" 
                 />
               </div>
               <div>
-                <label className="block text-xs font-medium text-gray-700 mb-1">Moneda del Fondo</label>
-                <select value={moneda} onChange={(e) => setMoneda(e.target.value)} className="w-full p-2 border rounded-lg text-sm bg-white font-semibold" disabled={!esAdmin || cajaEstaCerrada}>
+                <label className="block text-xs font-medium text-amber-900 mb-1">Moneda del Fondo</label>
+                <select value={monedaApertura} onChange={(e) => setMonedaApertura(e.target.value)} className="w-full p-2 border rounded-lg text-sm bg-white font-semibold">
                   <option value="PEN">Soles (S/)</option>
                   <option value="USD">Dólares ($)</option>
                 </select>
               </div>
             </div>
+            <div className="pt-2 flex justify-end">
+              <button type="button" onClick={guardarAperturaProyecto} className="bg-emerald-700 hover:bg-emerald-800 text-white font-bold py-2 px-5 rounded-lg text-xs shadow">
+                💾 OK: Aperturar / Actualizar Caja Chica
+              </button>
+            </div>
+          </div>
+        )}
 
-            {esAdmin && !cajaEstaCerrada && (
-              <div className="pt-2 flex justify-end">
-                <button
-                  type="button"
-                  onClick={guardarAperturaProyecto}
-                  className="bg-emerald-700 hover:bg-emerald-800 text-white font-bold py-2 px-5 rounded-lg text-xs shadow flex items-center gap-1.5"
-                >
-                  💾 OK: Guardar / Asignar Fondo Inicial
-                </button>
-              </div>
+        {/* SECCIÓN 2: CARGAR RENDICIÓN DE GASTOS */}
+        <form onSubmit={guardarGasto} className={`p-6 rounded-xl shadow-sm border space-y-4 ${cajaEstaCerrada ? 'bg-gray-100 opacity-60 pointer-events-none' : idEditando ? 'bg-amber-50/50 border-amber-300' : 'bg-white'}`}>
+          <div className="flex justify-between items-center border-b pb-2">
+            <h2 className="text-xs font-bold text-gray-500 uppercase tracking-wider">Cargar Comprobante de Gasto a Caja Chica seleccionada</h2>
+            {idEditando && (
+              <button type="button" onClick={limpiarFormularioGasto} className="text-xs text-red-600 underline font-semibold">
+                ✖ Cancelar Edición
+              </button>
             )}
           </div>
 
-          <div className="space-y-2 pt-2">
-            <div className="flex justify-between items-center">
-              <h2 className="text-xs font-bold text-gray-500 uppercase tracking-wider">2. Cargar Comprobante / Gasto del Proyecto</h2>
-              {idEditando && (
-                <button type="button" onClick={limpiarFormularioGasto} className="text-xs text-red-600 underline font-semibold">
-                  ✖ Cancelar Edición
-                </button>
-              )}
+          <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-4">
+            <div>
+              <label className="block text-xs font-medium text-gray-700 mb-1">Fecha Documento</label>
+              <input type="date" value={fechaDocumento} onChange={(e) => setFechaDocumento(e.target.value)} className="w-full p-2 border rounded-lg text-sm" disabled={cajaEstaCerrada} />
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-4">
-              <div>
-                <label className="block text-xs font-medium text-gray-700 mb-1">Fecha Documento</label>
-                <input type="date" value={fechaDocumento} onChange={(e) => setFechaDocumento(e.target.value)} className="w-full p-2 border rounded-lg text-sm" disabled={cajaEstaCerrada} />
-              </div>
+            <div>
+              <label className="block text-xs font-medium text-gray-700 mb-1">Tipo Documento</label>
+              <select value={tipoDocumento} onChange={(e) => setTipoDocumento(e.target.value)} className="w-full p-2 border rounded-lg text-sm bg-white" disabled={cajaEstaCerrada}>
+                <option>Factura</option>
+                <option>Boleta</option>
+                <option>RxH</option>
+                <option>Ticket</option>
+                <option>Sin Documento</option>
+              </select>
+            </div>
 
-              <div>
-                <label className="block text-xs font-medium text-gray-700 mb-1">Tipo Documento</label>
-                <select value={tipoDocumento} onChange={(e) => setTipoDocumento(e.target.value)} className="w-full p-2 border rounded-lg text-sm bg-white" disabled={cajaEstaCerrada}>
-                  <option>Factura</option>
-                  <option>Boleta</option>
-                  <option>RxH</option>
-                  <option>Ticket</option>
-                  <option>Sin Documento</option>
-                </select>
-              </div>
+            <div>
+              <label className="block text-xs font-medium text-gray-700 mb-1">N° Comprobante</label>
+              <input type="text" placeholder="Ej: F001-1234" value={numeroDocumento} onChange={(e) => setNumeroDocumento(e.target.value)} className="w-full p-2 border rounded-lg text-sm" disabled={cajaEstaCerrada} />
+            </div>
 
-              <div>
-                <label className="block text-xs font-medium text-gray-700 mb-1">N° Comprobante</label>
-                <input type="text" placeholder="Ej: F001-1234" value={numeroDocumento} onChange={(e) => setNumeroDocumento(e.target.value)} className="w-full p-2 border rounded-lg text-sm" disabled={cajaEstaCerrada} />
-              </div>
+            <div>
+              <label className="block text-xs font-medium text-gray-700 mb-1">Tipo de Gasto</label>
+              <select value={tipoGasto} onChange={(e) => setTipoGasto(e.target.value)} className="w-full p-2 border rounded-lg text-sm bg-white font-semibold" disabled={cajaEstaCerrada}>
+                <option>Combustible</option>
+                <option>Peaje</option>
+                <option>Alimentación</option>
+                <option>Hospedaje</option>
+                <option>Mantenimiento</option>
+                <option>Movilidad</option>
+                <option>Personal Extra</option>
+                <option>Otros</option>
+              </select>
+            </div>
 
-              <div>
-                <label className="block text-xs font-medium text-gray-700 mb-1">Tipo de Gasto</label>
-                <select value={tipoGasto} onChange={(e) => setTipoGasto(e.target.value)} className="w-full p-2 border rounded-lg text-sm bg-white font-semibold" disabled={cajaEstaCerrada}>
-                  <option>Combustible</option>
-                  <option>Peaje</option>
-                  <option>Alimentación</option>
-                  <option>Hospedaje</option>
-                  <option>Mantenimiento</option>
-                  <option>Movilidad</option>
-                  <option>Personal Extra</option>
-                  <option>Otros</option>
-                </select>
-              </div>
+            <div>
+              <label className="block text-xs font-medium text-gray-700 mb-1">Monto del Gasto *</label>
+              <input type="number" step="0.01" placeholder="0.00" value={montoGasto} onChange={(e) => setMontoGasto(e.target.value)} className="w-full p-2 border rounded-lg text-sm font-bold text-red-600" required disabled={cajaEstaCerrada} />
+            </div>
 
-              <div>
-                <label className="block text-xs font-medium text-gray-700 mb-1">Monto del Gasto *</label>
-                <input type="number" step="0.01" placeholder="0.00" value={montoGasto} onChange={(e) => setMontoGasto(e.target.value)} className="w-full p-2 border rounded-lg text-sm font-bold text-red-600" required disabled={cajaEstaCerrada} />
-              </div>
+            <div>
+              <label className="block text-xs font-medium text-gray-700 mb-1">RUC Proveedor (Opcional)</label>
+              <input type="text" placeholder="Ej: 20502073401" value={rucProveedor} onChange={(e) => setRucProveedor(e.target.value)} className="w-full p-2 border rounded-lg text-sm" disabled={cajaEstaCerrada} />
+            </div>
 
-              <div>
-                <label className="block text-xs font-medium text-gray-700 mb-1">RUC Proveedor (Opcional)</label>
-                <input type="text" placeholder="Ej: 20502073401" value={rucProveedor} onChange={(e) => setRucProveedor(e.target.value)} className="w-full p-2 border rounded-lg text-sm" disabled={cajaEstaCerrada} />
-              </div>
+            <div>
+              <label className="block text-xs font-medium text-gray-700 mb-1">Razón Social / Empresa *</label>
+              <input type="text" placeholder="Ej: Primax S.A. / Hostal Los Pinos" value={proveedorDetalle} onChange={(e) => setProveedorDetalle(e.target.value)} className="w-full p-2 border rounded-lg text-sm" disabled={cajaEstaCerrada} />
+            </div>
 
-              <div>
-                <label className="block text-xs font-medium text-gray-700 mb-1">Razón Social / Empresa *</label>
-                <input type="text" placeholder="Ej: Primax S.A. / Hostal Los Pinos" value={proveedorDetalle} onChange={(e) => setProveedorDetalle(e.target.value)} className="w-full p-2 border rounded-lg text-sm" disabled={cajaEstaCerrada} />
-              </div>
-
-              <div>
-                <label className="block text-xs font-medium text-gray-700 mb-1">Observaciones</label>
-                <input type="text" placeholder="Comentarios" value={observaciones} onChange={(e) => setObservaciones(e.target.value)} className="w-full p-2 border rounded-lg text-sm" disabled={cajaEstaCerrada} />
-              </div>
+            <div>
+              <label className="block text-xs font-medium text-gray-700 mb-1">Observaciones</label>
+              <input type="text" placeholder="Comentarios" value={observaciones} onChange={(e) => setObservaciones(e.target.value)} className="w-full p-2 border rounded-lg text-sm" disabled={cajaEstaCerrada} />
             </div>
           </div>
 
-          <button type="submit" disabled={cajaEstaCerrada} className={`font-semibold py-2 px-6 rounded-lg shadow text-white ${idEditando ? 'bg-amber-600 hover:bg-amber-700' : 'bg-blue-600 hover:bg-blue-700'}`}>
-            {idEditando ? '💾 Actualizar Comprobante' : `➕ Agregar Gasto al Proyecto`}
+          <button type="submit" disabled={cajaEstaCerrada || cajaSeleccionada === 'TODAS'} className={`font-semibold py-2 px-6 rounded-lg shadow text-white ${cajaSeleccionada === 'TODAS' ? 'bg-gray-400 cursor-not-allowed' : idEditando ? 'bg-amber-600 hover:bg-amber-700' : 'bg-blue-600 hover:bg-blue-700'}`}>
+            {cajaSeleccionada === 'TODAS' ? '⚠️ Selecciona una Caja Chica arriba para rendir' : idEditando ? '💾 Actualizar Comprobante' : `➕ Agregar Gasto a Caja ${cajaSeleccionada}`}
           </button>
         </form>
 
-        {/* Tabla de Comprobantes Filtrados */}
+        {/* Tabla de Rendición */}
         <div className="bg-white p-6 rounded-xl shadow-sm border space-y-4">
           <h2 className="text-lg font-semibold text-gray-800 border-b pb-2">
-            Comprobantes Rendidos {proyectoSeleccionado ? <>en Proyecto <span className="text-blue-600 font-extrabold">{proyectoSeleccionado}</span></> : ''}
+            Comprobantes Rendidos {proyectoSeleccionado ? <>en Proyecto <span className="text-blue-600 font-extrabold">{proyectoSeleccionado}</span> {cajaSeleccionada !== 'TODAS' ? <>(Caja: <span className="text-emerald-700 font-extrabold">{cajaSeleccionada}</span>)</> : '(Consolidado Cajas)'}</> : ''}
           </h2>
 
           {loading ? (
-            <p className="text-center text-sm text-gray-500 py-4">Cargando rendición...</p>
+            <p className="text-center text-sm text-gray-500 py-4">Cargando datos...</p>
           ) : !esAdmin && (!responsableFiltro || !proyectoSeleccionado) ? (
-            <p className="text-center text-sm text-gray-500 py-4">Ingresa tu Nombre de Responsable y Código de Proyecto arriba para visualizar los comprobantes.</p>
+            <p className="text-center text-sm text-gray-500 py-4">Ingresa tu Nombre de Responsable y Código de Proyecto arriba para visualizar la rendición.</p>
           ) : registrosFiltrados.length === 0 ? (
-            <p className="text-center text-sm text-gray-500 py-4">No hay comprobantes autorizados o registrados para los datos ingresados.</p>
+            <p className="text-center text-sm text-gray-500 py-4">No hay comprobantes cargados para la selección actual.</p>
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full text-left text-xs text-gray-600 border-collapse">
                 <thead>
                   <tr className="bg-gray-100 text-gray-700 uppercase font-semibold">
                     <th className="p-3">Código Proyecto</th>
+                    <th className="p-3">N° Caja</th>
                     <th className="p-3">Responsable</th>
                     <th className="p-3">Fecha</th>
                     <th className="p-3">Documento</th>
@@ -596,7 +659,8 @@ export default function CajaChicaHome() {
                   {registrosFiltrados.map((r) => (
                     <tr key={r.id} className="hover:bg-gray-50">
                       <td className="p-3 font-bold text-gray-900">{r.codigo_proyecto}</td>
-                      <td className="p-3 font-medium">{r.responsable}<br/><span className="text-[10px] text-gray-400">{r.numero_caja || 'Sin N° Caja'}</span></td>
+                      <td className="p-3"><span className="bg-blue-100 text-blue-800 px-2 py-0.5 rounded font-extrabold">{r.numero_caja}</span></td>
+                      <td className="p-3 font-medium">{r.responsable}</td>
                       <td className="p-3">{r.fecha_documento || '-'}</td>
                       <td className="p-3"><span className="font-semibold">{r.tipo_documento}:</span> {r.numero_documento || 'S/N'}</td>
                       <td className="p-3 font-medium text-blue-700">{r.tipo_gasto}</td>
@@ -604,7 +668,7 @@ export default function CajaChicaHome() {
                         {r.ruc_proveedor ? <span className="font-semibold text-gray-800">RUC: {r.ruc_proveedor}<br/></span> : null}
                         {r.proveedor_detalle || '-'}
                       </td>
-                      <td className="p-3 font-bold text-red-600">{r.moneda === 'PEN' ? 'S/' : '$'} {(r.monto_gasto || 0).toFixed(2)}</td>
+                      <td className="p-3 font-bold text-red-600">S/ {(r.monto_gasto || 0).toFixed(2)}</td>
                       <td className="p-3 text-center space-x-2">
                         {r.id && (
                           <>
