@@ -12,7 +12,6 @@ const CLAVE_ADMIN = 'vya2026';
 
 interface RegistroCaja {
   id?: number;
-  id_caja_unica?: string;
   numero_caja: string;
   responsable: string;
   codigo_proyecto: string;
@@ -61,10 +60,6 @@ export default function CajaChicaHome() {
     cargarRegistros();
   }, []);
 
-  const generarIdUnico = (prj: string, caja: string) => {
-    return `${prj.toUpperCase().trim()}_${caja.toUpperCase().trim()}`;
-  };
-
   // Cajas asociadas al proyecto
   const cajasDelProyecto = Array.from(
     new Set(
@@ -75,13 +70,19 @@ export default function CajaChicaHome() {
     )
   );
 
-  // Si cambia el proyecto o la caja seleccionada
+  // Precargar datos al seleccionar caja existente
   useEffect(() => {
     if (!proyectoSeleccionado || cajaSeleccionada === 'TODAS' || cajaSeleccionada === 'NUEVA') {
       return;
     }
-    const idTarget = generarIdUnico(proyectoSeleccionado, cajaSeleccionada);
-    const aperturaExistente = registros.find((r) => r.id_caja_unica === idTarget);
+    const prjTarget = proyectoSeleccionado.toUpperCase().trim();
+    const cajaTarget = cajaSeleccionada.toUpperCase().trim();
+
+    const aperturaExistente = registros.find(
+      (r) =>
+        (r.codigo_proyecto || '').toUpperCase().trim() === prjTarget &&
+        (r.numero_caja || '').toUpperCase().trim() === cajaTarget
+    );
 
     if (aperturaExistente) {
       setNumeroCajaApertura(aperturaExistente.numero_caja || '');
@@ -130,9 +131,12 @@ export default function CajaChicaHome() {
 
     const prjTarget = proyectoSeleccionado.toUpperCase().trim();
     const cajaTarget = numeroCajaApertura.toUpperCase().trim();
-    const idUnico = generarIdUnico(prjTarget, cajaTarget);
 
-    const existe = registros.some((r) => r.id_caja_unica === idUnico);
+    const existe = registros.some(
+      (r) =>
+        (r.codigo_proyecto || '').toUpperCase().trim() === prjTarget &&
+        (r.numero_caja || '').toUpperCase().trim() === cajaTarget
+    );
 
     if (existe) {
       const { error } = await supabase
@@ -142,7 +146,8 @@ export default function CajaChicaHome() {
           saldo_inicial: parseFloat(saldoInicialApertura) || 0,
           moneda: monedaApertura,
         })
-        .eq('id_caja_unica', idUnico);
+        .eq('codigo_proyecto', prjTarget)
+        .eq('numero_caja', cajaTarget);
 
       if (error) alert('Error al actualizar caja: ' + error.message);
       else {
@@ -152,7 +157,6 @@ export default function CajaChicaHome() {
       }
     } else {
       const payload: RegistroCaja = {
-        id_caja_unica: idUnico,
         codigo_proyecto: prjTarget,
         numero_caja: cajaTarget,
         responsable: responsableApertura,
@@ -192,7 +196,6 @@ export default function CajaChicaHome() {
       return;
     }
 
-    // Determinar la caja a utilizar (la del desplegable o la digitada manualmente)
     const cajaFinal = (
       cajaSeleccionada === 'NUEVA' ? cajaManualInput : cajaSeleccionada
     ).toUpperCase().trim();
@@ -208,16 +211,18 @@ export default function CajaChicaHome() {
     }
 
     const prjTarget = proyectoSeleccionado.toUpperCase().trim();
-    const idUnico = generarIdUnico(prjTarget, cajaFinal);
 
-    // Buscar si existe apertura previa para esta caja
-    const registroApertura = registros.find((r) => r.id_caja_unica === idUnico);
+    const registroApertura = registros.find(
+      (r) =>
+        (r.codigo_proyecto || '').toUpperCase().trim() === prjTarget &&
+        (r.numero_caja || '').toUpperCase().trim() === cajaFinal
+    );
+
     const responsableActual = registroApertura ? registroApertura.responsable : (responsableFiltro || 'Sin Responsable');
     const saldoInicialActual = registroApertura ? registroApertura.saldo_inicial : 0;
     const monedaActual = registroApertura ? registroApertura.moneda : 'PEN';
 
     const payload: RegistroCaja = {
-      id_caja_unica: idUnico,
       codigo_proyecto: prjTarget,
       numero_caja: cajaFinal,
       responsable: responsableActual,
@@ -263,7 +268,6 @@ export default function CajaChicaHome() {
     }
 
     const prjTarget = proyectoSeleccionado.toUpperCase().trim();
-    const idUnico = generarIdUnico(prjTarget, cajaTarget);
 
     if (!confirm(`¿Estás seguro de cambiar el estado de la caja "${cajaTarget}" a "${nuevoEstado}"?`)) {
       return;
@@ -272,7 +276,8 @@ export default function CajaChicaHome() {
     const { error } = await supabase
       .from('cajas_chicas')
       .update({ estado_caja: nuevoEstado })
-      .or(`id_caja_unica.eq.${idUnico},and(codigo_proyecto.ilike.${prjTarget},numero_caja.ilike.${cajaTarget})`);
+      .eq('codigo_proyecto', prjTarget)
+      .eq('numero_caja', cajaTarget);
 
     if (error) {
       alert('Error al actualizar estado: ' + error.message);
@@ -320,7 +325,6 @@ export default function CajaChicaHome() {
     }
 
     const datosExcel = registrosFiltrados.map((r) => ({
-      'ID Enlace': r.id_caja_unica || `${r.codigo_proyecto}_${r.numero_caja}`,
       'Código Proyecto': r.codigo_proyecto,
       'N° Caja': r.numero_caja,
       'Responsable': r.responsable,
@@ -370,8 +374,11 @@ export default function CajaChicaHome() {
     const prjTarget = proyectoSeleccionado.toUpperCase().trim();
 
     if (cajaActivaFiltro && cajaActivaFiltro !== 'TODAS') {
-      const idUnico = generarIdUnico(prjTarget, cajaActivaFiltro);
-      const registroCaja = registros.find((r) => r.id_caja_unica === idUnico || (r.codigo_proyecto.toUpperCase() === prjTarget && r.numero_caja.toUpperCase() === cajaActivaFiltro.toUpperCase()));
+      const registroCaja = registros.find(
+        (r) =>
+          (r.codigo_proyecto || '').toUpperCase().trim() === prjTarget &&
+          (r.numero_caja || '').toUpperCase().trim() === cajaActivaFiltro.toUpperCase().trim()
+      );
       return registroCaja ? registroCaja.saldo_inicial : 0;
     } else {
       const cajasProcesadas = new Set<string>();
@@ -379,9 +386,9 @@ export default function CajaChicaHome() {
       registros
         .filter((r) => (r.codigo_proyecto || '').toUpperCase().trim() === prjTarget)
         .forEach((r) => {
-          const keyUnica = r.id_caja_unica || generarIdUnico(prjTarget, r.numero_caja);
-          if (keyUnica && !cajasProcesadas.has(keyUnica)) {
-            cajasProcesadas.add(keyUnica);
+          const keyCaja = (r.numero_caja || '').toUpperCase().trim();
+          if (keyCaja && !cajasProcesadas.has(keyCaja)) {
+            cajasProcesadas.add(keyCaja);
             sumaSaldos += r.saldo_inicial || 0;
           }
         });
@@ -393,8 +400,11 @@ export default function CajaChicaHome() {
   const totalGastosRendidos = registrosFiltrados.reduce((acc, r) => acc + (r.monto_gasto || 0), 0);
   const saldoFinalCaja = saldoInicialCalculado - totalGastosRendidos;
 
-  const idUnicoActivo = generarIdUnico(proyectoSeleccionado, cajaActivaFiltro);
-  const registroCajaActiva = registros.find((r) => r.id_caja_unica === idUnicoActivo || (r.codigo_proyecto?.toUpperCase() === proyectoSeleccionado.toUpperCase() && r.numero_caja?.toUpperCase() === cajaActivaFiltro.toUpperCase()));
+  const registroCajaActiva = registros.find(
+    (r) =>
+      (r.codigo_proyecto || '').toUpperCase().trim() === proyectoSeleccionado.toUpperCase().trim() &&
+      (r.numero_caja || '').toUpperCase().trim() === cajaActivaFiltro.toUpperCase().trim()
+  );
   const estadoActualCaja = registroCajaActiva ? (registroCajaActiva.estado_caja || 'Abierta') : 'Abierta';
   const cajaEstaCerrada = cajaActivaFiltro !== 'TODAS' && estadoActualCaja === 'Cerrada';
 
@@ -548,7 +558,7 @@ export default function CajaChicaHome() {
           </div>
         )}
 
-        {/* Panel Admin: Apertura (Opcional) */}
+        {/* Panel Admin: Apertura */}
         {esAdmin && (
           <div className="bg-amber-50/60 p-6 rounded-xl border border-amber-300 space-y-3">
             <h2 className="text-xs font-bold text-amber-900 uppercase tracking-wider">🛠️ Panel Admin: Apertura y Asignación de Cajas a Proyectos</h2>
