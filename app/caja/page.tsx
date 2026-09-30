@@ -965,7 +965,7 @@ export default function CajaChicaHome() {
                           <div className="flex justify-center items-center gap-2">
                             <button onClick={() => prepararEdicion(r)} className="text-amber-600 font-semibold hover:underline cursor-pointer">✏️ Editar</button>
                             <span className="text-gray-300">|</span>
-                            <button onClick={() => eliminarRegistro(r)} className="text-red-600 font-semibold hover:underline cursor-pointer">🗑️ Borrar</button>
+                            <button onClick={() => eliminarRegistro(r)} className="text-red-600 font-semibold hover:underline cursor-pointer">🗑️️ Borrar</button>
                           </div>
                         )}
                       </td>
