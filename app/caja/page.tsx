@@ -1,14 +1,37 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { createClient } from '@supabase/supabase-js';
 import * as XLSX from 'xlsx';
+import {
+  PieChart,
+  Pie,
+  Cell,
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  Tooltip,
+  Legend,
+  ResponsiveContainer,
+} from 'recharts';
 
 const supabaseUrl = 'https://cxqwzbfbffarrlgbhtuv.supabase.co';
 const supabaseAnonKey = 'sb_publishable_tLRrpt_XooefWWZp-xXDaQ_eNyXO_zE';
 const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
 const CLAVE_ADMIN = 'vya2026';
+
+const COLORES_GRAFICOS = [
+  '#2563EB', // Azul
+  '#10B981', // Verde
+  '#F59E0B', // Ámbar
+  '#EF4444', // Rojo
+  '#8B5CF6', // Púrpura
+  '#EC4899', // Rosado
+  '#14B8A6', // Turquesa
+  '#6366F1', // Índigo
+];
 
 interface RegistroCaja {
   id?: number;
@@ -25,16 +48,18 @@ interface RegistroCaja {
   ruc_proveedor?: string;
   proveedor_detalle?: string;
   observaciones?: string;
+  url_comprobante?: string;
   estado_caja?: string;
 }
 
 export default function CajaChicaHome() {
   const [registros, setRegistros] = useState<RegistroCaja[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
+  const [subiendoArchivo, setSubiendoArchivo] = useState<boolean>(false);
   const [idEditando, setIdEditando] = useState<number | null>(null);
   const [esAdmin, setEsAdmin] = useState<boolean>(false);
 
-  // Filtros de Usuario
+  // Filtros
   const [responsableFiltro, setResponsableFiltro] = useState<string>('');
   const [proyectoSeleccionado, setProyectoSeleccionado] = useState<string>('');
   const [cajaSeleccionada, setCajaSeleccionada] = useState<string>('NUEVA');
@@ -55,12 +80,13 @@ export default function CajaChicaHome() {
   const [rucProveedor, setRucProveedor] = useState<string>('');
   const [proveedorDetalle, setProveedorDetalle] = useState<string>('');
   const [observaciones, setObservaciones] = useState<string>('');
+  const [archivoEvidencia, setArchivoEvidencia] = useState<File | null>(null);
+  const [urlExistente, setUrlExistente] = useState<string>('');
 
   useEffect(() => {
     cargarRegistros();
   }, []);
 
-  // Cajas asociadas al proyecto
   const cajasDelProyecto = Array.from(
     new Set(
       registros
@@ -70,11 +96,9 @@ export default function CajaChicaHome() {
     )
   );
 
-  // Precargar datos al seleccionar caja existente
   useEffect(() => {
-    if (!proyectoSeleccionado || cajaSeleccionada === 'TODAS' || cajaSeleccionada === 'NUEVA') {
-      return;
-    }
+    if (!proyectoSeleccionado || cajaSeleccionada === 'TODAS' || cajaSeleccionada === 'NUEVA') return;
+
     const prjTarget = proyectoSeleccionado.toUpperCase().trim();
     const cajaTarget = cajaSeleccionada.toUpperCase().trim();
 
@@ -116,6 +140,32 @@ export default function CajaChicaHome() {
       alert('Modo Administrador ACTIVADO.');
     } else if (pass !== null) {
       alert('Contraseña incorrecta.');
+    }
+  };
+
+  const subirComprobanteStorage = async (file: File): Promise<string | null> => {
+    try {
+      setSubiendoArchivo(true);
+      const fileExt = file.name.split('.').pop();
+      const fileName = `${Date.now()}_${Math.random().toString(36).substring(2, 7)}.${fileExt}`;
+      const filePath = `comprobantes/${fileName}`;
+
+      const { error: uploadError } = await supabase.storage
+        .from('caja_chica_evidencias')
+        .upload(filePath, file);
+
+      if (uploadError) {
+        alert('Error al subir comprobante: ' + uploadError.message);
+        return null;
+      }
+
+      const { data } = supabase.storage.from('caja_chica_evidencias').getPublicUrl(filePath);
+      return data.publicUrl;
+    } catch (err: any) {
+      alert('Error en subida de archivo: ' + err.message);
+      return null;
+    } finally {
+      setSubiendoArchivo(false);
     }
   };
 
@@ -186,6 +236,8 @@ export default function CajaChicaHome() {
     setRucProveedor('');
     setProveedorDetalle('');
     setObservaciones('');
+    setArchivoEvidencia(null);
+    setUrlExistente('');
   };
 
   const guardarGasto = async (e: React.FormEvent) => {
@@ -196,9 +248,7 @@ export default function CajaChicaHome() {
       return;
     }
 
-    const cajaFinal = (
-      cajaSeleccionada === 'NUEVA' ? cajaManualInput : cajaSeleccionada
-    ).toUpperCase().trim();
+    const cajaFinal = (cajaSeleccionada === 'NUEVA' ? cajaManualInput : cajaSeleccionada).toUpperCase().trim();
 
     if (!proyectoSeleccionado || !cajaFinal) {
       alert('Por favor especifica el Código de Proyecto y el Código de Caja.');
@@ -210,8 +260,13 @@ export default function CajaChicaHome() {
       return;
     }
 
-    const prjTarget = proyectoSeleccionado.toUpperCase().trim();
+    let urlFinal = urlExistente;
+    if (archivoEvidencia) {
+      const urlSubida = await subirComprobanteStorage(archivoEvidencia);
+      if (urlSubida) urlFinal = urlSubida;
+    }
 
+    const prjTarget = proyectoSeleccionado.toUpperCase().trim();
     const registroApertura = registros.find(
       (r) =>
         (r.codigo_proyecto || '').toUpperCase().trim() === prjTarget &&
@@ -236,20 +291,24 @@ export default function CajaChicaHome() {
       ruc_proveedor: rucProveedor.trim(),
       proveedor_detalle: proveedorDetalle,
       observaciones,
+      url_comprobante: urlFinal,
       estado_caja: 'Abierta',
     };
 
     if (idEditando) {
       const { error } = await supabase.from('cajas_chicas').update(payload).eq('id', idEditando);
       if (error) alert('Error al actualizar comprobante: ' + error.message);
-      else { limpiarFormularioGasto(); cargarRegistros(); }
+      else {
+        limpiarFormularioGasto();
+        cargarRegistros();
+      }
     } else {
       const { error } = await supabase.from('cajas_chicas').insert([payload]);
       if (error) alert('Error al registrar gasto: ' + error.message);
-      else { 
-        limpiarFormularioGasto(); 
+      else {
+        limpiarFormularioGasto();
         setCajaSeleccionada(cajaFinal);
-        cargarRegistros(); 
+        cargarRegistros();
       }
     }
   };
@@ -304,6 +363,7 @@ export default function CajaChicaHome() {
     setRucProveedor(r.ruc_proveedor || '');
     setProveedorDetalle(r.proveedor_detalle || '');
     setObservaciones(r.observaciones || '');
+    setUrlExistente(r.url_comprobante || '');
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
@@ -318,40 +378,10 @@ export default function CajaChicaHome() {
     else cargarRegistros();
   };
 
-  const exportarAExcel = () => {
-    if (!registrosFiltrados || registrosFiltrados.length === 0) {
-      alert('No hay comprobantes para exportar.');
-      return;
-    }
-
-    const datosExcel = registrosFiltrados.map((r) => ({
-      'Código Proyecto': r.codigo_proyecto,
-      'N° Caja': r.numero_caja,
-      'Responsable': r.responsable,
-      'Moneda': r.moneda,
-      'Saldo Inicial Asignado': r.saldo_inicial,
-      'Fecha Doc.': r.fecha_documento,
-      'Tipo Doc.': r.tipo_documento,
-      'N° Comprobante': r.numero_documento,
-      'Tipo Gasto': r.tipo_gasto,
-      'RUC Proveedor': r.ruc_proveedor || '-',
-      'Razón Social / Empresa': r.proveedor_detalle,
-      'Monto Gasto': r.monto_gasto,
-      'Observaciones': r.observaciones,
-      'Estado Caja': r.estado_caja || 'Abierta'
-    }));
-
-    const worksheet = XLSX.utils.json_to_sheet(datosExcel);
-    const workbook = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(workbook, worksheet, 'Liquidacion');
-    XLSX.writeFile(workbook, `Rendicion_${proyectoSeleccionado}_${cajaSeleccionada}.xlsx`);
-  };
-
-  // Filtrado de la tabla
   const cajaActivaFiltro = cajaSeleccionada === 'NUEVA' ? cajaManualInput : cajaSeleccionada;
 
   const registrosFiltrados = registros.filter((r) => {
-    const coincideProyecto = proyectoSeleccionado 
+    const coincideProyecto = proyectoSeleccionado
       ? (r.codigo_proyecto || '').toUpperCase().trim() === proyectoSeleccionado.toUpperCase().trim()
       : false;
 
@@ -359,16 +389,17 @@ export default function CajaChicaHome() {
       ? true
       : (r.numero_caja || '').toUpperCase().trim() === cajaActivaFiltro.toUpperCase().trim();
 
-    if (esAdmin) return coincideProyecto && coincideCaja;
+    const esRegistroGasto = r.tipo_documento !== 'Apertura';
 
-    const coincideResponsable = responsableFiltro 
+    if (esAdmin) return coincideProyecto && coincideCaja && esRegistroGasto;
+
+    const coincideResponsable = responsableFiltro
       ? (r.responsable || '').toLowerCase().includes(responsableFiltro.toLowerCase().trim())
       : false;
 
-    return coincideProyecto && coincideCaja && coincideResponsable;
+    return coincideProyecto && coincideCaja && coincideResponsable && esRegistroGasto;
   });
 
-  // Cálculo Dinámico de Fondo Inicial
   const totalSaldoInicial = () => {
     if (!proyectoSeleccionado) return 0;
     const prjTarget = proyectoSeleccionado.toUpperCase().trim();
@@ -399,6 +430,90 @@ export default function CajaChicaHome() {
   const saldoInicialCalculado = totalSaldoInicial();
   const totalGastosRendidos = registrosFiltrados.reduce((acc, r) => acc + (r.monto_gasto || 0), 0);
   const saldoFinalCaja = saldoInicialCalculado - totalGastosRendidos;
+
+  const datosResumenAgrupado = useMemo(() => {
+    const mapa: Record<string, { tipo: string; monto: number; cantidad: number }> = {};
+
+    registrosFiltrados.forEach((r) => {
+      const tipo = r.tipo_gasto || 'Otros';
+      const monto = r.monto_gasto || 0;
+
+      if (!mapa[tipo]) {
+        mapa[tipo] = { tipo, monto: 0, cantidad: 0 };
+      }
+      mapa[tipo].monto += monto;
+      mapa[tipo].cantidad += 1;
+    });
+
+    return Object.values(mapa).map((item) => {
+      const pctFondo = saldoInicialCalculado > 0 ? (item.monto / saldoInicialCalculado) * 100 : 0;
+      const pctTotal = totalGastosRendidos > 0 ? (item.monto / totalGastosRendidos) * 100 : 0;
+      return {
+        ...item,
+        pctFondo: parseFloat(pctFondo.toFixed(2)),
+        pctTotal: parseFloat(pctTotal.toFixed(2)),
+      };
+    });
+  }, [registrosFiltrados, saldoInicialCalculado, totalGastosRendidos]);
+
+  const exportarAExcel = () => {
+    if (!registrosFiltrados || registrosFiltrados.length === 0) {
+      alert('No hay comprobantes para exportar.');
+      return;
+    }
+
+    const fondoAsignado = saldoInicialCalculado;
+
+    const resumenExcel = datosResumenAgrupado.map((item) => ({
+      'Tipo de Gasto': item.tipo,
+      'Cant. Comprobantes': item.cantidad,
+      'Monto Total (S/)': item.monto.toFixed(2),
+      '% Del Fondo Asignado': `${item.pctFondo.toFixed(2)}%`,
+      '% Del Total Gastado': `${item.pctTotal.toFixed(2)}%`,
+    }));
+
+    resumenExcel.push({
+      'Tipo de Gasto': 'TOTAL GENERAL CONSUMIDO',
+      'Cant. Comprobantes': registrosFiltrados.length,
+      'Monto Total (S/)': totalGastosRendidos.toFixed(2),
+      '% Del Fondo Asignado': `${fondoAsignado > 0 ? ((totalGastosRendidos / fondoAsignado) * 100).toFixed(2) : '0.00'}%`,
+      '% Del Total Gastado': '100.00%',
+    });
+
+    const detalleExcel = registrosFiltrados.map((r) => {
+      const montoGasto = r.monto_gasto || 0;
+      const pctFondo = fondoAsignado > 0 ? ((montoGasto / fondoAsignado) * 100).toFixed(2) + '%' : '0.00%';
+
+      return {
+        'Código Proyecto': r.codigo_proyecto,
+        'N° Caja': r.numero_caja,
+        'Responsable': r.responsable,
+        'Moneda': r.moneda,
+        'Fondo Asignado Caja': r.saldo_inicial,
+        'Fecha Doc.': r.fecha_documento || '-',
+        'Tipo Doc.': r.tipo_documento,
+        'N° Comprobante': r.numero_documento || 'S/N',
+        'Tipo Gasto': r.tipo_gasto,
+        'RUC Proveedor': r.ruc_proveedor || '-',
+        'Razón Social / Empresa': r.proveedor_detalle,
+        'Monto Gasto (S/)': montoGasto,
+        '% Impacto Fondo': pctFondo,
+        'URL Evidencia': r.url_comprobante || 'Sin Evidencia',
+        'Observaciones': r.observaciones || '-',
+        'Estado Caja': r.estado_caja || 'Abierta',
+      };
+    });
+
+    const workbook = XLSX.utils.book_new();
+
+    const sheetResumen = XLSX.utils.json_to_sheet(resumenExcel);
+    XLSX.utils.book_append_sheet(workbook, sheetResumen, 'Resumen x Tipo Gasto');
+
+    const sheetDetalle = XLSX.utils.json_to_sheet(detalleExcel);
+    XLSX.utils.book_append_sheet(workbook, sheetDetalle, 'Detalle Liquidacion');
+
+    XLSX.writeFile(workbook, `Rendicion_${proyectoSeleccionado}_${cajaSeleccionada}.xlsx`);
+  };
 
   const registroCajaActiva = registros.find(
     (r) =>
@@ -452,9 +567,7 @@ export default function CajaChicaHome() {
                 type="text" 
                 placeholder="Ej: PR-SHA-001" 
                 value={proyectoSeleccionado} 
-                onChange={(e) => {
-                  setProyectoSeleccionado(e.target.value);
-                }}
+                onChange={(e) => setProyectoSeleccionado(e.target.value)}
                 className="p-2 border rounded-lg text-xs font-extrabold text-blue-900 bg-blue-50/50 uppercase w-full"
               />
             </div>
@@ -554,6 +667,95 @@ export default function CajaChicaHome() {
               <p className={`text-3xl font-extrabold mt-1 ${saldoFinalCaja >= 0 ? 'text-emerald-800' : 'text-red-800'}`}>
                 S/ {Math.abs(saldoFinalCaja).toFixed(2)}
               </p>
+            </div>
+          </div>
+        )}
+
+        {/* MÓDULO DE GRÁFICOS Y RESUMEN POR CATEGORÍA */}
+        {(esAdmin || (responsableFiltro && proyectoSeleccionado)) && datosResumenAgrupado.length > 0 && (
+          <div className="bg-white p-6 rounded-xl shadow-sm border space-y-6">
+            <h2 className="text-sm font-bold text-gray-700 uppercase tracking-wider border-b pb-2 flex items-center justify-between">
+              <span>📈 Resumen Visual y Distribución de Gastos</span>
+              <span className="text-xs font-normal text-gray-500">
+                Consumo Total: <strong className="text-gray-800">S/ {totalGastosRendidos.toFixed(2)}</strong> ({saldoInicialCalculado > 0 ? ((totalGastosRendidos / saldoInicialCalculado) * 100).toFixed(1) : 0}% del Fondo)
+              </span>
+            </h2>
+
+            {/* Tabla Resumen Agrupada */}
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-xs border-collapse">
+                <thead>
+                  <tr className="bg-gray-100 text-gray-700 uppercase font-semibold">
+                    <th className="p-2.5">Tipo de Gasto</th>
+                    <th className="p-2.5 text-center">Cant. Doc.</th>
+                    <th className="p-2.5 text-right">Monto Gastado (S/)</th>
+                    <th className="p-2.5 text-right">% Del Fondo Asignado</th>
+                    <th className="p-2.5 text-right">% Del Total Gastado</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y text-gray-600">
+                  {datosResumenAgrupado.map((item, idx) => (
+                    <tr key={item.tipo} className="hover:bg-gray-50">
+                      <td className="p-2.5 font-bold text-gray-800 flex items-center gap-2">
+                        <span className="w-3 h-3 rounded-full inline-block" style={{ backgroundColor: COLORES_GRAFICOS[idx % COLORES_GRAFICOS.length] }}></span>
+                        {item.tipo}
+                      </td>
+                      <td className="p-2.5 text-center font-medium">{item.cantidad}</td>
+                      <td className="p-2.5 text-right font-bold text-gray-900">S/ {item.monto.toFixed(2)}</td>
+                      <td className="p-2.5 text-right font-semibold text-blue-700">{item.pctFondo.toFixed(2)}%</td>
+                      <td className="p-2.5 text-right font-semibold text-amber-700">{item.pctTotal.toFixed(2)}%</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            {/* Gráficos Recharts */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 pt-2">
+              <div className="bg-gray-50 p-4 rounded-xl border border-gray-200">
+                <h3 className="text-xs font-bold text-gray-600 uppercase text-center mb-2">Distribución Porcentual por Tipo de Gasto</h3>
+                <div className="h-64">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <PieChart>
+                      <Pie
+                        data={datosResumenAgrupado}
+                        dataKey="monto"
+                        nameKey="tipo"
+                        cx="50%"
+                        cy="50%"
+                        innerRadius={50}
+                        outerRadius={80}
+                        paddingAngle={3}
+                        label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
+                      >
+                        {datosResumenAgrupado.map((entry, index) => (
+                          <Cell key={`cell-${index}`} fill={COLORES_GRAFICOS[index % COLORES_GRAFICOS.length]} />
+                        ))}
+                      </Pie>
+                      <Tooltip formatter={(value: number) => [`S/ ${value.toFixed(2)}`, 'Monto']} />
+                      <Legend />
+                    </PieChart>
+                  </ResponsiveContainer>
+                </div>
+              </div>
+
+              <div className="bg-gray-50 p-4 rounded-xl border border-gray-200">
+                <h3 className="text-xs font-bold text-gray-600 uppercase text-center mb-2">Comparativo de Gastos en Soles (S/)</h3>
+                <div className="h-64">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart data={datosResumenAgrupado} margin={{ top: 10, right: 20, left: 0, bottom: 20 }}>
+                      <XAxis dataKey="tipo" tick={{ fontSize: 10 }} interval={0} angle={-15} textAnchor="end" />
+                      <YAxis tick={{ fontSize: 10 }} />
+                      <Tooltip formatter={(value: number) => [`S/ ${value.toFixed(2)}`, 'Monto Total']} />
+                      <Bar dataKey="monto" fill="#2563EB" radius={[4, 4, 0, 0]}>
+                        {datosResumenAgrupado.map((entry, index) => (
+                          <Cell key={`bar-${index}`} fill={COLORES_GRAFICOS[index % COLORES_GRAFICOS.length]} />
+                        ))}
+                      </Bar>
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+              </div>
             </div>
           </div>
         )}
@@ -676,16 +878,33 @@ export default function CajaChicaHome() {
               <label className="block text-xs font-medium text-gray-700 mb-1">Observaciones</label>
               <input type="text" placeholder="Comentarios" value={observaciones} onChange={(e) => setObservaciones(e.target.value)} className="w-full p-2 border rounded-lg text-sm" disabled={cajaEstaCerrada} />
             </div>
+
+            {/* Input Evidencia */}
+            <div className="md:col-span-2 lg:col-span-4">
+              <label className="block text-xs font-bold text-gray-700 mb-1">Foto o PDF del Comprobante (Evidencia):</label>
+              <input
+                type="file"
+                accept="image/*,application/pdf"
+                onChange={(e) => setArchivoEvidencia(e.target.files?.[0] || null)}
+                className="w-full p-1.5 border rounded-lg text-xs bg-gray-50 file:mr-3 file:py-1 file:px-3 file:rounded-md file:border-0 file:text-xs file:font-semibold file:bg-blue-100 file:text-blue-700 hover:file:bg-blue-200"
+                disabled={cajaEstaCerrada || subiendoArchivo}
+              />
+              {urlExistente && (
+                <p className="text-[11px] text-gray-500 mt-1">
+                  📎 Evidencia adjunta actual: <a href={urlExistente} target="_blank" rel="noopener noreferrer" className="text-blue-600 underline font-semibold">Ver comprobante</a>
+                </p>
+              )}
+            </div>
           </div>
 
           <button 
             type="submit" 
-            disabled={cajaEstaCerrada || (!cajaActivaFiltro || cajaActivaFiltro === 'TODAS')} 
+            disabled={cajaEstaCerrada || (!cajaActivaFiltro || cajaActivaFiltro === 'TODAS') || subiendoArchivo} 
             className={`font-semibold py-2 px-6 rounded-lg shadow text-white cursor-pointer transition-colors ${
               (!cajaActivaFiltro || cajaActivaFiltro === 'TODAS') ? 'bg-gray-400 cursor-not-allowed' : idEditando ? 'bg-amber-600 hover:bg-amber-700' : 'bg-blue-600 hover:bg-blue-700'
             }`}
           >
-            {(!cajaActivaFiltro || cajaActivaFiltro === 'TODAS') ? '⚠️ Especifica / Digita una Caja Chica arriba para rendir' : idEditando ? '💾 Actualizar Comprobante' : `➕ Agregar Gasto a Caja ${cajaActivaFiltro}`}
+            {subiendoArchivo ? '⏳ Subiendo Evidencia...' : (!cajaActivaFiltro || cajaActivaFiltro === 'TODAS') ? '⚠️ Especifica / Digita una Caja Chica arriba para rendir' : idEditando ? '💾 Actualizar Comprobante' : `➕ Agregar Gasto a Caja ${cajaActivaFiltro}`}
           </button>
         </form>
 
@@ -713,6 +932,7 @@ export default function CajaChicaHome() {
                     <th className="p-3">Documento</th>
                     <th className="p-3">Tipo Gasto</th>
                     <th className="p-3">RUC / Empresa Proveedor</th>
+                    <th className="p-3">Evidencia</th>
                     <th className="p-3">Monto Gasto</th>
                     <th className="p-3 text-center">Acciones</th>
                   </tr>
@@ -730,14 +950,23 @@ export default function CajaChicaHome() {
                         {r.ruc_proveedor ? <span className="font-semibold text-gray-800">RUC: {r.ruc_proveedor}<br/></span> : null}
                         {r.proveedor_detalle || '-'}
                       </td>
+                      <td className="p-3">
+                        {r.url_comprobante ? (
+                          <a href={r.url_comprobante} target="_blank" rel="noopener noreferrer" className="bg-blue-50 text-blue-700 border border-blue-200 px-2 py-1 rounded font-semibold hover:bg-blue-100 transition-colors inline-block">
+                            📄 Ver Archivo
+                          </a>
+                        ) : (
+                          <span className="text-gray-400 italic">Sin adjunto</span>
+                        )}
+                      </td>
                       <td className="p-3 font-bold text-red-600">S/ {(r.monto_gasto || 0).toFixed(2)}</td>
                       <td className="p-3 text-center space-x-2">
                         {r.id && (
-                          <>
+                          <div className="flex justify-center items-center gap-2">
                             <button onClick={() => prepararEdicion(r)} className="text-amber-600 font-semibold hover:underline cursor-pointer">✏️ Editar</button>
                             <span className="text-gray-300">|</span>
                             <button onClick={() => eliminarRegistro(r)} className="text-red-600 font-semibold hover:underline cursor-pointer">🗑️ Borrar</button>
-                          </>
+                          </div>
                         )}
                       </td>
                     </tr>
