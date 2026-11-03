@@ -143,7 +143,7 @@ export default function CajaChicaHome() {
     }
   };
 
-  // SUBIDA DE EVIDENCIA (Coincidencia exacta con bucket CAJA_CHICA_EVIDENCIAS)
+  // SUBIDA DE EVIDENCIA (Ajustado al bucket CAJA_CHICA_EVIDENCIAS)
   const subirComprobanteStorage = async (file: File): Promise<string | null> => {
     try {
       setSubiendoArchivo(true);
