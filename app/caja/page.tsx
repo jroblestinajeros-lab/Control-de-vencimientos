@@ -143,16 +143,22 @@ export default function CajaChicaHome() {
     }
   };
 
-  // SUBIDA DE EVIDENCIA (Ajustado al bucket CAJA_CHICA_EVIDENCIAS)
+  // SUBIDA DE EVIDENCIA (Apuntando a la subcarpeta comprobantes/ dentro de caja_chica_evidencias)
   const subirComprobanteStorage = async (file: File): Promise<string | null> => {
     try {
       setSubiendoArchivo(true);
-      const fileExt = file.name.split('.').pop();
-      const fileName = `${Date.now()}_${Math.random().toString(36).substring(2, 7)}.${fileExt}`;
+      
+      const rawExt = file.name.split('.').pop() || 'jpg';
+      const fileExt = rawExt.toLowerCase().replace(/[^a-z0-9]/g, '');
+      const uniqueName = `${Date.now()}_${Math.random().toString(36).substring(2, 7)}.${fileExt}`;
+      const filePath = `comprobantes/${uniqueName}`;
 
       const { error: uploadError } = await supabase.storage
-        .from('CAJA_CHICA_EVIDENCIAS')
-        .upload(fileName, file, { upsert: true });
+        .from('caja_chica_evidencias')
+        .upload(filePath, file, { 
+          cacheControl: '3600',
+          upsert: true 
+        });
 
       if (uploadError) {
         alert('Error al subir comprobante: ' + uploadError.message);
@@ -160,8 +166,8 @@ export default function CajaChicaHome() {
       }
 
       const { data } = supabase.storage
-        .from('CAJA_CHICA_EVIDENCIAS')
-        .getPublicUrl(fileName);
+        .from('caja_chica_evidencias')
+        .getPublicUrl(filePath);
 
       return data.publicUrl;
     } catch (err: any) {
