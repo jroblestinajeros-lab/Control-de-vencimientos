@@ -1,14 +1,20 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { supabase } from './lib/supabase';
+import { supabase } from '@/lib/supabase';
 import { Transaction, SavingsGoal, Account } from '@/types/database';
+import TransactionModal from './components/TransactionModal';
+import SavingsGoalModal from './components/SavingsGoalModal';
 
 export default function DashboardFinanzas() {
   const [loading, setLoading] = useState(true);
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [savingsGoals, setSavingsGoals] = useState<SavingsGoal[]>([]);
+
+  // Modales
+  const [isTransactionModalOpen, setIsTransactionModalOpen] = useState(false);
+  const [isGoalModalOpen, setIsGoalModalOpen] = useState(false);
 
   // Totales
   const [totalBalance, setTotalBalance] = useState(0);
@@ -49,7 +55,6 @@ export default function DashboardFinanzas() {
     if (transData) {
       setTransactions(transData);
 
-      // Calcular Ingresos y Gastos del Mes Actual
       const now = new Date();
       const currentMonth = now.getMonth();
       const currentYear = now.getFullYear();
@@ -82,36 +87,34 @@ export default function DashboardFinanzas() {
             <h1 className="text-2xl md:text-3xl font-bold text-white">Gestión Financiera & Ahorro</h1>
             <p className="text-slate-400 text-sm mt-1">Control de presupuestos, flujo de caja y metas personales.</p>
           </div>
-          <button className="bg-emerald-600 hover:bg-emerald-500 text-white font-medium px-5 py-2.5 rounded-lg transition-colors flex items-center justify-center gap-2 shadow-lg shadow-emerald-900/20">
+          <button 
+            onClick={() => setIsTransactionModalOpen(true)}
+            className="bg-emerald-600 hover:bg-emerald-500 text-white font-medium px-5 py-2.5 rounded-lg transition-colors flex items-center justify-center gap-2 shadow-lg shadow-emerald-900/20"
+          >
             <span>+ Registrar Movimiento</span>
           </button>
         </div>
 
-        {/* METRICAS PRINCIPALES */}
+        {/* MÉTRICAS PRINCIPALES */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          
-          {/* Balance Total */}
           <div className="bg-slate-900/80 border border-slate-800 rounded-xl p-5 backdrop-blur-sm">
             <span className="text-xs font-semibold uppercase tracking-wider text-slate-400">Balance Total</span>
             <div className="text-2xl font-bold text-white mt-2">S/ {totalBalance.toFixed(2)}</div>
             <p className="text-xs text-slate-500 mt-1">Suma de todas tus cuentas</p>
           </div>
 
-          {/* Ingresos del Mes */}
           <div className="bg-slate-900/80 border border-slate-800 rounded-xl p-5 backdrop-blur-sm">
             <span className="text-xs font-semibold uppercase tracking-wider text-emerald-400">Ingresos del Mes</span>
             <div className="text-2xl font-bold text-emerald-400 mt-2">+ S/ {monthlyIncome.toFixed(2)}</div>
             <p className="text-xs text-slate-500 mt-1">Mes actual</p>
           </div>
 
-          {/* Gastos del Mes */}
           <div className="bg-slate-900/80 border border-slate-800 rounded-xl p-5 backdrop-blur-sm">
             <span className="text-xs font-semibold uppercase tracking-wider text-rose-400">Gastos del Mes</span>
             <div className="text-2xl font-bold text-rose-400 mt-2">- S/ {monthlyExpense.toFixed(2)}</div>
             <p className="text-xs text-slate-500 mt-1">Mes actual</p>
           </div>
 
-          {/* Fondo de Ahorro Acumulado */}
           <div className="bg-slate-900/80 border border-emerald-500/30 rounded-xl p-5 backdrop-blur-sm bg-gradient-to-br from-slate-900 via-slate-900 to-emerald-950/30">
             <span className="text-xs font-semibold uppercase tracking-wider text-blue-400">Ahorro Acumulado</span>
             <div className="text-2xl font-bold text-blue-400 mt-2">S/ {totalSavings.toFixed(2)}</div>
@@ -119,17 +122,22 @@ export default function DashboardFinanzas() {
           </div>
         </div>
 
-        {/* SECCIÓN DE METAS DE AHORRO ("Págate a ti mismo primero") */}
+        {/* METAS DE AHORRO */}
         <div className="space-y-4">
           <div className="flex items-center justify-between">
             <h2 className="text-xl font-semibold text-white">Metas de Ahorro Disciplinado</h2>
-            <button className="text-xs text-emerald-400 hover:underline">+ Nueva Meta</button>
+            <button 
+              onClick={() => setIsGoalModalOpen(true)}
+              className="text-xs text-emerald-400 hover:underline cursor-pointer font-medium"
+            >
+              + Nueva Meta
+            </button>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             {savingsGoals.length === 0 ? (
               <div className="col-span-3 bg-slate-900/40 border border-dashed border-slate-800 rounded-xl p-8 text-center text-slate-500">
-                No tienes metas de ahorro configuradas. ¡Crea una para comenzar a guardar dinero!
+                No tienes metas de ahorro configuradas. ¡Haz clic en "+ Nueva Meta" para comenzar!
               </div>
             ) : (
               savingsGoals.map((goal) => {
@@ -161,7 +169,7 @@ export default function DashboardFinanzas() {
           </div>
         </div>
 
-        {/* TABLA DE ÚLTIMAS TRANSACCIONES */}
+        {/* ÚLTIMOS MOVIMIENTOS */}
         <div className="bg-slate-900 border border-slate-800 rounded-xl overflow-hidden">
           <div className="p-5 border-b border-slate-800 flex justify-between items-center">
             <h2 className="text-lg font-semibold text-white">Últimos Movimientos</h2>
@@ -211,6 +219,19 @@ export default function DashboardFinanzas() {
             </table>
           </div>
         </div>
+
+        {/* MODALES */}
+        <TransactionModal 
+          isOpen={isTransactionModalOpen} 
+          onClose={() => setIsTransactionModalOpen(false)} 
+          onSuccess={fetchDashboardData} 
+        />
+
+        <SavingsGoalModal 
+          isOpen={isGoalModalOpen} 
+          onClose={() => setIsGoalModalOpen(false)} 
+          onSuccess={fetchDashboardData} 
+        />
 
       </div>
     </div>
