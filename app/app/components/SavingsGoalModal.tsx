@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
-import { supabase } from '../lib/supabase';
+import { supabase } from '@/lib/supabase';
 
 interface SavingsGoalModalProps {
   isOpen: boolean;
@@ -52,7 +52,6 @@ export default function SavingsGoalModal({ isOpen, onClose, onSuccess }: Savings
 
       if (insertError) throw insertError;
 
-      // Limpiar formulario y refrescar
       setName('');
       setTargetAmount('');
       setInitialAmount('');
@@ -69,8 +68,6 @@ export default function SavingsGoalModal({ isOpen, onClose, onSuccess }: Savings
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4">
       <div className="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-md overflow-hidden shadow-2xl">
-        
-        {/* Cabecera del Modal */}
         <div className="flex justify-between items-center p-5 border-b border-slate-800">
           <div className="flex items-center gap-2">
             <span className="text-xl">🎯</span>
@@ -84,7 +81,6 @@ export default function SavingsGoalModal({ isOpen, onClose, onSuccess }: Savings
           </button>
         </div>
 
-        {/* Formulario */}
         <form onSubmit={handleSubmit} className="p-6 space-y-4">
           {error && (
             <div className="p-3 bg-rose-950/60 border border-rose-800 text-rose-300 rounded-lg text-sm">
@@ -92,7 +88,6 @@ export default function SavingsGoalModal({ isOpen, onClose, onSuccess }: Savings
             </div>
           )}
 
-          {/* Nombre de la Meta */}
           <div>
             <label className="block text-xs font-semibold text-slate-300 uppercase mb-1">Nombre de la Meta</label>
             <input
@@ -105,7 +100,6 @@ export default function SavingsGoalModal({ isOpen, onClose, onSuccess }: Savings
             />
           </div>
 
-          {/* Monto Objetivo */}
           <div>
             <label className="block text-xs font-semibold text-slate-300 uppercase mb-1">Monto Objetivo (S/)</label>
             <input
@@ -119,7 +113,6 @@ export default function SavingsGoalModal({ isOpen, onClose, onSuccess }: Savings
             />
           </div>
 
-          {/* Monto Inicial y Fecha Límite */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <label className="block text-xs font-semibold text-slate-300 uppercase mb-1">Ahorro Inicial (Opcional)</label>
@@ -144,7 +137,6 @@ export default function SavingsGoalModal({ isOpen, onClose, onSuccess }: Savings
             </div>
           </div>
 
-          {/* Acciones */}
           <div className="flex justify-end gap-3 pt-3 border-t border-slate-800">
             <button
               type="button"
