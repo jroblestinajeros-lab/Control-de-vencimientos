@@ -1,385 +1,218 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import { createClient } from '@supabase/supabase-js';
-import * as XLSX from 'xlsx';
+import React, { useState, useEffect } from 'react';
+import { supabase } from './lib/supabase';
+import { Transaction, SavingsGoal, Account } from '@/types/database';
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
-const supabase = createClient(supabaseUrl, supabaseAnonKey);
+export default function DashboardFinanzas() {
+  const [loading, setLoading] = useState(true);
+  const [accounts, setAccounts] = useState<Account[]>([]);
+  const [transactions, setTransactions] = useState<Transaction[]>([]);
+  const [savingsGoals, setSavingsGoals] = useState<SavingsGoal[]>([]);
 
-interface Documento {
-  id?: number;
-  tipo_movimiento: string;
-  tipo_documento: string;
-  numero_documento: string;
-  codigo_proyecto: string;
-  empresa: string;
-  monto: number;
-  moneda: string;
-  fecha_emision: string;
-  fecha_vencimiento: string;
-  estado: string;
-}
-
-export default function Home() {
-  const [documentos, setDocumentos] = useState<Documento[]>([]);
-  const [loading, setLoading] = useState<boolean>(true);
-  const [fechaHoy, setFechaHoy] = useState<string>('');
-
-  // Formulario
-  const [tipoMovimiento, setTipoMovimiento] = useState<string>('Por Pagar (Proveedor)');
-  const [tipoDocumento, setTipoDocumento] = useState<string>('Factura');
-  const [numeroDocumento, setNumeroDocumento] = useState<string>('');
-  const [codigoProyecto, setCodigoProyecto] = useState<string>('');
-  const [empresa, setEmpresa] = useState<string>('');
-  const [monto, setMonto] = useState<string>('');
-  const [moneda, setMoneda] = useState<string>('PEN');
-  const [fechaEmision, setFechaEmision] = useState<string>('');
-  const [diasCredito, setDiasCredito] = useState<number>(0);
-  const [fechaVencimiento, setFechaVencimiento] = useState<string>('');
-  const [estado, setEstado] = useState<string>('Pendiente');
+  // Totales
+  const [totalBalance, setTotalBalance] = useState(0);
+  const [monthlyIncome, setMonthlyIncome] = useState(0);
+  const [monthlyExpense, setMonthlyExpense] = useState(0);
+  const [totalSavings, setTotalSavings] = useState(0);
 
   useEffect(() => {
-    setFechaHoy(new Date().toISOString().split('T')[0]);
-    cargarDocumentos();
+    fetchDashboardData();
   }, []);
 
-  // Función para calcular la fecha de vencimiento automáticamente
-  const manejarCambioFechaOCredito = (nuevaFecha: string, nuevosDias: number) => {
-    setFechaEmision(nuevaFecha);
-    setDiasCredito(nuevosDias);
-
-    if (nuevaFecha) {
-      const [year, month, day] = nuevaFecha.split('-').map(Number);
-      const fecha = new Date(year, month - 1, day);
-      
-      fecha.setDate(fecha.getDate() + Number(nuevosDias || 0));
-      
-      const yyyy = fecha.getFullYear();
-      const mm = String(fecha.getMonth() + 1).padStart(2, '0');
-      const dd = String(fecha.getDate()).padStart(2, '0');
-      
-      setFechaVencimiento(`${yyyy}-${mm}-${dd}`);
-    } else {
-      setFechaVencimiento('');
-    }
-  };
-
-  const cargarDocumentos = async () => {
+  async function fetchDashboardData() {
     setLoading(true);
-    const { data, error } = await supabase
-      .from('documentos')
+
+    // 1. Obtener Cuentas
+    const { data: accData } = await supabase.from('accounts').select('*');
+    if (accData) {
+      setAccounts(accData);
+      const balanceSum = accData.reduce((acc, curr) => acc + Number(curr.current_balance), 0);
+      setTotalBalance(balanceSum);
+    }
+
+    // 2. Obtener Metas de Ahorro
+    const { data: goalsData } = await supabase.from('savings_goals').select('*');
+    if (goalsData) {
+      setSavingsGoals(goalsData);
+      const savingsSum = goalsData.reduce((acc, curr) => acc + Number(curr.current_amount), 0);
+      setTotalSavings(savingsSum);
+    }
+
+    // 3. Obtener Transacciones Recientes
+    const { data: transData } = await supabase
+      .from('transactions')
       .select('*')
-      .order('fecha_vencimiento', { ascending: true });
+      .order('transaction_date', { ascending: false })
+      .limit(10);
+      
+    if (transData) {
+      setTransactions(transData);
 
-    if (error) {
-      console.error('Error al cargar datos:', error);
-    } else {
-      setDocumentos(data || []);
+      // Calcular Ingresos y Gastos del Mes Actual
+      const now = new Date();
+      const currentMonth = now.getMonth();
+      const currentYear = now.getFullYear();
+
+      let inc = 0;
+      let exp = 0;
+
+      transData.forEach((t) => {
+        const tDate = new Date(t.transaction_date);
+        if (tDate.getMonth() === currentMonth && tDate.getFullYear() === currentYear) {
+          if (t.type === 'INCOME') inc += Number(t.amount);
+          if (t.type === 'EXPENSE') exp += Number(t.amount);
+        }
+      });
+
+      setMonthlyIncome(inc);
+      setMonthlyExpense(exp);
     }
+
     setLoading(false);
-  };
-
-  const guardarDocumento = async (e: React.FormEvent) => {
-    e.preventDefault();
-
-    if (!numeroDocumento || !empresa || !monto || !fechaVencimiento) {
-      alert('Por favor completa los campos obligatorios.');
-      return;
-    }
-
-    const nuevoDoc: Documento = {
-      tipo_movimiento: tipoMovimiento,
-      tipo_documento: tipoDocumento,
-      numero_documento: numeroDocumento,
-      codigo_proyecto: codigoProyecto,
-      empresa,
-      monto: parseFloat(monto),
-      moneda,
-      fecha_emision: fechaEmision,
-      fecha_vencimiento: fechaVencimiento,
-      estado,
-    };
-
-    const { error } = await supabase.from('documentos').insert([nuevoDoc]);
-
-    if (error) {
-      alert('Error al guardar: ' + error.message);
-    } else {
-      setNumeroDocumento('');
-      setCodigoProyecto('');
-      setEmpresa('');
-      setMonto('');
-      setFechaEmision('');
-      setDiasCredito(0);
-      setFechaVencimiento('');
-      setEstado('Pendiente');
-      cargarDocumentos();
-    }
-  };
-
-  const cambiarEstado = async (id: number, nuevoEstado: string) => {
-    const { error } = await supabase
-      .from('documentos')
-      .update({ estado: nuevoEstado })
-      .eq('id', id);
-
-    if (error) {
-      alert('Error al actualizar estado: ' + error.message);
-    } else {
-      cargarDocumentos();
-    }
-  };
-
-  const exportarAExcel = () => {
-    if (!documentos || documentos.length === 0) {
-      alert('No hay datos registrados para exportar.');
-      return;
-    }
-
-    const datosFormateados = documentos.map((doc) => ({
-      'Tipo Movimiento': doc.tipo_movimiento,
-      'Tipo Documento': doc.tipo_documento,
-      'N° Documento': doc.numero_documento,
-      'Código Proyecto': doc.codigo_proyecto,
-      'Empresa / Cliente / Proveedor': doc.empresa,
-      'Monto': doc.monto,
-      'Moneda': doc.moneda,
-      'Fecha Emisión': doc.fecha_emision,
-      'Fecha Vencimiento': doc.fecha_vencimiento,
-      'Estado': doc.estado,
-    }));
-
-    const worksheet = XLSX.utils.json_to_sheet(datosFormateados);
-    const workbook = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(workbook, worksheet, 'Vencimientos');
-
-    const hoyStr = fechaHoy || new Date().toISOString().split('T')[0];
-    XLSX.writeFile(workbook, `Reporte_Vencimientos_VyA_${hoyStr}.xlsx`);
-  };
-
-  // Resumen usando fecha controlada en cliente y considerando solo pendientes
-  const vencidos = fechaHoy 
-    ? documentos.filter((d) => d.estado === 'Pendiente' && d.fecha_vencimiento < fechaHoy).length 
-    : 0;
-
-  const proximos = fechaHoy 
-    ? documentos.filter((d) => {
-        if (d.estado !== 'Pendiente') return false;
-        const difDias = (new Date(d.fecha_vencimiento).getTime() - new Date(fechaHoy).getTime()) / (1000 * 3600 * 24);
-        return difDias >= 0 && difDias <= 5;
-      }).length 
-    : 0;
+  }
 
   return (
-    <main className="min-h-screen bg-gray-50 p-4 md:p-8">
-      <div className="max-w-6xl mx-auto space-y-6">
+    <div className="min-h-screen bg-slate-950 text-slate-100 p-4 md:p-8">
+      <div className="max-w-7xl mx-auto space-y-8">
         
-        {/* Encabezado */}
-        <div className="bg-white p-6 rounded-xl shadow-sm border text-center flex flex-col items-center justify-center space-y-3">
-          <img src="/logo.jpeg" alt="VyA Consulting Logo" className="h-16 object-contain" />
-          <h1 className="text-2xl font-bold text-gray-800">Sistema de Control de Vencimientos y Alertas B2B</h1>
-          <p className="text-sm text-gray-500">Gestión Integral de Facturas, Boletas y Tickets (Soles y Dólares)</p>
-        </div>
-
-        {/* Resumen */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <div className="bg-red-50 border border-red-200 p-4 rounded-lg shadow-sm">
-            <span className="text-xs font-bold text-red-600 uppercase">Pendientes Vencidos</span>
-            <p className="text-3xl font-extrabold text-red-700 mt-1">{vencidos}</p>
+        {/* ENCABEZADO */}
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-slate-800 pb-6">
+          <div>
+            <h1 className="text-2xl md:text-3xl font-bold text-white">Gestión Financiera & Ahorro</h1>
+            <p className="text-slate-400 text-sm mt-1">Control de presupuestos, flujo de caja y metas personales.</p>
           </div>
-          <div className="bg-amber-50 border border-amber-200 p-4 rounded-lg shadow-sm">
-            <span className="text-xs font-bold text-amber-600 uppercase">Próximos a Vencer (≤ 5 días)</span>
-            <p className="text-3xl font-extrabold text-amber-700 mt-1">{proximos}</p>
-          </div>
-          <div className="bg-emerald-50 border border-emerald-200 p-4 rounded-lg shadow-sm">
-            <span className="text-xs font-bold text-emerald-600 uppercase">Total Registros Almacenados</span>
-            <p className="text-3xl font-extrabold text-emerald-700 mt-1">{documentos.length}</p>
-          </div>
-        </div>
-
-        {/* Formulario */}
-        <form onSubmit={guardarDocumento} className="bg-white p-6 rounded-xl shadow-sm border space-y-4">
-          <h2 className="text-lg font-semibold text-gray-800 border-b pb-2">Ingresar Nuevo Documento</h2>
-          
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-            <div>
-              <label className="block text-xs font-medium text-gray-700 mb-1">Tipo Movimiento</label>
-              <select value={tipoMovimiento} onChange={(e) => setTipoMovimiento(e.target.value)} className="w-full p-2 border rounded-lg text-sm bg-white">
-                <option>Por Pagar (Proveedor)</option>
-                <option>Por Cobrar (Cliente)</option>
-              </select>
-            </div>
-
-            <div>
-              <label className="block text-xs font-medium text-gray-700 mb-1">Tipo Documento</label>
-              <select value={tipoDocumento} onChange={(e) => setTipoDocumento(e.target.value)} className="w-full p-2 border rounded-lg text-sm bg-white">
-                <option>Factura</option>
-                <option>Boleta</option>
-                <option>Ticket</option>
-                <option>RxH</option>
-              </select>
-            </div>
-
-            <div>
-              <label className="block text-xs font-medium text-gray-700 mb-1">N° Documento *</label>
-              <input type="text" placeholder="Ej: F001-4589" value={numeroDocumento} onChange={(e) => setNumeroDocumento(e.target.value)} className="w-full p-2 border rounded-lg text-sm" required />
-            </div>
-
-            <div>
-              <label className="block text-xs font-medium text-gray-700 mb-1">Código Proyecto</label>
-              <input type="text" placeholder="Ej: PRJ-2026" value={codigoProyecto} onChange={(e) => setCodigoProyecto(e.target.value)} className="w-full p-2 border rounded-lg text-sm" />
-            </div>
-
-            <div className="md:col-span-2">
-              <label className="block text-xs font-medium text-gray-700 mb-1">Empresa / Cliente / Proveedor *</label>
-              <input type="text" placeholder="Razón Social o Nombre" value={empresa} onChange={(e) => setEmpresa(e.target.value)} className="w-full p-2 border rounded-lg text-sm" required />
-            </div>
-
-            <div>
-              <label className="block text-xs font-medium text-gray-700 mb-1">Monto *</label>
-              <input type="number" step="0.01" placeholder="0.00" value={monto} onChange={(e) => setMonto(e.target.value)} className="w-full p-2 border rounded-lg text-sm" required />
-            </div>
-
-            <div>
-              <label className="block text-xs font-medium text-gray-700 mb-1">Moneda</label>
-              <select value={moneda} onChange={(e) => setMoneda(e.target.value)} className="w-full p-2 border rounded-lg text-sm bg-white">
-                <option value="PEN">Soles (S/)</option>
-                <option value="USD">Dólares ($)</option>
-              </select>
-            </div>
-
-            <div>
-              <label className="block text-xs font-medium text-gray-700 mb-1">Fecha Emisión</label>
-              <input 
-                type="date" 
-                value={fechaEmision} 
-                onChange={(e) => manejarCambioFechaOCredito(e.target.value, diasCredito)} 
-                className="w-full p-2 border rounded-lg text-sm" 
-              />
-            </div>
-
-            <div>
-              <label className="block text-xs font-medium text-gray-700 mb-1">Días de Crédito</label>
-              <select 
-                value={diasCredito} 
-                onChange={(e) => manejarCambioFechaOCredito(fechaEmision, Number(e.target.value))} 
-                className="w-full p-2 border rounded-lg text-sm bg-white"
-              >
-                <option value={0}>Contado (0 días)</option>
-                <option value={15}>15 días</option>
-                <option value={30}>30 días</option>
-                <option value={45}>45 días</option>
-                <option value={60}>60 días</option>
-                <option value={90}>90 días</option>
-              </select>
-            </div>
-
-            <div>
-              <label className="block text-xs font-medium text-gray-700 mb-1">Fecha Vencimiento *</label>
-              <input 
-                type="date" 
-                value={fechaVencimiento} 
-                readOnly 
-                className="w-full p-2 border rounded-lg text-sm bg-gray-100 text-gray-600 cursor-not-allowed font-semibold" 
-                required 
-              />
-            </div>
-
-            <div>
-              <label className="block text-xs font-medium text-gray-700 mb-1">Estado de Pago</label>
-              <select value={estado} onChange={(e) => setEstado(e.target.value)} className="w-full p-2 border rounded-lg text-sm bg-white font-semibold">
-                <option value="Pendiente">Pendiente</option>
-                <option value="Pagado / Cobrado">Pagado / Cobrado</option>
-              </select>
-            </div>
-          </div>
-
-          <button type="submit" className="w-full md:w-auto bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 px-6 rounded-lg shadow transition-colors">
-            ➕ Guardar Documento
+          <button className="bg-emerald-600 hover:bg-emerald-500 text-white font-medium px-5 py-2.5 rounded-lg transition-colors flex items-center justify-center gap-2 shadow-lg shadow-emerald-900/20">
+            <span>+ Registrar Movimiento</span>
           </button>
-        </form>
+        </div>
 
-        {/* Tabla */}
-        <div className="bg-white p-6 rounded-xl shadow-sm border space-y-4">
-          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 border-b pb-3">
-            <h2 className="text-lg font-semibold text-gray-800">Registros de Documentos</h2>
-            <button
-              onClick={exportarAExcel}
-              className="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold py-2 px-4 rounded-lg shadow transition-colors flex items-center gap-2 text-sm"
-            >
-              📊 Exportar a Excel
-            </button>
+        {/* METRICAS PRINCIPALES */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          
+          {/* Balance Total */}
+          <div className="bg-slate-900/80 border border-slate-800 rounded-xl p-5 backdrop-blur-sm">
+            <span className="text-xs font-semibold uppercase tracking-wider text-slate-400">Balance Total</span>
+            <div className="text-2xl font-bold text-white mt-2">S/ {totalBalance.toFixed(2)}</div>
+            <p className="text-xs text-slate-500 mt-1">Suma de todas tus cuentas</p>
           </div>
 
-          {loading ? (
-            <p className="text-center text-sm text-gray-500 py-4">Cargando datos desde la nube...</p>
-          ) : documentos.length === 0 ? (
-            <p className="text-center text-sm text-gray-500 py-4">No hay documentos registrados aún.</p>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-left text-xs text-gray-600 border-collapse">
-                <thead>
-                  <tr className="bg-gray-100 text-gray-700 uppercase font-semibold">
-                    <th className="p-3">Movimiento</th>
-                    <th className="p-3">Documento</th>
-                    <th className="p-3">Empresa</th>
-                    <th className="p-3">Proyecto</th>
-                    <th className="p-3">Monto</th>
-                    <th className="p-3">Vencimiento</th>
-                    <th className="p-3">Estado</th>
-                    <th className="p-3 text-center">Acción</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y">
-                  {documentos.map((doc) => {
-                    const esPendiente = doc.estado === 'Pendiente';
-                    const esVencido = esPendiente && fechaHoy ? doc.fecha_vencimiento < fechaHoy : false;
+          {/* Ingresos del Mes */}
+          <div className="bg-slate-900/80 border border-slate-800 rounded-xl p-5 backdrop-blur-sm">
+            <span className="text-xs font-semibold uppercase tracking-wider text-emerald-400">Ingresos del Mes</span>
+            <div className="text-2xl font-bold text-emerald-400 mt-2">+ S/ {monthlyIncome.toFixed(2)}</div>
+            <p className="text-xs text-slate-500 mt-1">Mes actual</p>
+          </div>
 
-                    return (
-                      <tr key={doc.id} className="hover:bg-gray-50">
-                        <td className="p-3 font-medium">{doc.tipo_movimiento}</td>
-                        <td className="p-3">{doc.tipo_documento}: {doc.numero_documento}</td>
-                        <td className="p-3">{doc.empresa}</td>
-                        <td className="p-3">{doc.codigo_proyecto || '-'}</td>
-                        <td className="p-3 font-semibold">{doc.moneda === 'PEN' ? 'S/' : '$'} {doc.monto.toFixed(2)}</td>
-                        <td className="p-3">{doc.fecha_vencimiento}</td>
-                        <td className="p-3">
-                          {!esPendiente ? (
-                            <span className="px-2 py-1 rounded-full text-[10px] font-bold bg-blue-100 text-blue-700">
-                              PAGADO / COBRADO
-                            </span>
-                          ) : esVencido ? (
-                            <span className="px-2 py-1 rounded-full text-[10px] font-bold bg-red-100 text-red-700">
-                              VENCIDO
-                            </span>
-                          ) : (
-                            <span className="px-2 py-1 rounded-full text-[10px] font-bold bg-amber-100 text-amber-700">
-                              PENDIENTE
-                            </span>
-                          )}
-                        </td>
-                        <td className="p-3 text-center">
-                          {doc.id && (
-                            <button
-                              onClick={() => cambiarEstado(doc.id!, esPendiente ? 'Pagado / Cobrado' : 'Pendiente')}
-                              className="text-[11px] underline font-semibold text-gray-600 hover:text-blue-600"
-                            >
-                              {esPendiente ? 'Marcar Pagado' : 'Revertir'}
-                            </button>
-                          )}
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-          )}
+          {/* Gastos del Mes */}
+          <div className="bg-slate-900/80 border border-slate-800 rounded-xl p-5 backdrop-blur-sm">
+            <span className="text-xs font-semibold uppercase tracking-wider text-rose-400">Gastos del Mes</span>
+            <div className="text-2xl font-bold text-rose-400 mt-2">- S/ {monthlyExpense.toFixed(2)}</div>
+            <p className="text-xs text-slate-500 mt-1">Mes actual</p>
+          </div>
+
+          {/* Fondo de Ahorro Acumulado */}
+          <div className="bg-slate-900/80 border border-emerald-500/30 rounded-xl p-5 backdrop-blur-sm bg-gradient-to-br from-slate-900 via-slate-900 to-emerald-950/30">
+            <span className="text-xs font-semibold uppercase tracking-wider text-blue-400">Ahorro Acumulado</span>
+            <div className="text-2xl font-bold text-blue-400 mt-2">S/ {totalSavings.toFixed(2)}</div>
+            <p className="text-xs text-slate-400 mt-1">En metas activas</p>
+          </div>
+        </div>
+
+        {/* SECCIÓN DE METAS DE AHORRO ("Págate a ti mismo primero") */}
+        <div className="space-y-4">
+          <div className="flex items-center justify-between">
+            <h2 className="text-xl font-semibold text-white">Metas de Ahorro Disciplinado</h2>
+            <button className="text-xs text-emerald-400 hover:underline">+ Nueva Meta</button>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {savingsGoals.length === 0 ? (
+              <div className="col-span-3 bg-slate-900/40 border border-dashed border-slate-800 rounded-xl p-8 text-center text-slate-500">
+                No tienes metas de ahorro configuradas. ¡Crea una para comenzar a guardar dinero!
+              </div>
+            ) : (
+              savingsGoals.map((goal) => {
+                const percent = Math.min(Math.round((goal.current_amount / goal.target_amount) * 100), 100);
+                return (
+                  <div key={goal.id} className="bg-slate-900 border border-slate-800 rounded-xl p-5 space-y-3">
+                    <div className="flex justify-between items-start">
+                      <h3 className="font-semibold text-slate-200">{goal.name}</h3>
+                      <span className="text-xs bg-emerald-950 text-emerald-400 border border-emerald-800 px-2 py-0.5 rounded-full font-mono">
+                        {percent}%
+                      </span>
+                    </div>
+
+                    <div className="w-full bg-slate-800 h-2.5 rounded-full overflow-hidden">
+                      <div 
+                        className="bg-emerald-500 h-full rounded-full transition-all duration-500" 
+                        style={{ width: `${percent}%` }}
+                      ></div>
+                    </div>
+
+                    <div className="flex justify-between text-xs text-slate-400 font-mono pt-1">
+                      <span>S/ {Number(goal.current_amount).toFixed(2)}</span>
+                      <span>Meta: S/ {Number(goal.target_amount).toFixed(2)}</span>
+                    </div>
+                  </div>
+                );
+              })
+            )}
+          </div>
+        </div>
+
+        {/* TABLA DE ÚLTIMAS TRANSACCIONES */}
+        <div className="bg-slate-900 border border-slate-800 rounded-xl overflow-hidden">
+          <div className="p-5 border-b border-slate-800 flex justify-between items-center">
+            <h2 className="text-lg font-semibold text-white">Últimos Movimientos</h2>
+            <span className="text-xs text-slate-500">Mostrando las 10 últimas transacciones</span>
+          </div>
+
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-sm text-slate-300">
+              <thead className="bg-slate-950/60 text-slate-400 text-xs uppercase font-semibold">
+                <tr>
+                  <th className="px-6 py-3">Fecha</th>
+                  <th className="px-6 py-3">Descripción</th>
+                  <th className="px-6 py-3">Tipo</th>
+                  <th className="px-6 py-3 text-right">Monto</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-800">
+                {transactions.length === 0 ? (
+                  <tr>
+                    <td colSpan={4} className="px-6 py-8 text-center text-slate-500">
+                      No hay transacciones registradas aún.
+                    </td>
+                  </tr>
+                ) : (
+                  transactions.map((t) => (
+                    <tr key={t.id} className="hover:bg-slate-800/40 transition-colors">
+                      <td className="px-6 py-4 text-xs font-mono text-slate-400">{t.transaction_date}</td>
+                      <td className="px-6 py-4 font-medium text-white">{t.description || 'Sin descripción'}</td>
+                      <td className="px-6 py-4">
+                        <span className={`inline-block px-2 py-0.5 rounded text-xs font-semibold ${
+                          t.type === 'INCOME' ? 'bg-emerald-950 text-emerald-400 border border-emerald-800' :
+                          t.type === 'EXPENSE' ? 'bg-rose-950 text-rose-400 border border-rose-800' :
+                          'bg-blue-950 text-blue-400 border border-blue-800'
+                        }`}>
+                          {t.type === 'INCOME' ? 'Ingreso' : t.type === 'EXPENSE' ? 'Gasto' : 'Ahorro/Transf.'}
+                        </span>
+                      </td>
+                      <td className={`px-6 py-4 text-right font-mono font-bold ${
+                        t.type === 'INCOME' ? 'text-emerald-400' : t.type === 'EXPENSE' ? 'text-rose-400' : 'text-blue-400'
+                      }`}>
+                        {t.type === 'INCOME' ? '+' : '-'} S/ {Number(t.amount).toFixed(2)}
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
         </div>
 
       </div>
-    </main>
+    </div>
   );
 }
