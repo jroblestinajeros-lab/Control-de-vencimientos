@@ -3,12 +3,14 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from './lib/supabase';
 import { Transaction, SavingsGoal, Account } from '@/types/database';
+import TransactionModal from './components/TransactionModal';
 
 export default function DashboardFinanzas() {
   const [loading, setLoading] = useState(true);
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [savingsGoals, setSavingsGoals] = useState<SavingsGoal[]>([]);
+  const [isModalOpen, setIsModalOpen] = useState(false);
 
   // Totales
   const [totalBalance, setTotalBalance] = useState(0);
@@ -82,7 +84,10 @@ export default function DashboardFinanzas() {
             <h1 className="text-2xl md:text-3xl font-bold text-white">Gestión Financiera & Ahorro</h1>
             <p className="text-slate-400 text-sm mt-1">Control de presupuestos, flujo de caja y metas personales.</p>
           </div>
-          <button className="bg-emerald-600 hover:bg-emerald-500 text-white font-medium px-5 py-2.5 rounded-lg transition-colors flex items-center justify-center gap-2 shadow-lg shadow-emerald-900/20">
+          <button 
+            onClick={() => setIsModalOpen(true)}
+            className="bg-emerald-600 hover:bg-emerald-500 text-white font-medium px-5 py-2.5 rounded-lg transition-colors flex items-center justify-center gap-2 shadow-lg shadow-emerald-900/20"
+          >
             <span>+ Registrar Movimiento</span>
           </button>
         </div>
@@ -119,7 +124,7 @@ export default function DashboardFinanzas() {
           </div>
         </div>
 
-        {/* SECCIÓN DE METAS DE AHORRO ("Págate a ti mismo primero") */}
+        {/* SECCIÓN DE METAS DE AHORRO */}
         <div className="space-y-4">
           <div className="flex items-center justify-between">
             <h2 className="text-xl font-semibold text-white">Metas de Ahorro Disciplinado</h2>
@@ -211,6 +216,13 @@ export default function DashboardFinanzas() {
             </table>
           </div>
         </div>
+
+        {/* COMPONENTE MODAL */}
+        <TransactionModal 
+          isOpen={isModalOpen} 
+          onClose={() => setIsModalOpen(false)} 
+          onSuccess={fetchDashboardData} 
+        />
 
       </div>
     </div>
