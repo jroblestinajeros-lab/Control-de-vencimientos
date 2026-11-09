@@ -2,7 +2,6 @@
 
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import Link from 'next/link';
 import * as XLSX from 'xlsx';
 
 interface WorkShift {
@@ -19,7 +18,6 @@ interface WorkShift {
 export default function TareoPage() {
   const router = useRouter();
   const [loading, setLoading] = useState(true);
-  const [userEmail, setUserEmail] = useState<string>('jroblestinajeros@gmail.com');
 
   const [workerName, setWorkerName] = useState('');
   const [documentId, setDocumentId] = useState('');
@@ -32,19 +30,8 @@ export default function TareoPage() {
   const [shifts, setShifts] = useState<WorkShift[]>([]);
 
   useEffect(() => {
-    const sessionData = localStorage.getItem('user_session');
-    if (sessionData) {
-      try {
-        const parsed = JSON.parse(sessionData);
-        if (parsed?.user?.email) setUserEmail(parsed.user.email);
-      } catch (e) {
-        // Ignorar error de parsing
-      }
-    }
-
     const savedShifts = localStorage.getItem('va_tareo_shifts');
     if (savedShifts) setShifts(JSON.parse(savedShifts));
-
     setLoading(false);
   }, []);
 
@@ -151,24 +138,14 @@ export default function TareoPage() {
           </p>
         </div>
 
-        <div className="flex flex-wrap items-center gap-3">
-          {/* Enlace para regresar a Finanzas */}
-          <Link
-            href="/"
-            className="bg-emerald-700 hover:bg-emerald-600 text-white font-medium text-xs px-3.5 py-2 rounded-lg transition-colors flex items-center space-x-1 shadow-lg"
+        {shifts.length > 0 && (
+          <button
+            onClick={exportToExcel}
+            className="bg-emerald-700 hover:bg-emerald-600 text-white font-medium text-xs px-4 py-2 rounded-lg transition-colors shadow-lg"
           >
-            <span>💰 Panel de Finanzas</span>
-          </Link>
-
-          {shifts.length > 0 && (
-            <button
-              onClick={exportToExcel}
-              className="bg-blue-700 hover:bg-blue-600 text-white font-medium text-xs px-4 py-2 rounded-lg transition-colors shadow-lg"
-            >
-              📊 Exportar Matriz a Excel
-            </button>
-          )}
-        </div>
+            📊 Exportar Matriz a Excel
+          </button>
+        )}
       </header>
 
       <section className="max-w-7xl mx-auto space-y-6">
