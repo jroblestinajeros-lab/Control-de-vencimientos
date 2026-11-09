@@ -340,16 +340,27 @@ export default function HomePage() {
   if (loading) return null;
 
   return (
-    <main 
-      className="min-h-screen text-slate-100 p-6"
-      style={{ backgroundColor: '#0f172a', backgroundImage: 'linear-gradient(135deg, #0f172a 0%, #1e1b4b 50%, #311042 100%)' }}
+    <div 
+      style={{
+        position: 'fixed',
+        top: 0,
+        left: 0,
+        width: '100vw',
+        height: '100vh',
+        backgroundColor: '#1e0c38',
+        backgroundImage: 'radial-gradient(circle at 10% 20%, rgb(45, 10, 80) 0%, rgb(18, 8, 38) 90%)',
+        overflowY: 'auto',
+        zIndex: 99999,
+        padding: '24px',
+        color: '#f8fafc'
+      }}
     >
-      <header className="max-w-7xl mx-auto flex flex-col md:flex-row justify-between items-start md:items-center pb-6 border-b border-indigo-500/30 mb-8 gap-4">
+      <header className="max-w-7xl mx-auto flex flex-col md:flex-row justify-between items-start md:items-center pb-6 border-b border-purple-500/40 mb-8 gap-4">
         <div>
-          <h1 className="text-2xl font-black text-transparent bg-clip-text bg-gradient-to-r from-teal-300 via-cyan-300 to-fuchsia-400">
+          <h1 className="text-3xl font-black text-transparent bg-clip-text bg-gradient-to-r from-teal-300 via-fuchsia-400 to-cyan-300 tracking-tight">
             Control de Finanzas Personales
           </h1>
-          <p className="text-xs text-indigo-200 mt-1">
+          <p className="text-xs text-purple-200 mt-1">
             Usuario: <span className="text-teal-300 font-semibold">{userEmail}</span>
           </p>
         </div>
@@ -358,10 +369,10 @@ export default function HomePage() {
           <select
             value={currency}
             onChange={(e) => handleCurrencyChange(e.target.value as CurrencyCode)}
-            className="bg-indigo-950/80 border border-indigo-500/50 text-amber-300 font-bold text-xs px-3 py-2 rounded-xl focus:outline-none shadow-xl"
+            className="bg-purple-950 border border-purple-500 text-amber-300 font-bold text-xs px-3 py-2 rounded-xl focus:outline-none shadow-2xl"
           >
             {Object.entries(CURRENCIES).map(([code, info]) => (
-              <option key={code} value={code} style={{ backgroundColor: '#1e1b4b', color: '#fff' }}>
+              <option key={code} value={code} style={{ backgroundColor: '#2d0a50', color: '#fff' }}>
                 {info.label}
               </option>
             ))}
@@ -371,114 +382,114 @@ export default function HomePage() {
             type="month"
             value={selectedMonth}
             onChange={(e) => setSelectedMonth(e.target.value)}
-            className="bg-indigo-950/80 border border-indigo-500/50 text-white text-xs px-3 py-2 rounded-xl focus:outline-none font-mono shadow-xl"
+            className="bg-purple-950 border border-purple-500 text-white text-xs px-3 py-2 rounded-xl focus:outline-none font-mono shadow-2xl"
           />
 
           <button
             onClick={exportToExcel}
-            className="bg-gradient-to-r from-teal-500 to-emerald-600 hover:from-teal-400 hover:to-emerald-500 text-white font-semibold text-xs px-4 py-2.5 rounded-xl transition-all shadow-lg shadow-teal-950/60"
+            className="bg-gradient-to-r from-teal-400 to-emerald-500 hover:from-teal-300 hover:to-emerald-400 text-slate-950 font-bold text-xs px-4 py-2.5 rounded-xl transition-all shadow-xl shadow-teal-950/80"
           >
             <span>📊 Exportar Excel</span>
           </button>
 
           <button
             onClick={handleSignOut}
-            className="bg-indigo-950/80 hover:bg-indigo-900 border border-indigo-500/50 text-indigo-200 text-xs px-3 py-2 rounded-xl transition-colors shadow-xl"
+            className="bg-purple-950 hover:bg-purple-900 border border-purple-500 text-purple-200 text-xs px-3 py-2 rounded-xl transition-colors shadow-2xl"
           >
             Cerrar Sesión
           </button>
         </div>
       </header>
 
-      <section className="max-w-7xl mx-auto space-y-8">
+      <section className="max-w-7xl mx-auto space-y-8 pb-12">
         <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
           <div 
             className="p-6 rounded-3xl shadow-2xl border transition-all"
-            style={{ backgroundColor: 'rgba(30, 27, 75, 0.75)', borderColor: 'rgba(99, 102, 241, 0.3)', backdropFilter: 'blur(16px)' }}
+            style={{ backgroundColor: 'rgba(45, 10, 80, 0.75)', borderColor: 'rgba(217, 70, 239, 0.4)', backdropFilter: 'blur(16px)' }}
           >
-            <h3 className="text-xs font-semibold text-indigo-300 uppercase tracking-wider mb-2">Ingresos del Mes</h3>
+            <h3 className="text-xs font-semibold text-purple-300 uppercase tracking-wider mb-2">Ingresos del Mes</h3>
             <p className="text-3xl font-black text-cyan-300 font-mono tracking-tight">{currSymbol} {totalIncome.toFixed(2)}</p>
-            <p className="text-[11px] text-indigo-300/70 mt-1">Ingreso variable registrado</p>
+            <p className="text-[11px] text-purple-300/70 mt-1">Ingreso variable registrado</p>
           </div>
 
           <div 
-            className="p-6 rounded-3xl shadow-2xl border border-t-4 border-t-fuchsia-500 transition-all space-y-2"
-            style={{ backgroundColor: 'rgba(30, 27, 75, 0.75)', borderColor: 'rgba(99, 102, 241, 0.3)', backdropFilter: 'blur(16px)' }}
+            className="p-6 rounded-3xl shadow-2xl border border-t-4 border-t-fuchsia-400 transition-all space-y-2"
+            style={{ backgroundColor: 'rgba(45, 10, 80, 0.75)', borderColor: 'rgba(217, 70, 239, 0.4)', backdropFilter: 'blur(16px)' }}
           >
             <div className="flex justify-between items-center">
               <h3 className="text-xs font-semibold text-fuchsia-300 uppercase tracking-wider">Meta Ahorro</h3>
               <select
                 value={savingsTargetPercent}
                 onChange={(e) => handleSavingsPercentChange(Number(e.target.value))}
-                className="bg-indigo-950 border border-indigo-500 text-fuchsia-300 text-xs font-bold rounded-lg px-2 py-0.5 focus:outline-none"
+                className="bg-purple-950 border border-purple-500 text-fuchsia-300 text-xs font-bold rounded-lg px-2 py-0.5 focus:outline-none"
               >
                 {Array.from({ length: 18 }, (_, i) => (i + 2) * 5)
                   .concat(95)
                   .map((pct) => (
-                    <option key={pct} value={pct} style={{ backgroundColor: '#1e1b4b', color: '#fff' }}>
+                    <option key={pct} value={pct} style={{ backgroundColor: '#2d0a50', color: '#fff' }}>
                       {pct}%
                     </option>
                   ))}
               </select>
             </div>
-            <p className="text-3xl font-black text-fuchsia-400 font-mono tracking-tight">{currSymbol} {plannedSavings.toFixed(2)}</p>
-            <p className="text-[11px] text-indigo-300/70">Cuota reservada</p>
+            <p className="text-3xl font-black text-fuchsia-300 font-mono tracking-tight">{currSymbol} {plannedSavings.toFixed(2)}</p>
+            <p className="text-[11px] text-purple-300/70">Cuota reservada</p>
           </div>
 
           <div 
             className="p-6 rounded-3xl shadow-2xl border border-t-4 border-t-teal-400 transition-all"
-            style={{ backgroundColor: 'rgba(30, 27, 75, 0.75)', borderColor: 'rgba(99, 102, 241, 0.3)', backdropFilter: 'blur(16px)' }}
+            style={{ backgroundColor: 'rgba(45, 10, 80, 0.75)', borderColor: 'rgba(217, 70, 239, 0.4)', backdropFilter: 'blur(16px)' }}
           >
             <h3 className="text-xs font-semibold text-teal-300 uppercase tracking-wider mb-2">Presupuesto Gastos</h3>
             <p className="text-3xl font-black text-teal-300 font-mono tracking-tight">{currSymbol} {availableExpenseBudget.toFixed(2)}</p>
-            <p className="text-[11px] text-indigo-300/70 mt-1">Límite permitido en el mes</p>
+            <p className="text-[11px] text-purple-300/70 mt-1">Límite permitido en el mes</p>
           </div>
 
           <div 
             className="p-6 rounded-3xl shadow-2xl border transition-all"
-            style={{ backgroundColor: 'rgba(30, 27, 75, 0.75)', borderColor: 'rgba(99, 102, 241, 0.3)', backdropFilter: 'blur(16px)' }}
+            style={{ backgroundColor: 'rgba(45, 10, 80, 0.75)', borderColor: 'rgba(217, 70, 239, 0.4)', backdropFilter: 'blur(16px)' }}
           >
             <h3 className="text-xs font-semibold text-rose-300 uppercase tracking-wider mb-2">Gastos Ejecutados</h3>
             <p className="text-3xl font-black text-rose-400 font-mono tracking-tight">{currSymbol} {totalExpense.toFixed(2)}</p>
-            <p className="text-[11px] text-indigo-300/70 mt-1">Saldo: {currSymbol} {budgetRemaining.toFixed(2)}</p>
+            <p className="text-[11px] text-purple-300/70 mt-1">Saldo: {currSymbol} {budgetRemaining.toFixed(2)}</p>
           </div>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           <div 
             className="p-6 rounded-3xl shadow-2xl border flex flex-col justify-between transition-all"
-            style={{ backgroundColor: 'rgba(30, 27, 75, 0.75)', borderColor: 'rgba(99, 102, 241, 0.3)', backdropFilter: 'blur(16px)' }}
+            style={{ backgroundColor: 'rgba(45, 10, 80, 0.75)', borderColor: 'rgba(217, 70, 239, 0.4)', backdropFilter: 'blur(16px)' }}
           >
             <h4 className="text-xs font-semibold text-amber-300 uppercase tracking-wider mb-2">Gastos Fijos (Obligatorios)</h4>
             <p className="text-2xl font-bold text-amber-400 font-mono">{currSymbol} {fixedExpenses.toFixed(2)}</p>
-            <p className="text-[11px] text-indigo-300/70 mt-1">Alquiler, mantenimiento, servicios básicos</p>
+            <p className="text-[11px] text-purple-300/70 mt-1">Alquiler, mantenimiento, servicios básicos</p>
           </div>
 
           <div 
             className="p-6 rounded-3xl shadow-2xl border flex flex-col justify-between transition-all"
-            style={{ backgroundColor: 'rgba(30, 27, 75, 0.75)', borderColor: 'rgba(99, 102, 241, 0.3)', backdropFilter: 'blur(16px)' }}
+            style={{ backgroundColor: 'rgba(45, 10, 80, 0.75)', borderColor: 'rgba(217, 70, 239, 0.4)', backdropFilter: 'blur(16px)' }}
           >
-            <h4 className="text-xs font-semibold text-indigo-300 uppercase tracking-wider mb-2">Gastos Variables</h4>
-            <p className="text-2xl font-bold text-indigo-200 font-mono">{currSymbol} {variableExpenses.toFixed(2)}</p>
-            <p className="text-[11px] text-indigo-300/70 mt-1">Salidas, entretenimientos y extras</p>
+            <h4 className="text-xs font-semibold text-fuchsia-300 uppercase tracking-wider mb-2">Gastos Variables</h4>
+            <p className="text-2xl font-bold text-fuchsia-200 font-mono">{currSymbol} {variableExpenses.toFixed(2)}</p>
+            <p className="text-[11px] text-purple-300/70 mt-1">Salidas, entretenimientos y extras</p>
           </div>
 
           <div 
             className="p-6 rounded-3xl shadow-2xl border flex flex-col justify-between transition-all"
-            style={{ backgroundColor: 'rgba(30, 27, 75, 0.75)', borderColor: 'rgba(99, 102, 241, 0.3)', backdropFilter: 'blur(16px)' }}
+            style={{ backgroundColor: 'rgba(45, 10, 80, 0.75)', borderColor: 'rgba(217, 70, 239, 0.4)', backdropFilter: 'blur(16px)' }}
           >
             <h4 className="text-xs font-semibold text-emerald-300 uppercase tracking-wider mb-2">Salud Financiera (Fondo)</h4>
             <p className="text-2xl font-bold text-emerald-400 font-mono">{emergencyCoverageMonths} meses</p>
-            <p className="text-[11px] text-indigo-300/70 mt-1">Cobertura de tus gastos fijos acumulados</p>
+            <p className="text-[11px] text-purple-300/70 mt-1">Cobertura de tus gastos fijos acumulados</p>
           </div>
         </div>
 
         <div 
           className="rounded-3xl p-6 shadow-2xl border space-y-4"
-          style={{ backgroundColor: 'rgba(30, 27, 75, 0.75)', borderColor: 'rgba(99, 102, 241, 0.3)', backdropFilter: 'blur(16px)' }}
+          style={{ backgroundColor: 'rgba(45, 10, 80, 0.75)', borderColor: 'rgba(217, 70, 239, 0.4)', backdropFilter: 'blur(16px)' }}
         >
           <div className="flex justify-between items-center text-sm">
-            <span className="font-semibold text-indigo-200">
+            <span className="font-semibold text-purple-200">
               Distribución de Gastos por Categoría ({selectedMonth})
             </span>
             <span className="font-mono text-teal-300 font-bold">
@@ -487,7 +498,7 @@ export default function HomePage() {
           </div>
 
           {expensesByCategory.length === 0 ? (
-            <p className="text-xs text-indigo-300/60 py-2">No hay gastos ejecutados en este mes.</p>
+            <p className="text-xs text-purple-300/60 py-2">No hay gastos ejecutados en este mes.</p>
           ) : (
             <div className="space-y-3">
               {expensesByCategory.map((item) => {
@@ -495,12 +506,12 @@ export default function HomePage() {
                 return (
                   <div key={item.category} className="space-y-1">
                     <div className="flex justify-between text-xs">
-                      <span className="text-indigo-200">{item.category}</span>
-                      <span className="font-mono text-indigo-300">
+                      <span className="text-purple-200">{item.category}</span>
+                      <span className="font-mono text-purple-300">
                         {currSymbol} {item.amount.toFixed(2)} ({categoryPct}%)
                       </span>
                     </div>
-                    <div className="w-full bg-indigo-950 h-2.5 rounded-full overflow-hidden border border-indigo-500/30">
+                    <div className="w-full bg-purple-950 h-2.5 rounded-full overflow-hidden border border-purple-500/40">
                       <div
                         className="bg-gradient-to-r from-teal-400 to-cyan-400 h-full transition-all duration-500"
                         style={{ width: `${Math.min(categoryPct, 100)}%` }}
@@ -515,27 +526,27 @@ export default function HomePage() {
 
         <div 
           className="rounded-3xl p-6 shadow-2xl border"
-          style={{ backgroundColor: 'rgba(30, 27, 75, 0.75)', borderColor: 'rgba(99, 102, 241, 0.3)', backdropFilter: 'blur(16px)' }}
+          style={{ backgroundColor: 'rgba(45, 10, 80, 0.75)', borderColor: 'rgba(217, 70, 239, 0.4)', backdropFilter: 'blur(16px)' }}
         >
-          <h2 className="text-sm font-semibold text-indigo-200 uppercase tracking-wider mb-4">Acciones Rápidas ({selectedMonth})</h2>
+          <h2 className="text-sm font-semibold text-purple-200 uppercase tracking-wider mb-4">Acciones Rápidas ({selectedMonth})</h2>
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             <button
               onClick={() => handleOpenModal('income')}
-              className="bg-gradient-to-r from-teal-500 to-emerald-600 hover:from-teal-400 hover:to-emerald-500 text-white font-semibold py-3 px-4 rounded-2xl text-sm transition-all shadow-lg shadow-teal-950/60 flex items-center justify-center space-x-2"
+              className="bg-gradient-to-r from-teal-400 to-emerald-500 hover:from-teal-300 hover:to-emerald-400 text-slate-950 font-bold py-3 px-4 rounded-2xl text-sm transition-all shadow-xl shadow-teal-950/80 flex items-center justify-center space-x-2"
             >
               <span>+ Registrar Ingreso Variable</span>
             </button>
 
             <button
               onClick={() => handleOpenModal('expense')}
-              className="bg-gradient-to-r from-rose-500 to-pink-600 hover:from-rose-400 hover:to-pink-500 text-white font-semibold py-3 px-4 rounded-2xl text-sm transition-all shadow-lg shadow-rose-950/60 flex items-center justify-center space-x-2"
+              className="bg-gradient-to-r from-rose-500 to-pink-600 hover:from-rose-400 hover:to-pink-500 text-white font-bold py-3 px-4 rounded-2xl text-sm transition-all shadow-xl shadow-rose-950/80 flex items-center justify-center space-x-2"
             >
               <span>- Registrar Gasto</span>
             </button>
 
             <button
               onClick={() => handleOpenModal('goal')}
-              className="bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-white font-semibold py-3 px-4 rounded-2xl text-sm transition-all shadow-lg shadow-cyan-950/60 flex items-center justify-center space-x-2"
+              className="bg-gradient-to-r from-cyan-400 to-blue-600 hover:from-cyan-300 hover:to-blue-500 text-white font-bold py-3 px-4 rounded-2xl text-sm transition-all shadow-xl shadow-cyan-950/80 flex items-center justify-center space-x-2"
             >
               <span>🎯 Crear Meta de Ahorro</span>
             </button>
@@ -545,13 +556,13 @@ export default function HomePage() {
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           <div 
             className="lg:col-span-1 rounded-3xl p-6 shadow-2xl border space-y-4"
-            style={{ backgroundColor: 'rgba(30, 27, 75, 0.75)', borderColor: 'rgba(99, 102, 241, 0.3)', backdropFilter: 'blur(16px)' }}
+            style={{ backgroundColor: 'rgba(45, 10, 80, 0.75)', borderColor: 'rgba(217, 70, 239, 0.4)', backdropFilter: 'blur(16px)' }}
           >
             <div className="flex justify-between items-center">
               <h2 className="text-lg font-semibold text-white">Metas & Proyección</h2>
               <button
                 onClick={() => handleOpenModal('goal')}
-                className="text-xs bg-cyan-600 hover:bg-cyan-500 text-white px-3 py-1.5 rounded-xl transition-colors font-medium shadow-md"
+                className="text-xs bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-bold px-3 py-1.5 rounded-xl transition-colors shadow-md"
               >
                 + Nueva
               </button>
@@ -566,27 +577,27 @@ export default function HomePage() {
                   : 0;
 
                 return (
-                  <div key={g.id} className="bg-indigo-950/60 border border-indigo-500/30 p-4 rounded-2xl space-y-2">
+                  <div key={g.id} className="bg-purple-950/80 border border-purple-500/40 p-4 rounded-2xl space-y-2">
                     <div className="flex justify-between items-center">
                       <h3 className="font-semibold text-white text-xs">{g.title}</h3>
-                      <span className="text-[10px] font-mono bg-indigo-900 text-cyan-300 px-2 py-0.5 rounded-lg border border-indigo-500/30">
+                      <span className="text-[10px] font-mono bg-purple-900 text-cyan-300 px-2 py-0.5 rounded-lg border border-purple-500/40">
                         {pct}%
                       </span>
                     </div>
 
-                    <div className="flex justify-between text-[11px] text-indigo-300 font-mono">
+                    <div className="flex justify-between text-[11px] text-purple-200 font-mono">
                       <span>{currSymbol} {g.currentAmount.toFixed(2)}</span>
                       <span>{currSymbol} {g.targetAmount.toFixed(2)}</span>
                     </div>
 
-                    <div className="w-full bg-indigo-950 h-2 rounded-full overflow-hidden border border-indigo-500/30">
+                    <div className="w-full bg-purple-950 h-2 rounded-full overflow-hidden border border-purple-500/40">
                       <div
-                        className="bg-gradient-to-r from-cyan-400 to-indigo-400 h-full transition-all duration-500"
+                        className="bg-gradient-to-r from-cyan-400 to-fuchsia-400 h-full transition-all duration-500"
                         style={{ width: `${pct}%` }}
                       ></div>
                     </div>
 
-                    <p className="text-[10px] text-indigo-300/70 font-mono pt-1">
+                    <p className="text-[10px] text-purple-300/70 font-mono pt-1">
                       {monthsToTarget > 0 
                         ? `⏱ Tiempo est. para completar: ~${monthsToTarget} mes(es)`
                         : '🎉 Meta alcanzada o lista'}
@@ -599,15 +610,15 @@ export default function HomePage() {
 
           <div 
             className="lg:col-span-2 rounded-3xl p-6 shadow-2xl border space-y-4"
-            style={{ backgroundColor: 'rgba(30, 27, 75, 0.75)', borderColor: 'rgba(99, 102, 241, 0.3)', backdropFilter: 'blur(16px)' }}
+            style={{ backgroundColor: 'rgba(45, 10, 80, 0.75)', borderColor: 'rgba(217, 70, 239, 0.4)', backdropFilter: 'blur(16px)' }}
           >
             <h2 className="text-lg font-semibold text-white">Comparativa y Tendencia Mes a Mes</h2>
             {monthlyHistory.length === 0 ? (
-              <p className="text-sm text-indigo-300/60 py-6 text-center">Registra ingresos y gastos para generar la tendencia histórica.</p>
+              <p className="text-sm text-purple-300/60 py-6 text-center">Registra ingresos y gastos para generar la tendencia histórica.</p>
             ) : (
               <div className="overflow-x-auto">
-                <table className="w-full text-left text-sm text-indigo-200">
-                  <thead className="bg-indigo-950/60 text-indigo-300 uppercase text-xs border-b border-indigo-500/30">
+                <table className="w-full text-left text-sm text-purple-200">
+                  <thead className="bg-purple-950/80 text-purple-300 uppercase text-xs border-b border-purple-500/40">
                     <tr>
                       <th className="px-4 py-3 rounded-l-xl">Mes</th>
                       <th className="px-4 py-3 text-right">Ingresos</th>
@@ -615,9 +626,9 @@ export default function HomePage() {
                       <th className="px-4 py-3 text-right rounded-r-xl">Ahorro Reservado</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-indigo-500/20 font-mono">
+                  <tbody className="divide-y divide-purple-500/20 font-mono">
                     {monthlyHistory.map((h) => (
-                      <tr key={h.month} className="hover:bg-indigo-900/30">
+                      <tr key={h.month} className="hover:bg-purple-900/40">
                         <td className="px-4 py-3 text-xs text-white font-medium">{h.month}</td>
                         <td className="px-4 py-3 text-right text-cyan-300">{currSymbol} {h.income.toFixed(2)}</td>
                         <td className="px-4 py-3 text-right text-rose-400">{currSymbol} {h.expense.toFixed(2)}</td>
@@ -633,15 +644,15 @@ export default function HomePage() {
 
         <div 
           className="rounded-3xl p-6 shadow-2xl border space-y-4"
-          style={{ backgroundColor: 'rgba(30, 27, 75, 0.75)', borderColor: 'rgba(99, 102, 241, 0.3)', backdropFilter: 'blur(16px)' }}
+          style={{ backgroundColor: 'rgba(45, 10, 80, 0.75)', borderColor: 'rgba(217, 70, 239, 0.4)', backdropFilter: 'blur(16px)' }}
         >
           <h2 className="text-lg font-semibold text-white">Transacciones ({selectedMonth})</h2>
           {monthTransactions.length === 0 ? (
-            <p className="text-sm text-indigo-300/60 py-6 text-center">No hay registros para este mes. Registra tus ingresos o gastos arriba.</p>
+            <p className="text-sm text-purple-300/60 py-6 text-center">No hay registros para este mes. Registra tus ingresos o gastos arriba.</p>
           ) : (
             <div className="overflow-x-auto">
-              <table className="w-full text-left text-sm text-indigo-200">
-                <thead className="bg-indigo-950/60 text-indigo-300 uppercase text-xs border-b border-indigo-500/30">
+              <table className="w-full text-left text-sm text-purple-200">
+                <thead className="bg-purple-950/80 text-purple-300 uppercase text-xs border-b border-purple-500/40">
                   <tr>
                     <th className="px-4 py-3 rounded-l-xl">Fecha</th>
                     <th className="px-4 py-3">Tipo / Naturaleza</th>
@@ -651,23 +662,23 @@ export default function HomePage() {
                     <th className="px-4 py-3 text-center rounded-r-xl">Acciones</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-indigo-500/20">
+                <tbody className="divide-y divide-purple-500/20">
                   {monthTransactions.map((t) => (
-                    <tr key={t.id} className="hover:bg-indigo-900/30">
-                      <td className="px-4 py-3 text-xs text-indigo-300">{t.date}</td>
+                    <tr key={t.id} className="hover:bg-purple-900/40">
+                      <td className="px-4 py-3 text-xs text-purple-300">{t.date}</td>
                       <td className="px-4 py-3 text-xs">
                         <span className={`px-2 py-0.5 rounded-lg text-[10px] border ${
                           t.type === 'income' 
-                            ? 'bg-cyan-950 border-cyan-500 text-cyan-300' 
+                            ? 'bg-cyan-950 border-cyan-400 text-cyan-300' 
                             : t.nature === 'fixed'
-                            ? 'bg-amber-950 border-amber-500 text-amber-300'
-                            : 'bg-indigo-900 border-indigo-500 text-indigo-200'
+                            ? 'bg-amber-950 border-amber-400 text-amber-300'
+                            : 'bg-purple-900 border-purple-400 text-purple-200'
                         }`}>
                           {t.type === 'income' ? 'Ingreso' : t.nature === 'fixed' ? 'Gasto Fijo' : 'Gasto Variable'}
                         </span>
                       </td>
                       <td className="px-4 py-3 font-medium text-white">{t.description}</td>
-                      <td className="px-4 py-3 text-xs text-indigo-300">{t.category}</td>
+                      <td className="px-4 py-3 text-xs text-purple-300">{t.category}</td>
                       <td className={`px-4 py-3 text-right font-mono font-bold ${t.type === 'income' ? 'text-cyan-300' : 'text-rose-400'}`}>
                         {t.type === 'income' ? '+' : '-'} {currSymbol} {t.amount.toFixed(2)}
                       </td>
@@ -675,14 +686,14 @@ export default function HomePage() {
                         <button
                           onClick={() => handleEditTransaction(t)}
                           title="Editar Registro"
-                          className="text-xs bg-indigo-900 hover:bg-indigo-800 border border-indigo-500 text-indigo-200 px-2.5 py-1 rounded-lg transition-colors"
+                          className="text-xs bg-purple-900 hover:bg-purple-800 border border-purple-400 text-purple-200 px-2.5 py-1 rounded-lg transition-colors"
                         >
                           ✏️
                         </button>
                         <button
                           onClick={() => handleDeleteTransaction(t.id)}
                           title="Eliminar Registro"
-                          className="text-xs bg-rose-950 hover:bg-rose-900 border border-rose-700 text-rose-300 px-2.5 py-1 rounded-lg transition-colors"
+                          className="text-xs bg-rose-950 hover:bg-rose-900 border border-rose-500 text-rose-300 px-2.5 py-1 rounded-lg transition-colors"
                         >
                           🗑️
                         </button>
@@ -697,10 +708,10 @@ export default function HomePage() {
       </section>
 
       {showModal && (
-        <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-xl flex items-center justify-center p-4 z-50">
+        <div className="fixed inset-0 bg-slate-950/85 backdrop-blur-xl flex items-center justify-center p-4 z-50">
           <div 
             className="border rounded-3xl w-full max-w-md p-6 shadow-2xl space-y-4"
-            style={{ backgroundColor: '#1e1b4b', borderColor: 'rgba(99, 102, 241, 0.4)' }}
+            style={{ backgroundColor: '#2d0a50', borderColor: 'rgba(217, 70, 239, 0.5)' }}
           >
             <h3 className="text-lg font-bold text-white capitalize">
               {modalType === 'goal'
@@ -711,7 +722,7 @@ export default function HomePage() {
             </h3>
 
             {budgetError && (
-              <div className="p-3 bg-rose-950 border border-rose-700 text-rose-300 rounded-xl text-xs font-medium">
+              <div className="p-3 bg-rose-950 border border-rose-600 text-rose-300 rounded-xl text-xs font-medium">
                 {budgetError}
               </div>
             )}
@@ -720,19 +731,19 @@ export default function HomePage() {
               {modalType === 'goal' ? (
                 <>
                   <div>
-                    <label className="block text-xs font-semibold text-indigo-200 uppercase mb-1">Nombre de la Meta</label>
+                    <label className="block text-xs font-semibold text-purple-200 uppercase mb-1">Nombre de la Meta</label>
                     <input
                       type="text"
                       placeholder="Ej. Fondo de Emergencia, Vacaciones"
                       value={goalTitle}
                       onChange={(e) => setGoalTitle(e.target.value)}
                       required
-                      className="w-full bg-indigo-950 border border-indigo-500/50 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-teal-400 text-sm"
+                      className="w-full bg-purple-950 border border-purple-500/60 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-teal-300 text-sm"
                     />
                   </div>
 
                   <div>
-                    <label className="block text-xs font-semibold text-indigo-200 uppercase mb-1">Monto Objetivo ({currSymbol})</label>
+                    <label className="block text-xs font-semibold text-purple-200 uppercase mb-1">Monto Objetivo ({currSymbol})</label>
                     <input
                       type="number"
                       step="0.01"
@@ -740,43 +751,43 @@ export default function HomePage() {
                       value={goalTarget}
                       onChange={(e) => setGoalTarget(e.target.value)}
                       required
-                      className="w-full bg-indigo-950 border border-indigo-500/50 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-teal-400 font-mono text-sm"
+                      className="w-full bg-purple-950 border border-purple-500/60 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-teal-300 font-mono text-sm"
                     />
                   </div>
 
                   <div>
-                    <label className="block text-xs font-semibold text-indigo-200 uppercase mb-1">Ahorro Inicial ({currSymbol})</label>
+                    <label className="block text-xs font-semibold text-purple-200 uppercase mb-1">Ahorro Inicial ({currSymbol})</label>
                     <input
                       type="number"
                       step="0.01"
                       placeholder="0.00"
                       value={goalCurrent}
                       onChange={(e) => setGoalCurrent(e.target.value)}
-                      className="w-full bg-indigo-950 border border-indigo-500/50 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-teal-400 font-mono text-sm"
+                      className="w-full bg-purple-950 border border-purple-500/60 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-teal-300 font-mono text-sm"
                     />
                   </div>
                 </>
               ) : (
                 <>
                   <div>
-                    <label className="block text-xs font-semibold text-indigo-200 uppercase mb-1">Descripción</label>
+                    <label className="block text-xs font-semibold text-purple-200 uppercase mb-1">Descripción</label>
                     <input
                       type="text"
                       placeholder="Ej. Alquiler, Consultoría, Supermercado"
                       value={description}
                       onChange={(e) => setDescription(e.target.value)}
                       required
-                      className="w-full bg-indigo-950 border border-indigo-500/50 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-teal-400 text-sm"
+                      className="w-full bg-purple-950 border border-purple-500/60 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-teal-300 text-sm"
                     />
                   </div>
 
                   {modalType === 'expense' && (
                     <div>
-                      <label className="block text-xs font-semibold text-indigo-200 uppercase mb-1">Naturaleza del Gasto</label>
+                      <label className="block text-xs font-semibold text-purple-200 uppercase mb-1">Naturaleza del Gasto</label>
                       <select
                         value={expenseNature}
                         onChange={(e) => setExpenseNature(e.target.value as 'fixed' | 'variable')}
-                        className="w-full bg-indigo-950 border border-indigo-500/50 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-teal-400 text-sm"
+                        className="w-full bg-purple-950 border border-purple-500/60 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-teal-300 text-sm"
                       >
                         <option value="variable">Variable (Discrecional / Opcional)</option>
                         <option value="fixed">Fijo (Obligatorio / Inflexible)</option>
@@ -785,7 +796,7 @@ export default function HomePage() {
                   )}
 
                   <div>
-                    <label className="block text-xs font-semibold text-indigo-200 uppercase mb-1">Monto ({currSymbol})</label>
+                    <label className="block text-xs font-semibold text-purple-200 uppercase mb-1">Monto ({currSymbol})</label>
                     <input
                       type="number"
                       step="0.01"
@@ -793,19 +804,19 @@ export default function HomePage() {
                       value={amount}
                       onChange={(e) => setAmount(e.target.value)}
                       required
-                      className="w-full bg-indigo-950 border border-indigo-500/50 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-teal-400 font-mono text-sm"
+                      className="w-full bg-purple-950 border border-purple-500/60 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-teal-300 font-mono text-sm"
                     />
                   </div>
 
                   <div>
-                    <label className="block text-xs font-semibold text-indigo-200 uppercase mb-1">Categoría</label>
+                    <label className="block text-xs font-semibold text-purple-200 uppercase mb-1">Categoría</label>
                     <select
                       value={category}
                       onChange={(e) => setCategory(e.target.value)}
-                      className="w-full bg-indigo-950 border border-indigo-500/50 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-teal-400 text-sm"
+                      className="w-full bg-purple-950 border border-purple-500/60 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-teal-300 text-sm"
                     >
                       {(modalType === 'income' ? INCOME_CATEGORIES : EXPENSE_CATEGORIES).map((cat) => (
-                        <option key={cat} value={cat} style={{ backgroundColor: '#1e1b4b', color: '#fff' }}>
+                        <option key={cat} value={cat} style={{ backgroundColor: '#2d0a50', color: '#fff' }}>
                           {cat}
                         </option>
                       ))}
@@ -818,13 +829,13 @@ export default function HomePage() {
                 <button
                   type="button"
                   onClick={() => setShowModal(false)}
-                  className="px-4 py-2 bg-indigo-900 hover:bg-indigo-800 text-indigo-200 rounded-xl text-sm transition-colors"
+                  className="px-4 py-2 bg-purple-900 hover:bg-purple-800 text-purple-200 rounded-xl text-sm transition-colors"
                 >
                   Cancelar
                 </button>
                 <button
                   type="submit"
-                  className="px-4 py-2 bg-teal-600 hover:bg-teal-500 text-white rounded-xl text-sm font-medium transition-colors shadow-lg"
+                  className="px-4 py-2 bg-teal-500 hover:bg-teal-400 text-slate-950 font-bold rounded-xl text-sm transition-colors shadow-lg"
                 >
                   {editingTxId ? 'Actualizar' : 'Guardar'}
                 </button>
@@ -833,6 +844,6 @@ export default function HomePage() {
           </div>
         </div>
       )}
-    </main>
+    </div>
   );
 }
