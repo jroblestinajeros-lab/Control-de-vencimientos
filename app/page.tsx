@@ -12,6 +12,13 @@ interface Transaction {
   date: string;
 }
 
+interface SavingsGoal {
+  id: string;
+  title: string;
+  targetAmount: number;
+  currentAmount: number;
+}
+
 const EXPENSE_CATEGORIES = [
   'Vivienda / Alquiler / Mantenimiento',
   'Alimentación / Supermercado',
@@ -40,14 +47,21 @@ export default function HomePage() {
 
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [monthlyBudget, setMonthlyBudget] = useState<number>(5000);
+  const [goals, setGoals] = useState<SavingsGoal[]>([]);
   
   const [showModal, setShowModal] = useState<boolean>(false);
-  const [modalType, setModalType] = useState<'income' | 'expense' | 'budget'>('expense');
+  const [modalType, setModalType] = useState<'income' | 'expense' | 'budget' | 'goal'>('expense');
 
+  // Formulario de Transacciones y Presupuesto
   const [description, setDescription] = useState('');
   const [amount, setAmount] = useState('');
   const [category, setCategory] = useState(EXPENSE_CATEGORIES[0]);
   const [budgetError, setBudgetError] = useState<string | null>(null);
+
+  // Formulario de Metas
+  const [goalTitle, setGoalTitle] = useState('');
+  const [goalTarget, setGoalTarget] = useState('');
+  const [goalCurrent, setGoalCurrent] = useState('');
 
   useEffect(() => {
     const sessionData = localStorage.getItem('user_session');
@@ -71,8 +85,19 @@ export default function HomePage() {
 
     const savedTx = localStorage.getItem('fin_transactions');
     const savedBudget = localStorage.getItem('fin_budget');
+    const savedGoals = localStorage.getItem('fin_goals');
+
     if (savedTx) setTransactions(JSON.parse(savedTx));
     if (savedBudget) setMonthlyBudget(Number(savedBudget));
+    if (savedGoals) {
+      setGoals(JSON.parse(savedGoals));
+    } else {
+      // Metas predeterminadas de ejemplo
+      setGoals([
+        { id: '1', title: 'Fondo de Emergencia', targetAmount: 10000, currentAmount: 3500 },
+        { id: '2', title: 'Renovación de Equipos', targetAmount: 5000, currentAmount: 1200 },
+      ]);
+    }
 
     setLoading(false);
   }, [router]);
@@ -89,10 +114,13 @@ export default function HomePage() {
   const budgetRemaining = monthlyBudget - totalExpense;
   const budgetPercentage = Math.min(Math.round((totalExpense / (monthlyBudget || 1)) * 100), 100);
 
-  const handleOpenModal = (type: 'income' | 'expense' | 'budget') => {
+  const handleOpenModal = (type: 'income' | 'expense' | 'budget' | 'goal') => {
     setModalType(type);
     setDescription('');
     setAmount('');
+    setGoalTitle('');
+    setGoalTarget('');
+    setGoalCurrent('');
     setCategory(type === 'income' ? INCOME_CATEGORIES[0] : EXPENSE_CATEGORIES[0]);
     setBudgetError(null);
     setShowModal(true);
@@ -101,6 +129,26 @@ export default function HomePage() {
   const handleSave = (e: React.FormEvent) => {
     e.preventDefault();
     setBudgetError(null);
+
+    if (modalType === 'goal') {
+      const targetVal = parseFloat(goalTarget);
+      const currentVal = parseFloat(goalCurrent) || 0;
+      if (isNaN(targetVal) || targetVal <= 0) return;
+
+      const newGoal: SavingsGoal = {
+        id: Date.now().toString(),
+        title: goalTitle || 'Nueva Meta',
+        targetAmount: targetVal,
+        currentAmount: currentVal,
+      };
+
+      const updatedGoals = [...goals, newGoal];
+      setGoals(updatedGoals);
+      localStorage.setItem('fin_goals', JSON.stringify(updatedGoals));
+      setShowModal(false);
+      return;
+    }
+
     const val = parseFloat(amount);
     if (isNaN(val) || val <= 0) return;
 
@@ -108,7 +156,6 @@ export default function HomePage() {
       setMonthlyBudget(val);
       localStorage.setItem('fin_budget', val.toString());
     } else if (modalType === 'expense') {
-      // Validación estricta de presupuesto excedido
       if (val > budgetRemaining) {
         setBudgetError(
           `¡Atención! Este gasto (S/ ${val.toFixed(2)}) supera tu presupuesto disponible de S/ ${budgetRemaining.toFixed(2)}.`
@@ -221,10 +268,10 @@ export default function HomePage() {
           </div>
         </div>
 
-        {/* Botones de Acción */}
+        {/* Botones de Acción Rápidos */}
         <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-xl">
           <h2 className="text-sm font-semibold text-slate-300 uppercase tracking-wider mb-4">Acciones Rápidas</h2>
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
             <button
               onClick={() => handleOpenModal('income')}
               className="bg-emerald-600 hover:bg-emerald-500 text-white font-medium py-3 px-4 rounded-xl text-sm transition-all shadow-lg shadow-emerald-900/20 flex items-center justify-center space-x-2"
@@ -245,6 +292,54 @@ export default function HomePage() {
             >
               <span>⚙ Definir Presupuesto</span>
             </button>
+
+            <button
+              onClick={() => handleOpenModal('goal')}
+              className="bg-blue-600 hover:bg-blue-500 text-white font-medium py-3 px-4 rounded-xl text-sm transition-all shadow-lg shadow-blue-900/20 flex items-center justify-center space-x-2"
+            >
+              <span>🎯 Crear Meta Ahorro</span>
+            </button>
+          </div>
+        </div>
+
+        {/* Módulo de Metas de Ahorro */}
+        <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-xl space-y-6">
+          <div className="flex justify-between items-center">
+            <h2 className="text-lg font-semibold text-white">Metas de Ahorro & Objetivos</h2>
+            <button
+              onClick={() => handleOpenModal('goal')}
+              className="text-xs bg-blue-600 hover:bg-blue-500 text-white px-3 py-1.5 rounded-lg transition-colors font-medium"
+            >
+              + Nueva Meta
+            </button>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {goals.map((g) => {
+              const pct = Math.min(Math.round((g.currentAmount / (g.targetAmount || 1)) * 100), 100);
+              return (
+                <div key={g.id} className="bg-slate-950 border border-slate-800 p-5 rounded-xl space-y-3">
+                  <div className="flex justify-between items-center">
+                    <h3 className="font-semibold text-white text-sm">{g.title}</h3>
+                    <span className="text-xs font-mono bg-slate-900 text-blue-400 px-2 py-1 rounded border border-slate-800">
+                      {pct}% logrado
+                    </span>
+                  </div>
+
+                  <div className="flex justify-between text-xs text-slate-400 font-mono">
+                    <span>Actual: S/ {g.currentAmount.toFixed(2)}</span>
+                    <span>Meta: S/ {g.targetAmount.toFixed(2)}</span>
+                  </div>
+
+                  <div className="w-full bg-slate-900 h-2.5 rounded-full overflow-hidden border border-slate-800">
+                    <div
+                      className="bg-blue-500 h-full transition-all duration-500"
+                      style={{ width: `${pct}%` }}
+                    ></div>
+                  </div>
+                </div>
+              );
+            })}
           </div>
         </div>
 
@@ -291,7 +386,11 @@ export default function HomePage() {
         <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4 z-50">
           <div className="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-md p-6 shadow-2xl space-y-4">
             <h3 className="text-lg font-bold text-white capitalize">
-              {modalType === 'budget' ? 'Configurar Presupuesto Mensual' : `Registrar ${modalType === 'income' ? 'Ingreso' : 'Gasto'}`}
+              {modalType === 'budget'
+                ? 'Configurar Presupuesto Mensual'
+                : modalType === 'goal'
+                ? 'Crear Meta de Ahorro'
+                : `Registrar ${modalType === 'income' ? 'Ingreso' : 'Gasto'}`}
             </h3>
 
             {budgetError && (
@@ -301,48 +400,91 @@ export default function HomePage() {
             )}
 
             <form onSubmit={handleSave} className="space-y-4">
-              {modalType !== 'budget' && (
-                <div>
-                  <label className="block text-xs font-semibold text-slate-300 uppercase mb-1">Descripción</label>
-                  <input
-                    type="text"
-                    placeholder="Ej. Supermercado, Pago Luz, Consultoría"
-                    value={description}
-                    onChange={(e) => setDescription(e.target.value)}
-                    required
-                    className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-emerald-500 text-sm"
-                  />
-                </div>
-              )}
+              {modalType === 'goal' ? (
+                <>
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-300 uppercase mb-1">Nombre de la Meta</label>
+                    <input
+                      type="text"
+                      placeholder="Ej. Fondo de Emergencia, Vacaciones"
+                      value={goalTitle}
+                      onChange={(e) => setGoalTitle(e.target.value)}
+                      required
+                      className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-blue-500 text-sm"
+                    />
+                  </div>
 
-              <div>
-                <label className="block text-xs font-semibold text-slate-300 uppercase mb-1">Monto (S/)</label>
-                <input
-                  type="number"
-                  step="0.01"
-                  placeholder="0.00"
-                  value={amount}
-                  onChange={(e) => setAmount(e.target.value)}
-                  required
-                  className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-emerald-500 font-mono text-sm"
-                />
-              </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-300 uppercase mb-1">Monto Objetivo (S/)</label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      placeholder="10000.00"
+                      value={goalTarget}
+                      onChange={(e) => setGoalTarget(e.target.value)}
+                      required
+                      className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-blue-500 font-mono text-sm"
+                    />
+                  </div>
 
-              {modalType !== 'budget' && (
-                <div>
-                  <label className="block text-xs font-semibold text-slate-300 uppercase mb-1">Categoría</label>
-                  <select
-                    value={category}
-                    onChange={(e) => setCategory(e.target.value)}
-                    className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-emerald-500 text-sm"
-                  >
-                    {(modalType === 'income' ? INCOME_CATEGORIES : EXPENSE_CATEGORIES).map((cat) => (
-                      <option key={cat} value={cat}>
-                        {cat}
-                      </option>
-                    ))}
-                  </select>
-                </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-300 uppercase mb-1">Ahorro Inicial (S/)</label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      placeholder="0.00"
+                      value={goalCurrent}
+                      onChange={(e) => setGoalCurrent(e.target.value)}
+                      className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-blue-500 font-mono text-sm"
+                    />
+                  </div>
+                </>
+              ) : (
+                <>
+                  {modalType !== 'budget' && (
+                    <div>
+                      <label className="block text-xs font-semibold text-slate-300 uppercase mb-1">Descripción</label>
+                      <input
+                        type="text"
+                        placeholder="Ej. Supermercado, Pago Luz, Consultoría"
+                        value={description}
+                        onChange={(e) => setDescription(e.target.value)}
+                        required
+                        className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-emerald-500 text-sm"
+                      />
+                    </div>
+                  )}
+
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-300 uppercase mb-1">Monto (S/)</label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      placeholder="0.00"
+                      value={amount}
+                      onChange={(e) => setAmount(e.target.value)}
+                      required
+                      className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-emerald-500 font-mono text-sm"
+                    />
+                  </div>
+
+                  {modalType !== 'budget' && (
+                    <div>
+                      <label className="block text-xs font-semibold text-slate-300 uppercase mb-1">Categoría</label>
+                      <select
+                        value={category}
+                        onChange={(e) => setCategory(e.target.value)}
+                        className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-emerald-500 text-sm"
+                      >
+                        {(modalType === 'income' ? INCOME_CATEGORIES : EXPENSE_CATEGORIES).map((cat) => (
+                          <option key={cat} value={cat}>
+                            {cat}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
+                </>
               )}
 
               <div className="flex justify-end space-x-3 pt-2">
