@@ -1,10 +1,8 @@
 'use client';
 
 import React, { useState } from 'react';
-import { useRouter } from 'next/navigation';
 
 export default function LoginPage() {
-  const router = useRouter();
   const [isSignUp, setIsSignUp] = useState(false);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -21,7 +19,6 @@ export default function LoginPage() {
     setMessage(null);
 
     try {
-      // Llamada interna al servidor de Next.js (no al subdominio de Supabase)
       const res = await fetch('/api/auth', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -43,8 +40,8 @@ export default function LoginPage() {
         setMessage('Cuenta creada con éxito. Ya puedes iniciar sesión.');
         setIsSignUp(false);
       } else {
-        router.push('/');
-        router.refresh();
+        // Redirección completa para forzar la carga de la cookie de sesión de Supabase
+        window.location.href = '/';
       }
     } catch (err: any) {
       setError(err.message || 'Error durante la autenticación.');
