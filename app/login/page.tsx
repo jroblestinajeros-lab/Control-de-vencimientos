@@ -42,8 +42,15 @@ export default function LoginPage() {
         setMessage('Cuenta creada con éxito. Ya puedes iniciar sesión.');
         setIsSignUp(false);
       } else {
-        // Guardamos la sesión localmente y en cookie de respaldo
-        localStorage.setItem('user_session', JSON.stringify(data.session || { user: { email } }));
+        // EXTRACCIÓN Y BLINDAJE DEL CORREO REAL DEVUELTO POR LA API O EL FORMULARIO
+        const authenticatedEmail = data.session?.user?.email || data.user?.email || email;
+        const sessionPayload = {
+          user: { email: authenticatedEmail },
+          ...data.session
+        };
+
+        // Guardamos la sesión localmente asegurando el correo exacto
+        localStorage.setItem('user_session', JSON.stringify(sessionPayload));
         document.cookie = `user_logged_in=true; path=/; max-age=86400`;
         window.location.href = '/';
       }
