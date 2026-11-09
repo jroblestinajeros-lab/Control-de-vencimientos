@@ -55,7 +55,7 @@ export default function TareoPage() {
       try { setCollaborators(JSON.parse(savedCollabs)); } catch (e) { setCollaborators([]); }
     } else {
       const defaultCollabs: Collaborator[] = [
-        { dni: '45572820', name: 'Jorge Robles', cargo: 'Logística', startDate: '2026-08-01', regime: 'small' },
+        { dni: '45572820', name: 'Jorge Luis Robles Tinajeros', cargo: 'Administrativo', startDate: '2026-01-08', regime: 'small' },
         { dni: '45420921', name: 'Jefferson Aliaga Araujo', cargo: 'Gerente de Finanzas', startDate: '2015-01-01', regime: 'small' },
         { dni: '47891234', name: 'Carlos Mendoza', cargo: 'Técnico Batimetrista', startDate: '2026-08-01', regime: 'micro' }
       ];
@@ -67,8 +67,7 @@ export default function TareoPage() {
       try { setTareos(JSON.parse(savedTareos)); } catch (e) { setTareos([]); }
     } else {
       const defaultTareos: TareoRecord[] = [
-        { id: '1', dni: '45572820', name: 'Jorge Robles', cargo: 'Logística', projectCode: 'PRJ-01', status: 'campo', daysWorked: 7, date: '2026-09-11' },
-        { id: '2', dni: '45572820', name: 'Jorge Robles', cargo: 'Logística', projectCode: 'PRJ-02', status: 'descanso_medico', daysWorked: 2, date: '2026-09-12' }
+        { id: '1', dni: '45572820', name: 'Jorge Luis Robles Tinajeros', cargo: 'Administrativo', projectCode: 'PRJ-01', status: 'campo', daysWorked: 7, date: '2026-09-11' }
       ];
       setTareos(defaultTareos);
       localStorage.setItem('vya_tareos', JSON.stringify(defaultTareos));
@@ -77,7 +76,7 @@ export default function TareoPage() {
     setLoading(false);
   }, []);
 
-  // --- CÁLCULO DE VACACIONES MYPE ---
+  // --- LÓGICA DE CÁLCULO DE VACACIONES MYPE RIGUROSA ---
   const calculateVacationStatus = (startDateStr: string, regime: 'micro' | 'small') => {
     if (!startDateStr) return { earnedDays: 0, statusMessage: 'Sin fecha de ingreso', totalMonths: 0 };
     
@@ -92,18 +91,23 @@ export default function TareoPage() {
     const days = now.getDate() - start.getDate();
     
     const totalMonthsFraction = Math.max(0, months + (days >= 0 ? days / 30 : 0));
+    
+    // Asignación correcta según régimen MYPE: Microempresa = 15 días/año | Pequeña Empresa = 30 días/año
     const annualDays = regime === 'micro' ? 15 : 30;
     const monthlyAccrualRate = annualDays / 12;
 
     const earnedDays = totalMonthsFraction * monthlyAccrualRate;
     const completedFullMonth = diffDaysTotal >= 30;
 
-    let statusMessage = !completedFullMonth ? 'En periodo inicial (< 1 mes)' : `Proporcional MYPE (~${earnedDays.toFixed(1)} días)`;
+    let statusMessage = !completedFullMonth 
+      ? 'En periodo inicial (< 1 mes)' 
+      : `Vacaciones proporcionales MYPE (${annualDays} días/año)`;
 
     return {
       totalMonths: Number(totalMonthsFraction.toFixed(1)),
       earnedDays: Number(earnedDays.toFixed(1)),
-      statusMessage
+      statusMessage,
+      annualDays
     };
   };
 
@@ -236,6 +240,7 @@ export default function TareoPage() {
                     <th className="px-4 py-3">Colaborador</th>
                     <th className="px-4 py-3">Cargo</th>
                     <th className="px-4 py-3">Fecha Ingreso</th>
+                    <th className="px-4 py-3">Régimen</th>
                     <th className="px-4 py-3 text-right">Vacaciones MYPE Acumuladas</th>
                   </tr>
                 </thead>
@@ -248,6 +253,11 @@ export default function TareoPage() {
                         <td className="px-4 py-3 text-white font-sans font-medium">{c.name}</td>
                         <td className="px-4 py-3 text-purple-300">{c.cargo}</td>
                         <td className="px-4 py-3">{c.startDate}</td>
+                        <td className="px-4 py-3">
+                          <span className={`px-2 py-0.5 rounded text-[10px] border ${c.regime === 'micro' ? 'bg-amber-950 border-amber-400 text-amber-300' : 'bg-cyan-950 border-cyan-400 text-cyan-300'}`}>
+                            {c.regime === 'micro' ? 'Microempresa (15d)' : 'Pequeña Empresa (30d)'}
+                          </span>
+                        </td>
                         <td className="px-4 py-3 text-right font-bold text-fuchsia-300">{vac.earnedDays} días ({vac.statusMessage})</td>
                       </tr>
                     );
@@ -293,92 +303,60 @@ export default function TareoPage() {
               </div>
             </form>
 
-            {/* MATRIZ DE TAREO DETALLADA CON RESUMEN DE FALTAS, DESCANSO MÉDICO Y VACACIONES MYPE */}
+            {/* MATRIZ DE TAREO DETALLADA CON RÉGIMEN Y VACACIONES MYPE CORRECTAS */}
             <div className="rounded-3xl p-6 shadow-2xl border space-y-4" style={{ backgroundColor: 'rgba(30, 27, 75, 0.75)', borderColor: 'rgba(217, 70, 239, 0.3)' }}>
-              <h2 className="text-sm font-bold text-white uppercase tracking-wider">Matriz de Tareo & Resumen Consolidado de Colaboradores</h2>
+              <h2 className="text-sm font-bold text-white uppercase tracking-wider">Módulo de Asistencia, Tareo & Resumen Vacacional MYPE</h2>
               
               <div className="overflow-x-auto">
                 <table className="w-full text-left text-sm text-purple-200">
                   <thead className="bg-indigo-950/80 text-purple-300 uppercase text-xs border-b border-purple-500/30">
                     <tr>
-                      <th className="px-4 py-3">DNI</th>
                       <th className="px-4 py-3">Colaborador</th>
-                      <th className="px-4 py-3">Cargo</th>
-                      <th className="px-4 py-3 text-center">Días Campo / Oficina</th>
-                      <th className="px-4 py-3 text-center text-amber-300">Tardanzas / Faltas</th>
-                      <th className="px-4 py-3 text-center text-cyan-300">Descansos Médicos</th>
-                      <th className="px-4 py-3 text-right text-fuchsia-300">Vacaciones Acum. (MYPE)</th>
+                      <th className="px-4 py-3">Cargo / Régimen MYPE</th>
+                      <th className="px-4 py-3 text-center">Asistencias & Incidencias</th>
+                      <th className="px-4 py-3 text-right">Resumen Vacacional MYPE (Acumulado)</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-purple-500/20 font-mono text-xs">
                     {collaborators.map((c) => {
-                      // Agrupar registros de tareo de este colaborador
                       const collabTareos = tareos.filter(t => t.dni === c.dni);
                       const totalCampoOficina = collabTareos.filter(t => t.status === 'campo' || t.status === 'oficina').reduce((acc, t) => acc + t.daysWorked, 0);
                       const totalTardanzas = collabTareos.filter(t => t.status === 'tardanza').reduce((acc, t) => acc + t.daysWorked, 0);
                       const totalFaltas = collabTareos.filter(t => t.status === 'falto').reduce((acc, t) => acc + t.daysWorked, 0);
                       const totalDescansoMedico = collabTareos.filter(t => t.status === 'descanso_medico').reduce((acc, t) => acc + t.daysWorked, 0);
-                      
+
                       const vac = calculateVacationStatus(c.startDate, c.regime);
 
                       return (
                         <tr key={c.dni} className="hover:bg-indigo-900/30">
-                          <td className="px-4 py-3 text-teal-300">{c.dni}</td>
-                          <td className="px-4 py-3 text-white font-sans font-medium">{c.name}</td>
-                          <td className="px-4 py-3 text-purple-300">{c.cargo}</td>
-                          <td className="px-4 py-3 text-center text-teal-300 font-bold">{totalCampoOficina} días</td>
-                          <td className="px-4 py-3 text-center">
-                            <span className="text-amber-400 font-bold">{totalFaltas} faltas</span>
-                            {totalTardanzas > 0 && <span className="text-purple-300 text-[10px] block">({totalTardanzas} tard.)</span>}
+                          <td className="px-4 py-3 text-white font-sans font-medium">
+                            {c.name}
+                            <div className="text-[10px] text-purple-300/60 font-mono">DNI: {c.dni} | Ingreso: {c.startDate}</div>
                           </td>
-                          <td className="px-4 py-3 text-center text-cyan-300 font-bold">{totalDescansoMedico} días</td>
-                          <td className="px-4 py-3 text-right font-black text-fuchsia-300 text-sm">{vac.earnedDays} días</td>
+                          <td className="px-4 py-3 font-sans">
+                            <div className="text-purple-200 font-medium">{c.cargo}</div>
+                            {/* ETIQUETA DINÁMICA SEGÚN EL RÉGIMEN REAL */}
+                            <span className={`inline-block mt-0.5 px-2 py-0.5 rounded text-[9px] border ${c.regime === 'micro' ? 'bg-amber-950 border-amber-400 text-amber-300' : 'bg-cyan-950 border-cyan-400 text-cyan-300'}`}>
+                              {c.regime === 'micro' ? 'Microempresa (15d/año)' : 'Pequeña Empresa (30d/año)'}
+                            </span>
+                          </td>
+                          <td className="px-4 py-3 text-center font-sans">
+                            <div className="text-teal-300 font-bold">{totalCampoOficina} días lab.</div>
+                            <div className="text-[10px] text-purple-300">
+                              {totalFaltas > 0 && <span className="text-rose-400 font-bold mr-2">🔴 {totalFaltas} faltas</span>}
+                              {totalDescansoMedico > 0 && <span className="text-cyan-300 font-bold mr-2">🏥 {totalDescansoMedico} días DM</span>}
+                              {totalTardanzas > 0 && <span className="text-amber-300 font-bold">🟡 {totalTardanzas} tard.</span>}
+                              {totalFaltas === 0 && totalDescansoMedico === 0 && totalTardanzas === 0 && <span className="text-purple-300/60">Sin incidencias</span>}
+                            </div>
+                          </td>
+                          <td className="px-4 py-3 text-right">
+                            <div className="text-fuchsia-300 font-black text-sm">{vac.earnedDays} días acumulados</div>
+                            <div className="text-[10px] text-purple-200 font-sans">{vac.statusMessage}</div>
+                            <div className="text-[10px] text-cyan-300 font-mono mt-0.5">Tiempo laborado: {vac.totalMonths} meses</div>
+                          </td>
                         </tr>
                       );
                     })}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-
-            {/* HISTORIAL INDIVIDUAL DE REGISTROS */}
-            <div className="rounded-3xl p-6 shadow-2xl border space-y-4" style={{ backgroundColor: 'rgba(30, 27, 75, 0.75)', borderColor: 'rgba(217, 70, 239, 0.3)' }}>
-              <h2 className="text-sm font-bold text-white uppercase tracking-wider">Historial de Registros de Tareo & Incidencias</h2>
-              
-              <div className="overflow-x-auto">
-                <table className="w-full text-left text-sm text-purple-200">
-                  <thead className="bg-indigo-950/80 text-purple-300 uppercase text-xs border-b border-purple-500/30">
-                    <tr>
-                      <th className="px-4 py-3">Fecha</th>
-                      <th className="px-4 py-3">Colaborador</th>
-                      <th className="px-4 py-3">Proyecto</th>
-                      <th className="px-4 py-3">Estado / Incidencia</th>
-                      <th className="px-4 py-3 text-right">Días</th>
-                      <th className="px-4 py-3 text-center">Acción</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-purple-500/20 font-mono text-xs">
-                    {tareos.map((t) => (
-                      <tr key={t.id} className="hover:bg-indigo-900/30">
-                        <td className="px-4 py-3 text-purple-300">{t.date}</td>
-                        <td className="px-4 py-3 text-white font-sans font-medium">{t.name} (DNI: {t.dni})</td>
-                        <td className="px-4 py-3 text-cyan-300">{t.projectCode}</td>
-                        <td className="px-4 py-3">
-                          <span className={`px-2 py-0.5 rounded text-[10px] uppercase font-bold ${
-                            t.status === 'falto' ? 'bg-rose-950 border border-rose-500 text-rose-300' :
-                            t.status === 'descanso_medico' ? 'bg-cyan-950 border border-cyan-500 text-cyan-300' :
-                            t.status === 'tardanza' ? 'bg-amber-950 border border-amber-500 text-amber-300' :
-                            'bg-indigo-900 border border-purple-500 text-purple-200'
-                          }`}>
-                            {t.status.replace('_', ' ')}
-                          </span>
-                        </td>
-                        <td className="px-4 py-3 text-right text-teal-300">{t.daysWorked} días</td>
-                        <td className="px-4 py-3 text-center">
-                          <button onClick={() => handleDeleteTareo(t.id)} className="bg-rose-950 hover:bg-rose-900 border border-rose-500 text-rose-300 px-2.5 py-1 rounded-lg text-xs">🗑️</button>
-                        </td>
-                      </tr>
-                    ))}
                   </tbody>
                 </table>
               </div>
