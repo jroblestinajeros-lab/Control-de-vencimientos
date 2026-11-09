@@ -103,7 +103,6 @@ export default function HomePage() {
     }
     setUserEmail(currentEmail);
 
-    // LLAVES PERSONALIZADAS POR USUARIO PARA AISLAR DATOS
     const txKey = `fin_transactions_${currentEmail}`;
     const goalsKey = `fin_goals_${currentEmail}`;
     const percentKey = `fin_savings_percent_${currentEmail}`;
@@ -132,9 +131,75 @@ export default function HomePage() {
         setTransactions([]);
       }
     } else {
-      // Si es un usuario nuevo (como Sthefanie), arranca limpio con 0 transacciones
-      setTransactions([]);
-      localStorage.setItem(txKey, JSON.stringify([]));
+      // SOLO EL USUARIO PRINCIPAL CARGA DATOS DE PRUEBA. NUEVOS USUARIOS ARRANCAN EN 0.
+      if (currentEmail === 'jroblestinajeros@gmail.com') {
+        const defaultTransactions: Transaction[] = [
+          {
+            id: '1731100001',
+            description: 'Sueldo Principal',
+            amount: 2500,
+            type: 'income',
+            category: 'Sueldo / Salario Principal',
+            date: '09/11/2026',
+            month: '2026-11',
+          },
+          {
+            id: '1731100002',
+            description: 'menu',
+            amount: 350,
+            type: 'expense',
+            nature: 'fixed',
+            category: 'Alimentación / Supermercado',
+            date: '09/11/2026',
+            month: '2026-11',
+          },
+          {
+            id: '1731100003',
+            description: 'pasaje',
+            amount: 150,
+            type: 'expense',
+            nature: 'fixed',
+            category: 'Transporte / Combustible / Pasajes',
+            date: '09/11/2026',
+            month: '2026-11',
+          },
+          {
+            id: '1731100004',
+            description: 'celular y disney',
+            amount: 130,
+            type: 'expense',
+            nature: 'fixed',
+            category: 'Servicios (Luz, Agua, Internet, Celular)',
+            date: '09/11/2026',
+            month: '2026-11',
+          },
+          {
+            id: '1731100005',
+            description: 'deuda banco',
+            amount: 300,
+            type: 'expense',
+            nature: 'fixed',
+            category: 'Otros / Varios',
+            date: '09/11/2026',
+            month: '2026-11',
+          },
+          {
+            id: '1731100006',
+            description: 'deuda',
+            amount: 1000,
+            type: 'expense',
+            nature: 'fixed',
+            category: 'Otros / Varios',
+            date: '09/11/2026',
+            month: '2026-11',
+          },
+        ];
+        setTransactions(defaultTransactions);
+        localStorage.setItem(txKey, JSON.stringify(defaultTransactions));
+      } else {
+        setTransactions([]);
+        localStorage.setItem(txKey, JSON.stringify([]));
+      }
     }
 
     if (savedGoals) {
@@ -147,12 +212,17 @@ export default function HomePage() {
         setGoals([]);
       }
     } else {
-      // Metas iniciales limpias o vacías para usuarios nuevos
-      const defaultGoals: SavingsGoal[] = [
-        { id: '1', title: 'Fondo de Emergencia', targetAmount: 5000, currentAmount: 0 },
-      ];
-      setGoals(defaultGoals);
-      localStorage.setItem(goalsKey, JSON.stringify(defaultGoals));
+      if (currentEmail === 'jroblestinajeros@gmail.com') {
+        const defaultGoals: SavingsGoal[] = [
+          { id: '1', title: 'Fondo de Emergencia Operativa', targetAmount: 10000, currentAmount: 3500 },
+          { id: '2', title: 'Renovación de Equipos / ROV', targetAmount: 5000, currentAmount: 1200 },
+        ];
+        setGoals(defaultGoals);
+        localStorage.setItem(goalsKey, JSON.stringify(defaultGoals));
+      } else {
+        setGoals([]);
+        localStorage.setItem(goalsKey, JSON.stringify([]));
+      }
     }
 
     setLoading(false);
