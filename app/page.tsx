@@ -234,7 +234,7 @@ export default function HomePage() {
   const fixedExpenseMonthlyAvg = fixedExpenses || (totalExpense * 0.5) || 1;
   const emergencyCoverageMonths = (totalSavedAllGoals / fixedExpenseMonthlyAvg).toFixed(1);
 
-  // Cálculo de acumulados y porcentajes
+  // Cálculo de acumulados para la matriz superior
   let runningCumulative = 0;
   const rawExpenses = EXPENSE_CATEGORIES.map((cat) => {
     const total = monthTransactions
@@ -394,14 +394,20 @@ export default function HomePage() {
       [`Acumulado (${currSymbol})`]: item.cumulative,
     }));
 
-    const txData = monthTransactions.map((t) => ({
-      Fecha: t.date,
-      Tipo: t.type === 'income' ? 'Ingreso' : 'Gasto',
-      Naturaleza: t.nature === 'fixed' ? 'Fijo (Obligatorio)' : t.nature === 'variable' ? 'Variable' : '-',
-      Descripción: t.description,
-      Categoría: t.category,
-      [`Monto (${currSymbol})`]: t.amount,
-    }));
+    const txData = monthTransactions.map((t) => {
+      const txPct = availableExpenseBudget > 0 && t.type === 'expense' 
+        ? `${Math.round((t.amount / availableExpenseBudget) * 100)}%` 
+        : '-';
+      return {
+        Fecha: t.date,
+        Tipo: t.type === 'income' ? 'Ingreso' : 'Gasto',
+        Naturaleza: t.nature === 'fixed' ? 'Fijo (Obligatorio)' : t.nature === 'variable' ? 'Variable' : '-',
+        Descripción: t.description,
+        Categoría: t.category,
+        [`Monto (${currSymbol})`]: t.amount,
+        '% Presupuesto Mensual': txPct,
+      };
+    });
 
     const goalsData = goals.map((g) => ({
       'Meta / Objetivo': g.title,
@@ -417,8 +423,8 @@ export default function HomePage() {
     const wsGoals = XLSX.utils.json_to_sheet(goalsData);
 
     XLSX.utils.book_append_sheet(wb, wsSummary, 'Resumen General');
-    XLSX.utils.book_append_sheet(wb, wsCat, 'Gastos por Categoría (% y Acum)');
-    XLSX.utils.book_append_sheet(wb, wsTx, 'Transacciones');
+    XLSX.utils.book_append_sheet(wb, wsCat, 'Gastos por Categoría');
+    XLSX.utils.book_append_sheet(wb, wsTx, 'Transacciones con %');
     XLSX.utils.book_append_sheet(wb, wsGoals, 'Metas de Ahorro');
 
     XLSX.writeFile(wb, `Reporte_Finanzas_${currency}_${selectedMonth}.xlsx`);
@@ -569,14 +575,14 @@ export default function HomePage() {
           </div>
         </div>
 
-        {/* MATRIZ DE GASTOS POR CATEGORÍA CON % Y ACUMULADO */}
+        {/* MATRIZ SUPERIOR CON ACUMULADO */}
         <div 
           className="rounded-3xl p-6 shadow-2xl border space-y-4"
           style={{ backgroundColor: 'rgba(30, 27, 75, 0.75)', borderColor: 'rgba(217, 70, 239, 0.3)', backdropFilter: 'blur(16px)' }}
         >
           <div className="flex justify-between items-center text-sm pb-2 border-b border-purple-500/30">
             <span className="font-bold text-white uppercase tracking-wider">
-              Matriz de Gastos por Categoría, Porcentaje y Acumulado ({selectedMonth})
+              Matriz de Gastos por Categoría y Acumulado ({selectedMonth})
             </span>
             <span className="font-mono text-teal-300 font-bold">
               {budgetPercentage}% consumido del presupuesto
@@ -740,11 +746,12 @@ export default function HomePage() {
           </div>
         </div>
 
+        {/* TABLA DE TRANSACCIONES CON EL % DEL PRESUPUESTO INCLUIDO */}
         <div 
           className="rounded-3xl p-6 shadow-2xl border space-y-4"
           style={{ backgroundColor: 'rgba(30, 27, 75, 0.75)', borderColor: 'rgba(217, 70, 239, 0.3)', backdropFilter: 'blur(16px)' }}
         >
-          <h2 className="text-lg font-semibold text-white">Transacciones ({selectedMonth})</h2>
+          <h2 className="text-lg font-semibold text-white">Transacciones e Impacto en Presupuesto ({selectedMonth})</h2>
           {monthTransactions.length === 0 ? (
             <p className="text-sm text-purple-300/60 py-6 text-center">No hay registros para este mes. Registra tus ingresos o gastos arriba.</p>
           ) : (
@@ -757,47 +764,57 @@ export default function HomePage() {
                     <th className="px-4 py-3">Descripción</th>
                     <th className="px-4 py-3">Categoría</th>
                     <th className="px-4 py-3 text-right">Monto</th>
+                    <th className="px-4 py-3 text-right">% Presupuesto</th>
                     <th className="px-4 py-3 text-center rounded-r-xl">Acciones</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-purple-500/20">
-                  {monthTransactions.map((t) => (
-                    <tr key={t.id} className="hover:bg-indigo-900/30">
-                      <td className="px-4 py-3 text-xs text-purple-300">{t.date}</td>
-                      <td className="px-4 py-3 text-xs">
-                        <span className={`px-2 py-0.5 rounded-lg text-[10px] border ${
-                          t.type === 'income' 
-                            ? 'bg-cyan-950 border-cyan-400 text-cyan-300' 
-                            : t.nature === 'fixed'
-                            ? 'bg-amber-950 border-amber-400 text-amber-300'
-                            : 'bg-indigo-900 border-indigo-400 text-indigo-200'
-                        }`}>
-                          {t.type === 'income' ? 'Ingreso' : t.nature === 'fixed' ? 'Gasto Fijo' : 'Gasto Variable'}
-                        </span>
-                      </td>
-                      <td className="px-4 py-3 font-medium text-white">{t.description}</td>
-                      <td className="px-4 py-3 text-xs text-purple-300">{t.category}</td>
-                      <td className={`px-4 py-3 text-right font-mono font-bold ${t.type === 'income' ? 'text-cyan-300' : 'text-rose-400'}`}>
-                        {t.type === 'income' ? '+' : '-'} {currSymbol} {t.amount.toFixed(2)}
-                      </td>
-                      <td className="px-4 py-3 text-center space-x-2">
-                        <button
-                          onClick={() => handleEditTransaction(t)}
-                          title="Editar Registro"
-                          className="text-xs bg-indigo-900 hover:bg-indigo-800 border border-indigo-400 text-indigo-200 px-2.5 py-1 rounded-lg transition-colors"
-                        >
-                          ✏️
-                        </button>
-                        <button
-                          onClick={() => handleDeleteTransaction(t.id)}
-                          title="Eliminar Registro"
-                          className="text-xs bg-rose-950 hover:bg-rose-900 border border-rose-500 text-rose-300 px-2.5 py-1 rounded-lg transition-colors"
-                        >
-                          🗑️
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
+                <tbody className="divide-y divide-purple-500/20 font-mono text-xs">
+                  {monthTransactions.map((t) => {
+                    const txPct = availableExpenseBudget > 0 && t.type === 'expense' 
+                      ? Math.round((t.amount / availableExpenseBudget) * 100) 
+                      : 0;
+
+                    return (
+                      <tr key={t.id} className="hover:bg-indigo-900/30">
+                        <td className="px-4 py-3 text-purple-300">{t.date}</td>
+                        <td className="px-4 py-3">
+                          <span className={`px-2 py-0.5 rounded-lg text-[10px] border ${
+                            t.type === 'income' 
+                              ? 'bg-cyan-950 border-cyan-400 text-cyan-300' 
+                              : t.nature === 'fixed'
+                              ? 'bg-amber-950 border-amber-400 text-amber-300'
+                              : 'bg-indigo-900 border-indigo-400 text-indigo-200'
+                          }`}>
+                            {t.type === 'income' ? 'Ingreso' : t.nature === 'fixed' ? 'Gasto Fijo' : 'Gasto Variable'}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3 font-medium text-white font-sans">{t.description}</td>
+                        <td className="px-4 py-3 text-purple-300 font-sans">{t.category}</td>
+                        <td className={`px-4 py-3 text-right font-bold ${t.type === 'income' ? 'text-cyan-300' : 'text-rose-400'}`}>
+                          {t.type === 'income' ? '+' : '-'} {currSymbol} {t.amount.toFixed(2)}
+                        </td>
+                        <td className="px-4 py-3 text-right text-fuchsia-300 font-bold">
+                          {t.type === 'expense' ? `${txPct}%` : '-'}
+                        </td>
+                        <td className="px-4 py-3 text-center space-x-2">
+                          <button
+                            onClick={() => handleEditTransaction(t)}
+                            title="Editar Registro"
+                            className="text-xs bg-indigo-900 hover:bg-indigo-800 border border-indigo-400 text-indigo-200 px-2.5 py-1 rounded-lg transition-colors"
+                          >
+                            ✏️
+                          </button>
+                          <button
+                            onClick={() => handleDeleteTransaction(t.id)}
+                            title="Eliminar Registro"
+                            className="text-xs bg-rose-950 hover:bg-rose-900 border border-rose-500 text-rose-300 px-2.5 py-1 rounded-lg transition-colors"
+                          >
+                            🗑️
+                          </button>
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
