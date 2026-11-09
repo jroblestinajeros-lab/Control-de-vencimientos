@@ -3,13 +3,34 @@
 import React, { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 
+interface Transaction {
+  id: string;
+  description: string;
+  amount: number;
+  type: 'income' | 'expense';
+  category: string;
+  date: string;
+}
+
 export default function HomePage() {
   const router = useRouter();
   const [loading, setLoading] = useState(true);
   const [userEmail, setUserEmail] = useState<string>('');
 
+  // Estado de finanzas
+  const [transactions, setTransactions] = useState<Transaction[]>([]);
+  const [monthlyBudget, setMonthlyBudget] = useState<number>(5000);
+  
+  // Modales
+  const [showModal, setShowModal] = useState<boolean>(false);
+  const [modalType, setModalType] = useState<'income' | 'expense' | 'budget'>('expense');
+
+  // Formulario
+  const [description, setDescription] = useState('');
+  const [amount, setAmount] = useState('');
+  const [category, setCategory] = useState('General');
+
   useEffect(() => {
-    // Comprobamos sesión local
     const sessionData = localStorage.getItem('user_session');
     const isLoggedCookie = document.cookie.includes('user_logged_in');
 
@@ -29,8 +50,59 @@ export default function HomePage() {
       setUserEmail('jroblestinajeros@gmail.com');
     }
 
+    // Cargar datos locales de prueba o persistidos
+    const savedTx = localStorage.getItem('fin_transactions');
+    const savedBudget = localStorage.getItem('fin_budget');
+    if (savedTx) setTransactions(JSON.parse(savedTx));
+    if (savedBudget) setMonthlyBudget(Number(savedBudget));
+
     setLoading(false);
   }, [router]);
+
+  // Cálculos dinámicos
+  const totalIncome = transactions
+    .filter((t) => t.type === 'income')
+    .reduce((acc, t) => acc + t.amount, 0);
+
+  const totalExpense = transactions
+    .filter((t) => t.type === 'expense')
+    .reduce((acc, t) => acc + t.amount, 0);
+
+  const balance = totalIncome - totalExpense;
+  const budgetRemaining = monthlyBudget - totalExpense;
+
+  const handleOpenModal = (type: 'income' | 'expense' | 'budget') => {
+    setModalType(type);
+    setDescription('');
+    setAmount('');
+    setCategory(type === 'income' ? 'Sueldo/Ingreso' : 'Servicios/Varios');
+    setShowModal(true);
+  };
+
+  const handleSave = (e: React.FormEvent) => {
+    e.preventDefault();
+    const val = parseFloat(amount);
+    if (isNaN(val) || val <= 0) return;
+
+    if (modalType === 'budget') {
+      setMonthlyBudget(val);
+      localStorage.setItem('fin_budget', val.toString());
+    } else {
+      const newTx: Transaction = {
+        id: Date.now().toString(),
+        description: description || (modalType === 'income' ? 'Ingreso' : 'Gasto'),
+        amount: val,
+        type: modalType,
+        category,
+        date: new Date().toLocaleDateString('es-PE'),
+      };
+      const updated = [newTx, ...transactions];
+      setTransactions(updated);
+      localStorage.setItem('fin_transactions', JSON.stringify(updated));
+    }
+
+    setShowModal(false);
+  };
 
   function handleSignOut() {
     localStorage.removeItem('user_session');
@@ -49,7 +121,7 @@ export default function HomePage() {
 
   return (
     <main className="min-h-screen bg-slate-950 text-slate-100 p-6">
-      {/* Encabezado Principal */}
+      {/* Encabezado */}
       <header className="max-w-7xl mx-auto flex justify-between items-center pb-6 border-b border-slate-800 mb-8">
         <div>
           <h1 className="text-2xl font-bold text-white">Control de Finanzas Personales</h1>
@@ -66,33 +138,72 @@ export default function HomePage() {
         </button>
       </header>
 
-      {/* Contenido Principal / Dashboard */}
-      <section className="max-w-7xl mx-auto space-y-6">
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+      <section className="max-w-7xl mx-auto space-y-8">
+        {/* Tarjetas de Resumen */}
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
           <div className="bg-slate-900 border border-slate-800 p-6 rounded-2xl shadow-lg">
             <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Balance General</h3>
-            <p className="text-3xl font-bold text-emerald-400 font-mono">S/ 0.00</p>
+            <p className={`text-3xl font-bold font-mono ${balance >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
+              S/ {balance.toFixed(2)}
+            </p>
           </div>
 
           <div className="bg-slate-900 border border-slate-800 p-6 rounded-2xl shadow-lg">
             <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Ingresos del Mes</h3>
-            <p className="text-3xl font-bold text-blue-400 font-mono">S/ 0.00</p>
+            <p className="text-3xl font-bold text-blue-400 font-mono">S/ {totalIncome.toFixed(2)}</p>
           </div>
 
           <div className="bg-slate-900 border border-slate-800 p-6 rounded-2xl shadow-lg">
             <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Gastos del Mes</h3>
-            <p className="text-3xl font-bold text-rose-400 font-mono">S/ 0.00</p>
+            <p className="text-3xl font-bold text-rose-400 font-mono">S/ {totalExpense.toFixed(2)}</p>
+          </div>
+
+          <div className="bg-slate-900 border border-slate-800 p-6 rounded-2xl shadow-lg">
+            <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Presupuesto Disponible</h3>
+            <p className={`text-3xl font-bold font-mono ${budgetRemaining >= 0 ? 'text-purple-400' : 'text-amber-400'}`}>
+              S/ {budgetRemaining.toFixed(2)}
+            </p>
           </div>
         </div>
 
-        {/* Módulo de bienvenida */}
-        <div className="bg-slate-900 border border-slate-800 rounded-2xl p-8 text-center space-y-3">
-          <h2 className="text-lg font-semibold text-white">Plataforma Lista & Autenticada</h2>
-          <p className="text-sm text-slate-400 max-w-md mx-auto">
-            Acceso concedido correctamente. Puedes comenzar a estructurar tus módulos de ingresos, gastos y presupuestos.
-          </p>
+        {/* Panel de Botones de Acción */}
+        <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-xl">
+          <h2 className="text-sm font-semibold text-slate-300 uppercase tracking-wider mb-4">Acciones Rápidas</h2>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <button
+              onClick={() => handleOpenModal('income')}
+              className="bg-emerald-600 hover:bg-emerald-500 text-white font-medium py-3 px-4 rounded-xl text-sm transition-all shadow-lg shadow-emerald-900/20 flex items-center justify-center space-x-2"
+            >
+              <span>+ Registrar Ingreso</span>
+            </button>
+
+            <button
+              onClick={() => handleOpenModal('expense')}
+              className="bg-rose-600 hover:bg-rose-500 text-white font-medium py-3 px-4 rounded-xl text-sm transition-all shadow-lg shadow-rose-900/20 flex items-center justify-center space-x-2"
+            >
+              <span>- Registrar Gasto</span>
+            </button>
+
+            <button
+              onClick={() => handleOpenModal('budget')}
+              className="bg-purple-600 hover:bg-purple-500 text-white font-medium py-3 px-4 rounded-xl text-sm transition-all shadow-lg shadow-purple-900/20 flex items-center justify-center space-x-2"
+            >
+              <span>⚙ Definir Presupuesto</span>
+            </button>
+          </div>
         </div>
-      </section>
-    </main>
-  );
-}
+
+        {/* Historial de Transacciones */}
+        <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-xl space-y-4">
+          <h2 className="text-lg font-semibold text-white">Historial de Transacciones</h2>
+          {transactions.length === 0 ? (
+            <p className="text-sm text-slate-500 py-6 text-center">No hay registros aún. Usa los botones superiores para comenzar.</p>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-sm text-slate-300">
+                <thead className="bg-slate-950 text-slate-400 uppercase text-xs">
+                  <tr>
+                    <th className="px-4 py-3 rounded-l-lg">Fecha</th>
+                    <th className="px-4 py-3">Descripción</th>
+                    <th className="px-4 py-3">Categoría</th>
+                    <th className="px-
