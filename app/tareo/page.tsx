@@ -9,7 +9,7 @@ interface WorkShift {
   workerName: string;
   documentId: string;
   position: string;
-  workType: 'campo' | 'oficina';
+  dailyStatus: 'campo' | 'oficina' | 'libre';
   startDate: string;
   daysWorked: number;
   yearsOfService: number;
@@ -22,7 +22,7 @@ export default function TareoPage() {
   const [workerName, setWorkerName] = useState('');
   const [documentId, setDocumentId] = useState('');
   const [position, setPosition] = useState('');
-  const [workType, setWorkType] = useState<'campo' | 'oficina'>('campo');
+  const [dailyStatus, setDailyStatus] = useState<'campo' | 'oficina' | 'libre'>('campo');
   const [startDate, setStartDate] = useState(new Date().toISOString().slice(0, 10));
   const [daysWorked, setDaysWorked] = useState<string>('14');
   const [yearsOfService, setYearsOfService] = useState<string>('1');
@@ -35,18 +35,16 @@ export default function TareoPage() {
     setLoading(false);
   }, []);
 
-  function calculateRestDays(days: number, type: 'campo' | 'oficina') {
-    if (type === 'oficina') {
+  function calculateRestDays(days: number, status: 'campo' | 'oficina' | 'libre') {
+    if (status === 'libre') return 0;
+    
+    // Tanto para Oficina como para Campo Corto (hasta 13 días), aplica la regla 5x2 (5 días trabajo = 2 días descanso)
+    if (status === 'oficina' || days < 14) {
       return Math.floor(days / 5) * 2 + (days % 5) * 0.4;
     }
 
-    if (days >= 14) {
-      return days / 2;
-    }
-
-    const fullBlocks = Math.floor(days / 5);
-    const remainderDays = days % 5;
-    return fullBlocks * 2 + remainderDays * 0.4;
+    // Régimen Atípico en Campo (>= 14 días continuos en proporción 2x1)
+    return days / 2;
   }
 
   function calculateVacationDays(years: number) {
@@ -64,16 +62,16 @@ export default function TareoPage() {
     e.preventDefault();
     const dWorked = parseInt(daysWorked) || 0;
     const yService = parseFloat(yearsOfService) || 0;
-    if (dWorked <= 0) return;
+    if (dWorked <= 0 && dailyStatus !== 'libre') return;
 
     const newRecord: WorkShift = {
       id: Date.now().toString(),
       workerName: workerName || 'Colaborador',
       documentId: documentId || 'S/D',
       position: position || 'Técnico / Operativo',
-      workType,
+      dailyStatus,
       startDate,
-      daysWorked: dWorked,
+      daysWorked: dailyStatus === 'libre' ? 0 : dWorked,
       yearsOfService: yService,
     };
 
@@ -84,7 +82,7 @@ export default function TareoPage() {
     setWorkerName('');
     setDocumentId('');
     setPosition('');
-    setDaysWorked('14');
+      setDaysWorked('14');
   };
 
   const handleDeleteShift = (id: string) => {
@@ -96,7 +94,7 @@ export default function TareoPage() {
 
   const exportToExcel = () => {
     const dataToExport = shifts.map((s) => {
-      const rest = calculateRestDays(s.daysWorked, s.workType);
+      const rest = calculateRestDays(s.daysWorked, s.dailyStatus);
       const vacations = calculateVacationDays(s.yearsOfService);
       const returnDate = calculateReturnDate(s.startDate, s.daysWorked, rest);
 
@@ -104,16 +102,16 @@ export default function TareoPage() {
         'DNI / CE': s.documentId,
         'Nombre del Colaborador': s.workerName,
         'Cargo / Especialidad': s.position,
-        'Modalidad / Ubicación': s.workType === 'campo' ? 'Campo' : 'Oficina',
+        'Estado / Modalidad': s.dailyStatus === 'campo' ? 'Campo' : s.dailyStatus === 'oficina' ? 'Oficina' : 'Día Libre',
         'Fecha Inicio': s.startDate,
         'Días Laborados': s.daysWorked,
         'Días Descanso Generados': rest.toFixed(1),
-        'Régimen Aplicado':
-          s.workType === 'oficina'
-            ? 'Oficina 5x2'
-            : s.daysWorked >= 14
-            ? 'Atípico 2x1 (≥14 días)'
-            : 'Campo Corto (5x2)',
+        'Régimen / Cálculo':
+          s.dailyStatus === 'libre'
+            ? 'N/A'
+            : s.dailyStatus === 'oficina' || s.daysWorked < 14
+            ? '5x2 (Oficina / Campo Corto)'
+            : 'Atípico 2x1 (≥14 días)',
         'Fecha Retorno Estimada': returnDate,
         'Años de Servicio': s.yearsOfService,
         'Días Vacaciones Acumuladas': vacations,
@@ -151,7 +149,7 @@ export default function TareoPage() {
       <section className="max-w-7xl mx-auto space-y-6">
         <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-xl space-y-4">
           <h2 className="text-sm font-semibold text-slate-300 uppercase tracking-wider">
-            Registrar / Calcular Jornada de Trabajo
+            Registro y Asistencia Automática por Colaborador
           </h2>
 
           <form onSubmit={handleAddShift} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -183,7 +181,7 @@ export default function TareoPage() {
               <label className="block text-xs font-semibold text-slate-400 uppercase mb-1">Cargo / Especialidad</label>
               <input
                 type="text"
-                placeholder="Ej. Especialista en Batimetría"
+                placeholder="Ej. Administración"
                 value={position}
                 onChange={(e) => setPosition(e.target.value)}
                 required
@@ -192,14 +190,15 @@ export default function TareoPage() {
             </div>
 
             <div>
-              <label className="block text-xs font-semibold text-slate-400 uppercase mb-1">Modalidad</label>
+              <label className="block text-xs font-semibold text-slate-400 uppercase mb-1">Estado / Asistencia</label>
               <select
-                value={workType}
-                onChange={(e) => setWorkType(e.target.value as 'campo' | 'oficina')}
-                className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-emerald-500"
+                value={dailyStatus}
+                onChange={(e) => setDailyStatus(e.target.value as 'campo' | 'oficina' | 'libre')}
+                className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-emerald-500 font-medium text-emerald-400"
               >
-                <option value="campo">Campo (Comisión / Planta / Mina)</option>
-                <option value="oficina">Oficina (Sede Administrativa)</option>
+                <option value="campo">🟢 En Campo (Comisión / Planta / Mina)</option>
+                <option value="oficina">🔵 En Oficina (Sede Administrativa)</option>
+                <option value="libre">⚪ Día Libre / Descanso</option>
               </select>
             </div>
 
@@ -218,11 +217,12 @@ export default function TareoPage() {
               <label className="block text-xs font-semibold text-slate-400 uppercase mb-1">Días Continuos</label>
               <input
                 type="number"
-                min="1"
+                min="0"
                 value={daysWorked}
                 onChange={(e) => setDaysWorked(e.target.value)}
-                required
-                className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-white font-mono text-xs focus:outline-none focus:border-emerald-500"
+                required={dailyStatus !== 'libre'}
+                disabled={dailyStatus === 'libre'}
+                className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-white font-mono text-xs focus:outline-none focus:border-emerald-500 disabled:opacity-50"
               />
             </div>
 
@@ -243,7 +243,7 @@ export default function TareoPage() {
                 type="submit"
                 className="bg-emerald-600 hover:bg-emerald-500 text-white font-medium text-xs px-5 py-2.5 rounded-lg transition-colors shadow-md"
               >
-                + Guardar Registro de Tareo
+                + Registrar Asistencia & Calcular
               </button>
             </div>
           </form>
@@ -253,7 +253,7 @@ export default function TareoPage() {
           <h2 className="text-lg font-semibold text-white">Matriz de Tareo & Saldos de Descanso</h2>
           {shifts.length === 0 ? (
             <p className="text-xs text-slate-500 text-center py-6">
-              No hay jornadas registradas. Completa el formulario superior para calcular y guardar los tareos.
+              No hay jornadas registradas. Completa el formulario superior para registrar asistencia y calcular descansos.
             </p>
           ) : (
             <div className="overflow-x-auto">
@@ -263,7 +263,7 @@ export default function TareoPage() {
                     <th className="px-4 py-3 rounded-l-lg">DNI / CE</th>
                     <th className="px-4 py-3">Colaborador</th>
                     <th className="px-4 py-3">Cargo</th>
-                    <th className="px-4 py-3">Modalidad</th>
+                    <th className="px-4 py-3">Estado</th>
                     <th className="px-4 py-3 text-center">Laborados</th>
                     <th className="px-4 py-3 text-center">Descanso Generado</th>
                     <th className="px-4 py-3">Régimen Aplicado</th>
@@ -274,7 +274,7 @@ export default function TareoPage() {
                 </thead>
                 <tbody className="divide-y divide-slate-800">
                   {shifts.map((s) => {
-                    const rest = calculateRestDays(s.daysWorked, s.workType);
+                    const rest = calculateRestDays(s.daysWorked, s.dailyStatus);
                     const vacations = calculateVacationDays(s.yearsOfService);
                     const returnDate = calculateReturnDate(s.startDate, s.daysWorked, rest);
 
@@ -285,21 +285,23 @@ export default function TareoPage() {
                         <td className="px-4 py-3 font-sans text-slate-400">{s.position}</td>
                         <td className="px-4 py-3 font-sans">
                           <span className={`px-2 py-0.5 rounded text-[10px] border ${
-                            s.workType === 'campo'
+                            s.dailyStatus === 'campo'
                               ? 'bg-amber-950/60 border-amber-800 text-amber-300'
-                              : 'bg-blue-950/60 border-blue-800 text-blue-300'
+                              : s.dailyStatus === 'oficina'
+                              ? 'bg-blue-950/60 border-blue-800 text-blue-300'
+                              : 'bg-slate-800 border-slate-700 text-slate-300'
                           }`}>
-                            {s.workType === 'campo' ? 'Campo' : 'Oficina'}
+                            {s.dailyStatus === 'campo' ? 'Campo' : s.dailyStatus === 'oficina' ? 'Oficina' : 'Día Libre'}
                           </span>
                         </td>
                         <td className="px-4 py-3 text-center font-bold text-white">{s.daysWorked} días</td>
                         <td className="px-4 py-3 text-center font-bold text-emerald-400">{rest.toFixed(1)} días</td>
                         <td className="px-4 py-3 font-sans text-xs text-slate-400">
-                          {s.workType === 'oficina'
-                            ? 'Oficina (5x2)'
-                            : s.daysWorked >= 14
-                            ? 'Atípico 2x1 (14d = 7d descanso)'
-                            : 'Campo Corto (5x2)'}
+                          {s.dailyStatus === 'libre'
+                            ? 'N/A (Día Libre)'
+                            : s.dailyStatus === 'oficina' || s.daysWorked < 14
+                            ? '5x2 (Campo Corto / Oficina)'
+                            : 'Atípico 2x1 (14d = 7d descanso)'}
                         </td>
                         <td className="px-4 py-3 text-center text-purple-300">{returnDate}</td>
                         <td className="px-4 py-3 text-right font-bold text-blue-400">
