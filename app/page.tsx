@@ -9,10 +9,10 @@ interface Transaction {
   description: string;
   amount: number;
   type: 'income' | 'expense';
-  nature?: 'fixed' | 'variable'; // 1. Gastos Fijos vs Variables
+  nature?: 'fixed' | 'variable';
   category: string;
   date: string;
-  month: string; // Formato YYYY-MM
+  month: string;
 }
 
 interface SavingsGoal {
@@ -56,7 +56,6 @@ export default function HomePage() {
   const [loading, setLoading] = useState(true);
   const [userEmail, setUserEmail] = useState<string>('');
 
-  // Selector de Moneda y Mes Activo
   const [currency, setCurrency] = useState<CurrencyCode>('PEN');
   const [selectedMonth, setSelectedMonth] = useState<string>(
     new Date().toISOString().slice(0, 7)
@@ -68,6 +67,7 @@ export default function HomePage() {
   
   const [showModal, setShowModal] = useState<boolean>(false);
   const [modalType, setModalType] = useState<'income' | 'expense' | 'goal'>('income');
+  const [editingTxId, setEditingTxId] = useState<string | null>(null);
 
   // Formulario
   const [description, setDescription] = useState('');
@@ -134,12 +134,10 @@ export default function HomePage() {
     localStorage.setItem('fin_savings_percent', newPercent.toString());
   };
 
-  // Transacciones filtradas por mes
   const monthTransactions = transactions.filter(
     (t) => (t.month || t.date.slice(0, 7)) === selectedMonth
   );
 
-  // Totales por Mes
   const totalIncome = monthTransactions
     .filter((t) => t.type === 'income')
     .reduce((acc, t) => acc + t.amount, 0);
@@ -148,7 +146,6 @@ export default function HomePage() {
     .filter((t) => t.type === 'expense')
     .reduce((acc, t) => acc + t.amount, 0);
 
-  // 1. Desglose de Gastos Fijos vs Variables
   const fixedExpenses = monthTransactions
     .filter((t) => t.type === 'expense' && t.nature === 'fixed')
     .reduce((acc, t) => acc + t.amount, 0);
@@ -165,13 +162,10 @@ export default function HomePage() {
     ? Math.min(Math.round((totalExpense / availableExpenseBudget) * 100), 100)
     : 0;
 
-  // 4. KPIs de Salud Financiera
-  // Cobertura de Fondo de Emergencia basada en Gastos Fijos (Objetivo habitual: 3 a 6 meses)
   const totalSavedAllGoals = goals.reduce((acc, g) => acc + g.currentAmount, 0);
   const fixedExpenseMonthlyAvg = fixedExpenses || (totalExpense * 0.5) || 1;
   const emergencyCoverageMonths = (totalSavedAllGoals / fixedExpenseMonthlyAvg).toFixed(1);
 
-  // Gastos agrupados por categoría
   const expensesByCategory = EXPENSE_CATEGORIES.map((cat) => {
     const total = monthTransactions
       .filter((t) => t.type === 'expense' && t.category === cat)
@@ -179,7 +173,6 @@ export default function HomePage() {
     return { category: cat, amount: total };
   }).filter((item) => item.amount > 0);
 
-  // 5. Histórico y Tendencias (Últimos 4 meses)
   const availableMonths = Array.from(
     new Set(transactions.map((t) => t.month || t.date.slice(0, 7)))
   ).sort().reverse().slice(0, 4);
@@ -194,6 +187,7 @@ export default function HomePage() {
 
   const handleOpenModal = (type: 'income' | 'expense' | 'goal') => {
     setModalType(type);
+    setEditingTxId(null);
     setDescription('');
     setAmount('');
     setExpenseNature('variable');
@@ -203,6 +197,26 @@ export default function HomePage() {
     setCategory(type === 'income' ? INCOME_CATEGORIES[0] : EXPENSE_CATEGORIES[0]);
     setBudgetError(null);
     setShowModal(true);
+  };
+
+  // Abrir Modal en Modo Edición
+  const handleEditTransaction = (tx: Transaction) => {
+    setModalType(tx.type);
+    setEditingTxId(tx.id);
+    setDescription(tx.description);
+    setAmount(tx.amount.toString());
+    setExpenseNature(tx.nature || 'variable');
+    setCategory(tx.category);
+    setBudgetError(null);
+    setShowModal(true);
+  };
+
+  // Eliminar Transacción
+  const handleDeleteTransaction = (id: string) => {
+    if (!confirm('¿Estás seguro de que deseas eliminar este registro?')) return;
+    const updated = transactions.filter((t) => t.id !== id);
+    setTransactions(updated);
+    localStorage.setItem('fin_transactions', JSON.stringify(updated));
   };
 
   const handleSave = (e: React.FormEvent) => {
@@ -232,32 +246,44 @@ export default function HomePage() {
     if (isNaN(val) || val <= 0) return;
 
     if (modalType === 'expense') {
-      if (availableExpenseBudget > 0 && val > budgetRemaining) {
+      // Calcular presupuesto disponible contemplando si se está editando
+      const currentTxAmount = editingTxId 
+        ? transactions.find(t => t.id === editingTxId)?.amount || 0 
+        : 0;
+      const adjustedRemaining = budgetRemaining + currentTxAmount;
+
+      if (availableExpenseBudget > 0 && val > adjustedRemaining) {
         setBudgetError(
-          `¡Atención! Este gasto (${currSymbol} ${val.toFixed(2)}) supera el presupuesto disponible para gastos (${currSymbol} ${budgetRemaining.toFixed(2)}). Preserva tu cuota de ahorro del ${savingsTargetPercent}%.`
+          `¡Atención! Este gasto (${currSymbol} ${val.toFixed(2)}) supera el presupuesto disponible para gastos (${currSymbol} ${adjustedRemaining.toFixed(2)}). Preserva tu cuota de ahorro del ${savingsTargetPercent}%.`
         );
         return;
       }
+    }
 
-      const newTx: Transaction = {
-        id: Date.now().toString(),
-        description: description || 'Gasto',
-        amount: val,
-        type: 'expense',
-        nature: expenseNature,
-        category,
-        date: new Date().toLocaleDateString('es-PE'),
-        month: selectedMonth,
-      };
-      const updated = [newTx, ...transactions];
+    if (editingTxId) {
+      // Actualizar Transacción Existente
+      const updated = transactions.map((t) => {
+        if (t.id === editingTxId) {
+          return {
+            ...t,
+            description: description || t.description,
+            amount: val,
+            nature: modalType === 'expense' ? expenseNature : undefined,
+            category,
+          };
+        }
+        return t;
+      });
       setTransactions(updated);
       localStorage.setItem('fin_transactions', JSON.stringify(updated));
     } else {
+      // Crear Nueva Transacción
       const newTx: Transaction = {
         id: Date.now().toString(),
-        description: description || 'Ingreso Variable',
+        description: description || (modalType === 'income' ? 'Ingreso Variable' : 'Gasto'),
         amount: val,
-        type: 'income',
+        type: modalType,
+        nature: modalType === 'expense' ? expenseNature : undefined,
         category,
         date: new Date().toLocaleDateString('es-PE'),
         month: selectedMonth,
@@ -328,7 +354,6 @@ export default function HomePage() {
 
   return (
     <main className="min-h-screen bg-slate-950 text-slate-100 p-6">
-      {/* Encabezado */}
       <header className="max-w-7xl mx-auto flex flex-col md:flex-row justify-between items-start md:items-center pb-6 border-b border-slate-800 mb-8 gap-4">
         <div>
           <h1 className="text-2xl font-bold text-white">Control de Finanzas Personales</h1>
@@ -416,7 +441,7 @@ export default function HomePage() {
           </div>
         </div>
 
-        {/* 4. Tarjeta de Salud Financiera & Desglose Fijo vs Variable */}
+        {/* Tarjeta de Salud Financiera & Desglose Fijo vs Variable */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           <div className="bg-slate-900 border border-slate-800 p-6 rounded-2xl shadow-lg flex flex-col justify-between">
             <h4 className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Gastos Fijos (Obligatorios)</h4>
@@ -502,9 +527,8 @@ export default function HomePage() {
           </div>
         </div>
 
-        {/* 2. Metas de Ahorro con Simulación de Tiempo + Histórico Mes a Mes */}
+        {/* Metas & Historial */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          {/* Metas con Proyección */}
           <div className="lg:col-span-1 bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-xl space-y-4">
             <div className="flex justify-between items-center">
               <h2 className="text-lg font-semibold text-white">Metas & Proyección</h2>
@@ -556,7 +580,6 @@ export default function HomePage() {
             </div>
           </div>
 
-          {/* 5. Comparativa Mes a Mes */}
           <div className="lg:col-span-2 bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-xl space-y-4">
             <h2 className="text-lg font-semibold text-white">Comparativa y Tendencia Mes a Mes</h2>
             {monthlyHistory.length === 0 ? (
@@ -588,7 +611,7 @@ export default function HomePage() {
           </div>
         </div>
 
-        {/* Historial de Transacciones del Mes Activo */}
+        {/* Historial de Transacciones con Edición y Eliminación */}
         <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-xl space-y-4">
           <h2 className="text-lg font-semibold text-white">Transacciones ({selectedMonth})</h2>
           {monthTransactions.length === 0 ? (
@@ -602,7 +625,8 @@ export default function HomePage() {
                     <th className="px-4 py-3">Tipo / Naturaleza</th>
                     <th className="px-4 py-3">Descripción</th>
                     <th className="px-4 py-3">Categoría</th>
-                    <th className="px-4 py-3 text-right rounded-r-lg">Monto</th>
+                    <th className="px-4 py-3 text-right">Monto</th>
+                    <th className="px-4 py-3 text-center rounded-r-lg">Acciones</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-800">
@@ -625,6 +649,22 @@ export default function HomePage() {
                       <td className={`px-4 py-3 text-right font-mono font-bold ${t.type === 'income' ? 'text-emerald-400' : 'text-rose-400'}`}>
                         {t.type === 'income' ? '+' : '-'} {currSymbol} {t.amount.toFixed(2)}
                       </td>
+                      <td className="px-4 py-3 text-center space-x-2">
+                        <button
+                          onClick={() => handleEditTransaction(t)}
+                          title="Editar Registro"
+                          className="text-xs bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-300 px-2 py-1 rounded transition-colors"
+                        >
+                          ✏️
+                        </button>
+                        <button
+                          onClick={() => handleDeleteTransaction(t.id)}
+                          title="Eliminar Registro"
+                          className="text-xs bg-rose-950/80 hover:bg-rose-900 border border-rose-800 text-rose-300 px-2 py-1 rounded transition-colors"
+                        >
+                          🗑️
+                        </button>
+                      </td>
                     </tr>
                   ))}
                 </tbody>
@@ -641,6 +681,8 @@ export default function HomePage() {
             <h3 className="text-lg font-bold text-white capitalize">
               {modalType === 'goal'
                 ? 'Crear Meta de Ahorro'
+                : editingTxId
+                ? `Editar ${modalType === 'income' ? 'Ingreso' : 'Gasto'}`
                 : `Registrar ${modalType === 'income' ? 'Ingreso Variable' : 'Gasto'}`}
             </h3>
 
@@ -760,7 +802,7 @@ export default function HomePage() {
                   type="submit"
                   className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-sm font-medium transition-colors"
                 >
-                  Guardar
+                  {editingTxId ? 'Actualizar' : 'Guardar'}
                 </button>
               </div>
             </form>
