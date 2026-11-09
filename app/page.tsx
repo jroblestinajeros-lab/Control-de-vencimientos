@@ -340,10 +340,10 @@ export default function HomePage() {
   if (loading) return null;
 
   return (
-    <main className="min-h-screen bg-[#070e1b] text-slate-100 p-6">
-      <header className="max-w-7xl mx-auto flex flex-col md:flex-row justify-between items-start md:items-center pb-6 border-b border-slate-800/80 mb-8 gap-4">
+    <main className="min-h-screen bg-[#111827] text-slate-100 p-6">
+      <header className="max-w-7xl mx-auto flex flex-col md:flex-row justify-between items-start md:items-center pb-6 border-b border-slate-700 mb-8 gap-4">
         <div>
-          <h1 className="text-2xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-white via-slate-200 to-slate-400">
+          <h1 className="text-2xl font-extrabold text-white tracking-wide">
             Control de Finanzas Personales
           </h1>
           <p className="text-xs text-slate-400 mt-1">
@@ -355,7 +355,7 @@ export default function HomePage() {
           <select
             value={currency}
             onChange={(e) => handleCurrencyChange(e.target.value as CurrencyCode)}
-            className="bg-[#0f172a] border border-slate-700/80 text-amber-400 font-bold text-xs px-3 py-2 rounded-xl focus:outline-none focus:border-amber-500 shadow-lg"
+            className="bg-[#1f2937] border border-slate-600 text-amber-400 font-bold text-xs px-3 py-2 rounded-xl focus:outline-none focus:border-amber-500 shadow-lg"
           >
             {Object.entries(CURRENCIES).map(([code, info]) => (
               <option key={code} value={code}>
@@ -368,19 +368,19 @@ export default function HomePage() {
             type="month"
             value={selectedMonth}
             onChange={(e) => setSelectedMonth(e.target.value)}
-            className="bg-[#0f172a] border border-slate-700/80 text-white text-xs px-3 py-2 rounded-xl focus:outline-none focus:border-emerald-500 font-mono shadow-lg"
+            className="bg-[#1f2937] border border-slate-600 text-white text-xs px-3 py-2 rounded-xl focus:outline-none focus:border-emerald-500 font-mono shadow-lg"
           />
 
           <button
             onClick={exportToExcel}
-            className="bg-emerald-700 hover:bg-emerald-600 text-white font-medium text-xs px-4 py-2 rounded-xl transition-colors flex items-center space-x-1.5 shadow-lg shadow-emerald-950/40"
+            className="bg-emerald-700 hover:bg-emerald-600 text-white font-medium text-xs px-4 py-2 rounded-xl transition-colors flex items-center space-x-1.5 shadow-lg"
           >
             <span>📊 Exportar Excel</span>
           </button>
 
           <button
             onClick={handleSignOut}
-            className="bg-[#0f172a] hover:bg-slate-800 border border-slate-700/80 text-slate-300 text-xs px-3 py-2 rounded-xl transition-colors shadow-lg"
+            className="bg-[#1f2937] hover:bg-slate-700 border border-slate-600 text-slate-300 text-xs px-3 py-2 rounded-xl transition-colors shadow-lg"
           >
             Cerrar Sesión
           </button>
@@ -389,19 +389,19 @@ export default function HomePage() {
 
       <section className="max-w-7xl mx-auto space-y-8">
         <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-          <div className="bg-[#0f172a] border border-slate-700/80 p-6 rounded-2xl shadow-xl hover:border-slate-600 transition-all">
+          <div className="bg-[#1f2937] border border-slate-600/80 p-6 rounded-2xl shadow-2xl hover:border-slate-500 transition-all">
             <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Ingresos del Mes</h3>
             <p className="text-3xl font-bold text-blue-400 font-mono">{currSymbol} {totalIncome.toFixed(2)}</p>
-            <p className="text-[11px] text-slate-500 mt-1">Ingreso variable registrado</p>
+            <p className="text-[11px] text-slate-400 mt-1">Ingreso variable registrado</p>
           </div>
 
-          <div className="bg-[#0f172a] border border-slate-700/80 p-6 rounded-2xl shadow-xl border-l-4 border-l-purple-500 hover:border-slate-600 transition-all space-y-2">
+          <div className="bg-[#1f2937] border border-slate-600/80 p-6 rounded-2xl shadow-2xl border-l-4 border-l-purple-400 hover:border-slate-500 transition-all space-y-2">
             <div className="flex justify-between items-center">
               <h3 className="text-xs font-semibold text-purple-300 uppercase tracking-wider">Meta Ahorro</h3>
               <select
                 value={savingsTargetPercent}
                 onChange={(e) => handleSavingsPercentChange(Number(e.target.value))}
-                className="bg-slate-950 border border-slate-700 text-purple-300 text-xs font-bold rounded-lg px-2 py-0.5 focus:outline-none focus:border-purple-500"
+                className="bg-[#111827] border border-slate-600 text-purple-300 text-xs font-bold rounded-lg px-2 py-0.5 focus:outline-none focus:border-purple-400"
               >
                 {Array.from({ length: 18 }, (_, i) => (i + 2) * 5)
                   .concat(95)
@@ -413,54 +413,54 @@ export default function HomePage() {
               </select>
             </div>
             <p className="text-3xl font-bold text-purple-400 font-mono">{currSymbol} {plannedSavings.toFixed(2)}</p>
-            <p className="text-[11px] text-slate-500">Cuota reservada</p>
+            <p className="text-[11px] text-slate-400">Cuota reservada</p>
           </div>
 
-          <div className="bg-[#0f172a] border border-slate-700/80 p-6 rounded-2xl shadow-xl border-l-4 border-l-emerald-500 hover:border-slate-600 transition-all">
+          <div className="bg-[#1f2937] border border-slate-600/80 p-6 rounded-2xl shadow-2xl border-l-4 border-l-emerald-400 hover:border-slate-500 transition-all">
             <h3 className="text-xs font-semibold text-emerald-300 uppercase tracking-wider mb-2">Presupuesto Gastos</h3>
             <p className="text-3xl font-bold text-emerald-400 font-mono">{currSymbol} {availableExpenseBudget.toFixed(2)}</p>
-            <p className="text-[11px] text-slate-500 mt-1">Límite permitido en el mes</p>
+            <p className="text-[11px] text-slate-400 mt-1">Límite permitido en el mes</p>
           </div>
 
-          <div className="bg-[#0f172a] border border-slate-700/80 p-6 rounded-2xl shadow-xl hover:border-slate-600 transition-all">
+          <div className="bg-[#1f2937] border border-slate-600/80 p-6 rounded-2xl shadow-2xl hover:border-slate-500 transition-all">
             <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Gastos Ejecutados</h3>
             <p className="text-3xl font-bold text-rose-400 font-mono">{currSymbol} {totalExpense.toFixed(2)}</p>
-            <p className="text-[11px] text-slate-500 mt-1">Saldo: {currSymbol} {budgetRemaining.toFixed(2)}</p>
+            <p className="text-[11px] text-slate-400 mt-1">Saldo: {currSymbol} {budgetRemaining.toFixed(2)}</p>
           </div>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          <div className="bg-[#0f172a] border border-slate-700/80 p-6 rounded-2xl shadow-xl flex flex-col justify-between hover:border-slate-600 transition-all">
+          <div className="bg-[#1f2937] border border-slate-600/80 p-6 rounded-2xl shadow-2xl flex flex-col justify-between hover:border-slate-500 transition-all">
             <h4 className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Gastos Fijos (Obligatorios)</h4>
             <p className="text-2xl font-bold text-amber-400 font-mono">{currSymbol} {fixedExpenses.toFixed(2)}</p>
-            <p className="text-[11px] text-slate-500 mt-1">Alquiler, mantenimiento, servicios básicos</p>
+            <p className="text-[11px] text-slate-400 mt-1">Alquiler, mantenimiento, servicios básicos</p>
           </div>
 
-          <div className="bg-[#0f172a] border border-slate-700/80 p-6 rounded-2xl shadow-xl flex flex-col justify-between hover:border-slate-600 transition-all">
+          <div className="bg-[#1f2937] border border-slate-600/80 p-6 rounded-2xl shadow-2xl flex flex-col justify-between hover:border-slate-500 transition-all">
             <h4 className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Gastos Variables</h4>
             <p className="text-2xl font-bold text-indigo-400 font-mono">{currSymbol} {variableExpenses.toFixed(2)}</p>
-            <p className="text-[11px] text-slate-500 mt-1">Salidas, entretenimientos y extras</p>
+            <p className="text-[11px] text-slate-400 mt-1">Salidas, entretenimientos y extras</p>
           </div>
 
-          <div className="bg-[#0f172a] border border-slate-700/80 p-6 rounded-2xl shadow-xl flex flex-col justify-between hover:border-slate-600 transition-all">
+          <div className="bg-[#1f2937] border border-slate-600/80 p-6 rounded-2xl shadow-2xl flex flex-col justify-between hover:border-slate-500 transition-all">
             <h4 className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Salud Financiera (Fondo)</h4>
             <p className="text-2xl font-bold text-emerald-400 font-mono">{emergencyCoverageMonths} meses</p>
-            <p className="text-[11px] text-slate-500 mt-1">Cobertura de tus gastos fijos acumulados</p>
+            <p className="text-[11px] text-slate-400 mt-1">Cobertura de tus gastos fijos acumulados</p>
           </div>
         </div>
 
-        <div className="bg-[#0f172a] border border-slate-700/80 rounded-2xl p-6 shadow-xl space-y-4">
+        <div className="bg-[#1f2937] border border-slate-600/80 rounded-2xl p-6 shadow-2xl space-y-4">
           <div className="flex justify-between items-center text-sm">
-            <span className="font-semibold text-slate-300">
+            <span className="font-semibold text-slate-200">
               Distribución de Gastos por Categoría ({selectedMonth})
             </span>
-            <span className="font-mono text-slate-400">
+            <span className="font-mono text-slate-300">
               {budgetPercentage}% consumido del presupuesto
             </span>
           </div>
 
           {expensesByCategory.length === 0 ? (
-            <p className="text-xs text-slate-500 py-2">No hay gastos ejecutados en este mes.</p>
+            <p className="text-xs text-slate-400 py-2">No hay gastos ejecutados en este mes.</p>
           ) : (
             <div className="space-y-3">
               {expensesByCategory.map((item) => {
@@ -468,14 +468,14 @@ export default function HomePage() {
                 return (
                   <div key={item.category} className="space-y-1">
                     <div className="flex justify-between text-xs">
-                      <span className="text-slate-300">{item.category}</span>
-                      <span className="font-mono text-slate-400">
+                      <span className="text-slate-200">{item.category}</span>
+                      <span className="font-mono text-slate-300">
                         {currSymbol} {item.amount.toFixed(2)} ({categoryPct}%)
                       </span>
                     </div>
-                    <div className="w-full bg-slate-950 h-2 rounded-full overflow-hidden border border-slate-800">
+                    <div className="w-full bg-[#111827] h-2.5 rounded-full overflow-hidden border border-slate-600">
                       <div
-                        className="bg-emerald-500 h-full transition-all duration-500"
+                        className="bg-emerald-400 h-full transition-all duration-500"
                         style={{ width: `${Math.min(categoryPct, 100)}%` }}
                       ></div>
                     </div>
@@ -486,26 +486,26 @@ export default function HomePage() {
           )}
         </div>
 
-        <div className="bg-[#0f172a] border border-slate-700/80 rounded-2xl p-6 shadow-xl">
-          <h2 className="text-sm font-semibold text-slate-300 uppercase tracking-wider mb-4">Acciones Rápidas ({selectedMonth})</h2>
+        <div className="bg-[#1f2937] border border-slate-600/80 rounded-2xl p-6 shadow-2xl">
+          <h2 className="text-sm font-semibold text-slate-200 uppercase tracking-wider mb-4">Acciones Rápidas ({selectedMonth})</h2>
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             <button
               onClick={() => handleOpenModal('income')}
-              className="bg-emerald-600 hover:bg-emerald-500 text-white font-medium py-3 px-4 rounded-xl text-sm transition-all shadow-lg shadow-emerald-900/20 flex items-center justify-center space-x-2"
+              className="bg-emerald-600 hover:bg-emerald-500 text-white font-medium py-3 px-4 rounded-xl text-sm transition-all shadow-lg flex items-center justify-center space-x-2"
             >
               <span>+ Registrar Ingreso Variable</span>
             </button>
 
             <button
               onClick={() => handleOpenModal('expense')}
-              className="bg-rose-600 hover:bg-rose-500 text-white font-medium py-3 px-4 rounded-xl text-sm transition-all shadow-lg shadow-rose-900/20 flex items-center justify-center space-x-2"
+              className="bg-rose-600 hover:bg-rose-500 text-white font-medium py-3 px-4 rounded-xl text-sm transition-all shadow-lg flex items-center justify-center space-x-2"
             >
               <span>- Registrar Gasto</span>
             </button>
 
             <button
               onClick={() => handleOpenModal('goal')}
-              className="bg-blue-600 hover:bg-blue-500 text-white font-medium py-3 px-4 rounded-xl text-sm transition-all shadow-lg shadow-blue-900/20 flex items-center justify-center space-x-2"
+              className="bg-blue-600 hover:bg-blue-500 text-white font-medium py-3 px-4 rounded-xl text-sm transition-all shadow-lg flex items-center justify-center space-x-2"
             >
               <span>🎯 Crear Meta de Ahorro</span>
             </button>
@@ -513,7 +513,7 @@ export default function HomePage() {
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          <div className="lg:col-span-1 bg-[#0f172a] border border-slate-700/80 rounded-2xl p-6 shadow-xl space-y-4">
+          <div className="lg:col-span-1 bg-[#1f2937] border border-slate-600/80 rounded-2xl p-6 shadow-2xl space-y-4">
             <div className="flex justify-between items-center">
               <h2 className="text-lg font-semibold text-white">Metas & Proyección</h2>
               <button
@@ -533,27 +533,27 @@ export default function HomePage() {
                   : 0;
 
                 return (
-                  <div key={g.id} className="bg-slate-950 border border-slate-800 p-4 rounded-xl space-y-2">
+                  <div key={g.id} className="bg-[#111827] border border-slate-600 p-4 rounded-xl space-y-2">
                     <div className="flex justify-between items-center">
                       <h3 className="font-semibold text-white text-xs">{g.title}</h3>
-                      <span className="text-[10px] font-mono bg-slate-900 text-blue-400 px-2 py-0.5 rounded border border-slate-800">
+                      <span className="text-[10px] font-mono bg-[#1f2937] text-blue-400 px-2 py-0.5 rounded border border-slate-600">
                         {pct}%
                       </span>
                     </div>
 
-                    <div className="flex justify-between text-[11px] text-slate-400 font-mono">
+                    <div className="flex justify-between text-[11px] text-slate-300 font-mono">
                       <span>{currSymbol} {g.currentAmount.toFixed(2)}</span>
                       <span>{currSymbol} {g.targetAmount.toFixed(2)}</span>
                     </div>
 
-                    <div className="w-full bg-slate-900 h-2 rounded-full overflow-hidden border border-slate-800">
+                    <div className="w-full bg-[#111827] h-2.5 rounded-full overflow-hidden border border-slate-600">
                       <div
-                        className="bg-blue-500 h-full transition-all duration-500"
+                        className="bg-blue-400 h-full transition-all duration-500"
                         style={{ width: `${pct}%` }}
                       ></div>
                     </div>
 
-                    <p className="text-[10px] text-slate-500 font-mono pt-1">
+                    <p className="text-[10px] text-slate-400 font-mono pt-1">
                       {monthsToTarget > 0 
                         ? `⏱ Tiempo est. para completar: ~${monthsToTarget} mes(es)`
                         : '🎉 Meta alcanzada o lista'}
@@ -564,14 +564,14 @@ export default function HomePage() {
             </div>
           </div>
 
-          <div className="lg:col-span-2 bg-[#0f172a] border border-slate-700/80 rounded-2xl p-6 shadow-xl space-y-4">
+          <div className="lg:col-span-2 bg-[#1f2937] border border-slate-600/80 rounded-2xl p-6 shadow-2xl space-y-4">
             <h2 className="text-lg font-semibold text-white">Comparativa y Tendencia Mes a Mes</h2>
             {monthlyHistory.length === 0 ? (
-              <p className="text-sm text-slate-500 py-6 text-center">Registra ingresos y gastos para generar la tendencia histórica.</p>
+              <p className="text-sm text-slate-400 py-6 text-center">Registra ingresos y gastos para generar la tendencia histórica.</p>
             ) : (
               <div className="overflow-x-auto">
-                <table className="w-full text-left text-sm text-slate-300">
-                  <thead className="bg-slate-950 text-slate-400 uppercase text-xs">
+                <table className="w-full text-left text-sm text-slate-200">
+                  <thead className="bg-[#111827] text-slate-300 uppercase text-xs border-b border-slate-600">
                     <tr>
                       <th className="px-4 py-3 rounded-l-lg">Mes</th>
                       <th className="px-4 py-3 text-right">Ingresos</th>
@@ -579,9 +579,9 @@ export default function HomePage() {
                       <th className="px-4 py-3 text-right rounded-r-lg">Ahorro Reservado</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-slate-800 font-mono">
+                  <tbody className="divide-y divide-slate-600 font-mono">
                     {monthlyHistory.map((h) => (
-                      <tr key={h.month} className="hover:bg-slate-800/50">
+                      <tr key={h.month} className="hover:bg-slate-700/50">
                         <td className="px-4 py-3 text-xs text-white font-medium">{h.month}</td>
                         <td className="px-4 py-3 text-right text-emerald-400">{currSymbol} {h.income.toFixed(2)}</td>
                         <td className="px-4 py-3 text-right text-rose-400">{currSymbol} {h.expense.toFixed(2)}</td>
@@ -595,14 +595,14 @@ export default function HomePage() {
           </div>
         </div>
 
-        <div className="bg-[#0f172a] border border-slate-700/80 rounded-2xl p-6 shadow-xl space-y-4">
+        <div className="bg-[#1f2937] border border-slate-600/80 rounded-2xl p-6 shadow-2xl space-y-4">
           <h2 className="text-lg font-semibold text-white">Transacciones ({selectedMonth})</h2>
           {monthTransactions.length === 0 ? (
-            <p className="text-sm text-slate-500 py-6 text-center">No hay registros para este mes. Registra tus ingresos o gastos arriba.</p>
+            <p className="text-sm text-slate-400 py-6 text-center">No hay registros para este mes. Registra tus ingresos o gastos arriba.</p>
           ) : (
             <div className="overflow-x-auto">
-              <table className="w-full text-left text-sm text-slate-300">
-                <thead className="bg-slate-950 text-slate-400 uppercase text-xs">
+              <table className="w-full text-left text-sm text-slate-200">
+                <thead className="bg-[#111827] text-slate-300 uppercase text-xs border-b border-slate-600">
                   <tr>
                     <th className="px-4 py-3 rounded-l-lg">Fecha</th>
                     <th className="px-4 py-3">Tipo / Naturaleza</th>
@@ -612,23 +612,23 @@ export default function HomePage() {
                     <th className="px-4 py-3 text-center rounded-r-lg">Acciones</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-slate-800">
+                <tbody className="divide-y divide-slate-600">
                   {monthTransactions.map((t) => (
-                    <tr key={t.id} className="hover:bg-slate-800/50">
-                      <td className="px-4 py-3 text-xs text-slate-400">{t.date}</td>
+                    <tr key={t.id} className="hover:bg-slate-700/50">
+                      <td className="px-4 py-3 text-xs text-slate-300">{t.date}</td>
                       <td className="px-4 py-3 text-xs">
                         <span className={`px-2 py-0.5 rounded text-[10px] border ${
                           t.type === 'income' 
-                            ? 'bg-emerald-950/60 border-emerald-800 text-emerald-300' 
+                            ? 'bg-emerald-950 border-emerald-600 text-emerald-300' 
                             : t.nature === 'fixed'
-                            ? 'bg-amber-950/60 border-amber-800 text-amber-300'
-                            : 'bg-slate-800 border-slate-700 text-slate-300'
+                            ? 'bg-amber-950 border-amber-600 text-amber-300'
+                            : 'bg-slate-700 border-slate-500 text-slate-200'
                         }`}>
                           {t.type === 'income' ? 'Ingreso' : t.nature === 'fixed' ? 'Gasto Fijo' : 'Gasto Variable'}
                         </span>
                       </td>
                       <td className="px-4 py-3 font-medium text-white">{t.description}</td>
-                      <td className="px-4 py-3 text-xs text-slate-400">{t.category}</td>
+                      <td className="px-4 py-3 text-xs text-slate-300">{t.category}</td>
                       <td className={`px-4 py-3 text-right font-mono font-bold ${t.type === 'income' ? 'text-emerald-400' : 'text-rose-400'}`}>
                         {t.type === 'income' ? '+' : '-'} {currSymbol} {t.amount.toFixed(2)}
                       </td>
@@ -636,14 +636,14 @@ export default function HomePage() {
                         <button
                           onClick={() => handleEditTransaction(t)}
                           title="Editar Registro"
-                          className="text-xs bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-300 px-2 py-1 rounded transition-colors"
+                          className="text-xs bg-slate-700 hover:bg-slate-600 border border-slate-500 text-slate-200 px-2 py-1 rounded transition-colors"
                         >
                           ✏️
                         </button>
                         <button
                           onClick={() => handleDeleteTransaction(t.id)}
                           title="Eliminar Registro"
-                          className="text-xs bg-rose-950/80 hover:bg-rose-900 border border-rose-800 text-rose-300 px-2 py-1 rounded transition-colors"
+                          className="text-xs bg-rose-950 hover:bg-rose-900 border border-rose-700 text-rose-300 px-2 py-1 rounded transition-colors"
                         >
                           🗑️
                         </button>
@@ -659,7 +659,7 @@ export default function HomePage() {
 
       {showModal && (
         <div className="fixed inset-0 bg-slate-950/85 backdrop-blur-md flex items-center justify-center p-4 z-50">
-          <div className="bg-[#0f172a] border border-slate-700 rounded-2xl w-full max-w-md p-6 shadow-2xl space-y-4">
+          <div className="bg-[#1f2937] border border-slate-600 rounded-2xl w-full max-w-md p-6 shadow-2xl space-y-4">
             <h3 className="text-lg font-bold text-white capitalize">
               {modalType === 'goal'
                 ? 'Crear Meta de Ahorro'
@@ -669,7 +669,7 @@ export default function HomePage() {
             </h3>
 
             {budgetError && (
-              <div className="p-3 bg-rose-950/80 border border-rose-800 text-rose-300 rounded-lg text-xs font-medium">
+              <div className="p-3 bg-rose-950 border border-rose-700 text-rose-300 rounded-lg text-xs font-medium">
                 {budgetError}
               </div>
             )}
@@ -685,7 +685,7 @@ export default function HomePage() {
                       value={goalTitle}
                       onChange={(e) => setGoalTitle(e.target.value)}
                       required
-                      className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-blue-500 text-sm"
+                      className="w-full bg-[#111827] border border-slate-600 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-blue-400 text-sm"
                     />
                   </div>
 
@@ -698,7 +698,7 @@ export default function HomePage() {
                       value={goalTarget}
                       onChange={(e) => setGoalTarget(e.target.value)}
                       required
-                      className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-blue-500 font-mono text-sm"
+                      className="w-full bg-[#111827] border border-slate-600 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-blue-400 font-mono text-sm"
                     />
                   </div>
 
@@ -710,7 +710,7 @@ export default function HomePage() {
                       placeholder="0.00"
                       value={goalCurrent}
                       onChange={(e) => setGoalCurrent(e.target.value)}
-                      className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-blue-500 font-mono text-sm"
+                      className="w-full bg-[#111827] border border-slate-600 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-blue-400 font-mono text-sm"
                     />
                   </div>
                 </>
@@ -724,7 +724,7 @@ export default function HomePage() {
                       value={description}
                       onChange={(e) => setDescription(e.target.value)}
                       required
-                      className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-emerald-500 text-sm"
+                      className="w-full bg-[#111827] border border-slate-600 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-emerald-400 text-sm"
                     />
                   </div>
 
@@ -734,7 +734,7 @@ export default function HomePage() {
                       <select
                         value={expenseNature}
                         onChange={(e) => setExpenseNature(e.target.value as 'fixed' | 'variable')}
-                        className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-emerald-500 text-sm"
+                        className="w-full bg-[#111827] border border-slate-600 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-emerald-400 text-sm"
                       >
                         <option value="variable">Variable (Discrecional / Opcional)</option>
                         <option value="fixed">Fijo (Obligatorio / Inflexible)</option>
@@ -751,7 +751,7 @@ export default function HomePage() {
                       value={amount}
                       onChange={(e) => setAmount(e.target.value)}
                       required
-                      className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-emerald-500 font-mono text-sm"
+                      className="w-full bg-[#111827] border border-slate-600 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-emerald-400 font-mono text-sm"
                     />
                   </div>
 
@@ -760,7 +760,7 @@ export default function HomePage() {
                     <select
                       value={category}
                       onChange={(e) => setCategory(e.target.value)}
-                      className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-emerald-500 text-sm"
+                      className="w-full bg-[#111827] border border-slate-600 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-emerald-400 text-sm"
                     >
                       {(modalType === 'income' ? INCOME_CATEGORIES : EXPENSE_CATEGORIES).map((cat) => (
                         <option key={cat} value={cat}>
@@ -776,7 +776,7 @@ export default function HomePage() {
                 <button
                   type="button"
                   onClick={() => setShowModal(false)}
-                  className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg text-sm transition-colors"
+                  className="px-4 py-2 bg-slate-700 hover:bg-slate-600 text-slate-200 rounded-lg text-sm transition-colors"
                 >
                   Cancelar
                 </button>
