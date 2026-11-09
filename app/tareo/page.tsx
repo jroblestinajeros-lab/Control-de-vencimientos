@@ -48,8 +48,9 @@ export default function TareoPage() {
   useEffect(() => {
     document.title = "Módulo Operativo de Tareo & Vacaciones MYPE | V&A Consulting";
     
-    const savedCollabs = localStorage.getItem('vya_collaborators_v5');
-    const savedTareos = localStorage.getItem('vya_tareos_v5');
+    // Llaves fijas y permanentes para evitar reseteos de caché
+    const savedCollabs = localStorage.getItem('vya_collaborators_permanent');
+    const savedTareos = localStorage.getItem('vya_tareos_permanent');
 
     if (savedCollabs) {
       try { setCollaborators(JSON.parse(savedCollabs)); } catch (e) { setCollaborators([]); }
@@ -60,7 +61,7 @@ export default function TareoPage() {
         { dni: '47891234', name: 'Carlos Mendoza', cargo: 'Técnico Batimetrista', startDate: '2026-08-01', regime: 'micro' }
       ];
       setCollaborators(defaultCollabs);
-      localStorage.setItem('vya_collaborators_v5', JSON.stringify(defaultCollabs));
+      localStorage.setItem('vya_collaborators_permanent', JSON.stringify(defaultCollabs));
     }
 
     if (savedTareos) {
@@ -70,7 +71,7 @@ export default function TareoPage() {
         { id: '1', dni: '45572820', name: 'Jorge Luis Robles Tinajeros', cargo: 'Administrativo', projectCode: 'PRJ-01', status: 'campo', daysWorked: 14, date: '2026-09-11' }
       ];
       setTareos(defaultTareos);
-      localStorage.setItem('vya_tareos_v5', JSON.stringify(defaultTareos));
+      localStorage.setItem('vya_tareos_permanent', JSON.stringify(defaultTareos));
     }
 
     setLoading(false);
@@ -134,7 +135,7 @@ export default function TareoPage() {
     }
 
     setCollaborators(updated);
-    localStorage.setItem('vya_collaborators_v5', JSON.stringify(updated));
+    localStorage.setItem('vya_collaborators_permanent', JSON.stringify(updated));
 
     setDniInput('');
     setNameInput('');
@@ -158,7 +159,7 @@ export default function TareoPage() {
     if (!confirm('¿Deseas eliminar este colaborador del maestro?')) return;
     const updated = collaborators.filter(c => c.dni !== dni);
     setCollaborators(updated);
-    localStorage.setItem('vya_collaborators_v5', JSON.stringify(updated));
+    localStorage.setItem('vya_collaborators_permanent', JSON.stringify(updated));
   };
 
   const handleAddTareo = (e: React.FormEvent) => {
@@ -182,13 +183,13 @@ export default function TareoPage() {
 
     const updated = [newRecord, ...tareos];
     setTareos(updated);
-    localStorage.setItem('vya_tareos_v5', JSON.stringify(updated));
+    localStorage.setItem('vya_tareos_permanent', JSON.stringify(updated));
   };
 
   const handleDeleteTareo = (id: string) => {
     const updated = tareos.filter(t => t.id !== id);
     setTareos(updated);
-    localStorage.setItem('vya_tareos_v5', JSON.stringify(updated));
+    localStorage.setItem('vya_tareos_permanent', JSON.stringify(updated));
   };
 
   if (loading) return null;
@@ -289,7 +290,7 @@ export default function TareoPage() {
                     <th className="px-4 py-3">Cargo</th>
                     <th className="px-4 py-3">Fecha Ingreso</th>
                     <th className="px-4 py-3">Régimen</th>
-                    <th className="px-4 py-3 text-right">Vacaciones Netas (Acum. - Tomadas)</th>
+                    <th className="px-4 py-3 text-right">Vacaciones Netas</th>
                     <th className="px-4 py-3 text-center">Acciones</th>
                   </tr>
                 </thead>
@@ -309,7 +310,7 @@ export default function TareoPage() {
                             {c.regime === 'micro' ? 'Microempresa (15d)' : 'Pequeña Empresa (30d)'}
                           </span>
                         </td>
-                        <td className="px-4 py-3 text-right font-bold text-fuchsia-300">{vac.netDays} días netos <span className="text-[10px] text-purple-300">({vac.earnedDays} gen. - {takenVac} tom.)</span></td>
+                        <td className="px-4 py-3 text-right font-bold text-fuchsia-300">{vac.netDays} días netos</td>
                         <td className="px-4 py-3 text-center space-x-2">
                           <button onClick={() => handleEditCollaborator(c)} title="Editar" className="bg-indigo-900 hover:bg-indigo-800 border border-indigo-400 text-indigo-200 px-2.5 py-1 rounded-lg text-xs">✏️</button>
                           <button onClick={() => handleDeleteCollaborator(c.dni)} title="Eliminar" className="bg-rose-950 hover:bg-rose-900 border border-rose-500 text-rose-300 px-2.5 py-1 rounded-lg text-xs">🗑️</button>
@@ -351,7 +352,6 @@ export default function TareoPage() {
                 <input type="text" value={projectCode} onChange={(e) => setProjectCode(e.target.value)} className="w-full bg-indigo-950 border border-purple-500/50 rounded-xl px-3 py-2 text-white text-xs font-mono" />
               </div>
               <div>
-                {/* CAMBIO SOLICITADO: Solo 'Días' sin la barra '/' ni unidades */}
                 <label className="block text-[11px] font-semibold text-purple-200 uppercase mb-1">Días</label>
                 <input type="number" step="0.5" value={daysWorkedInput} onChange={(e) => setDaysWorkedInput(e.target.value)} required className="w-full bg-indigo-950 border border-purple-500/50 rounded-xl px-3 py-2 text-white text-xs font-mono" />
               </div>
@@ -360,7 +360,7 @@ export default function TareoPage() {
               </div>
             </form>
 
-            {/* MATRIZ DE TAREO & RESUMEN CON BOLSAS RESTADAS */}
+            {/* MATRIZ DE TAREO & RESUMEN */}
             <div className="rounded-3xl p-6 shadow-2xl border space-y-4" style={{ backgroundColor: 'rgba(30, 27, 75, 0.75)', borderColor: 'rgba(217, 70, 239, 0.3)' }}>
               <h2 className="text-sm font-bold text-white uppercase tracking-wider">Módulo de Asistencia, Tareo & Control de Bolsas (Vacaciones y Descansos)</h2>
               
@@ -380,9 +380,7 @@ export default function TareoPage() {
                       const collabTareos = tareos.filter(t => t.dni === c.dni);
                       const totalCampoOficina = collabTareos.filter(t => t.status === 'campo' || t.status === 'oficina').reduce((acc, t) => acc + t.daysWorked, 0);
                       
-                      // Lógica de Descansos (Generados vs Tomados)
-                      // Nota: Por cada 2 o 3 días de campo se generan descansos según política, o tomamos los días de campo generados y restamos los tomados ("descanso")
-                      const generatedRest = Number((totalCampoOficina * 0.333).toFixed(1)); // Ejemplo proporcional de descanso generado por labor
+                      const generatedRest = Number((totalCampoOficina * 0.333).toFixed(1));
                       const takenRest = collabTareos.filter(t => t.status === 'descanso').reduce((acc, t) => acc + t.daysWorked, 0);
                       const netRest = Math.max(0, generatedRest - takenRest);
 
@@ -390,7 +388,6 @@ export default function TareoPage() {
                       const totalFaltas = collabTareos.filter(t => t.status === 'falto').reduce((acc, t) => acc + t.daysWorked, 0);
                       const totalDescansoMedico = collabTareos.filter(t => t.status === 'descanso_medico').reduce((acc, t) => acc + t.daysWorked, 0);
                       
-                      // Vacaciones Tomadas vs Acumuladas
                       const takenVac = collabTareos.filter(t => t.status === 'vacaciones').reduce((acc, t) => acc + t.daysWorked, 0);
                       const vac = calculateVacationStatus(c.startDate, c.regime, takenVac);
 
@@ -433,7 +430,7 @@ export default function TareoPage() {
               </div>
             </div>
 
-            {/* HISTORIAL DE REGISTROS CON ELIMINACIÓN */}
+            {/* HISTORIAL */}
             <div className="rounded-3xl p-6 shadow-2xl border space-y-4" style={{ backgroundColor: 'rgba(30, 27, 75, 0.75)', borderColor: 'rgba(217, 70, 239, 0.3)' }}>
               <h2 className="text-sm font-bold text-white uppercase tracking-wider">Historial de Registros de Tareo & Vacaciones</h2>
               <div className="overflow-x-auto">
