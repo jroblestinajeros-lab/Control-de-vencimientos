@@ -1,7 +1,6 @@
 'use client';
 
 import React, { useState } from 'react';
-import { supabase } from '@/lib/supabase';
 import { useRouter } from 'next/navigation';
 
 export default function LoginPage() {
@@ -22,24 +21,30 @@ export default function LoginPage() {
     setMessage(null);
 
     try {
-      if (isSignUp) {
-        const { error: signUpError } = await supabase.auth.signUp({
+      // Llamada interna al servidor de Next.js (no al subdominio de Supabase)
+      const res = await fetch('/api/auth', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: isSignUp ? 'signup' : 'signin',
           email,
           password,
-          options: {
-            data: { full_name: fullName }
-          }
-        });
-        if (signUpError) throw signUpError;
+          fullName,
+        }),
+      });
+
+      const data = await res.json();
+
+      if (!res.ok || data.error) {
+        throw new Error(data.error || 'Error en la autenticación');
+      }
+
+      if (isSignUp) {
         setMessage('Cuenta creada con éxito. Ya puedes iniciar sesión.');
         setIsSignUp(false);
       } else {
-        const { error: signInError } = await supabase.auth.signInWithPassword({
-          email,
-          password
-        });
-        if (signInError) throw signInError;
         router.push('/');
+        router.refresh();
       }
     } catch (err: any) {
       setError(err.message || 'Error durante la autenticación.');
