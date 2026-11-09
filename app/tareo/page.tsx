@@ -1,35 +1,86 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 import * as XLSX from 'xlsx';
 
-interface WorkShift {
+interface Transaction {
   id: string;
-  workerName: string;
-  documentId: string; // DNI / CE
-  position: string;   // Cargo / Especialidad
-  workType: 'campo' | 'oficina';
-  startDate: string;
-  daysWorked: number;
-  yearsOfService: number;
+  description: string;
+  amount: number;
+  type: 'income' | 'expense';
+  nature?: 'fixed' | 'variable';
+  category: string;
+  date: string;
+  month: string;
 }
 
-export default function TareoPage() {
+interface SavingsGoal {
+  id: string;
+  title: string;
+  targetAmount: number;
+  currentAmount: number;
+}
+
+type CurrencyCode = 'PEN' | 'USD' | 'EUR';
+
+const CURRENCIES: Record<CurrencyCode, { symbol: string; label: string }> = {
+  PEN: { symbol: 'S/', label: 'Soles (S/)' },
+  USD: { symbol: '$', label: 'Dólares ($)' },
+  EUR: { symbol: '€', label: 'Euros (€)' },
+};
+
+const EXPENSE_CATEGORIES = [
+  'Vivienda / Alquiler / Mantenimiento',
+  'Alimentación / Supermercado',
+  'Servicios (Luz, Agua, Internet, Celular)',
+  'Transporte / Combustible / Pasajes',
+  'Salud / Medicinas / Seguros',
+  'Educación / Cursos',
+  'Entretenimiento / Salidas / Suscripciones',
+  'Compras / Ropa / Tecnología',
+  'Ahorro / Inversión Directa',
+  'Otros / Varios',
+];
+
+const INCOME_CATEGORIES = [
+  'Sueldo / Salario Principal',
+  'Consultorías / Servicios Profesionales',
+  'Inversiones / Rendimientos',
+  'Ventas / Negocio Personal',
+  'Otros Ingresos Variables',
+];
+
+export default function HomePage() {
   const router = useRouter();
   const [loading, setLoading] = useState(true);
   const [userEmail, setUserEmail] = useState<string>('');
 
-  // Formulario de Tareo
-  const [workerName, setWorkerName] = useState('');
-  const [documentId, setDocumentId] = useState('');
-  const [position, setPosition] = useState('');
-  const [workType, setWorkType] = useState<'campo' | 'oficina'>('campo');
-  const [startDate, setStartDate] = useState(new Date().toISOString().slice(0, 10));
-  const [daysWorked, setDaysWorked] = useState<string>('14');
-  const [yearsOfService, setYearsOfService] = useState<string>('1');
+  const [currency, setCurrency] = useState<CurrencyCode>('PEN');
+  const [selectedMonth, setSelectedMonth] = useState<string>(
+    new Date().toISOString().slice(0, 7)
+  );
 
-  const [shifts, setShifts] = useState<WorkShift[]>([]);
+  const [transactions, setTransactions] = useState<Transaction[]>([]);
+  const [savingsTargetPercent, setSavingsTargetPercent] = useState<number>(20);
+  const [goals, setGoals] = useState<SavingsGoal[]>([]);
+  
+  const [showModal, setShowModal] = useState<boolean>(false);
+  const [modalType, setModalType] = useState<'income' | 'expense' | 'goal'>('income');
+  const [editingTxId, setEditingTxId] = useState<string | null>(null);
+
+  const [description, setDescription] = useState('');
+  const [amount, setAmount] = useState('');
+  const [expenseNature, setExpenseNature] = useState<'fixed' | 'variable'>('variable');
+  const [category, setCategory] = useState(INCOME_CATEGORIES[0]);
+  const [budgetError, setBudgetError] = useState<string | null>(null);
+
+  const [goalTitle, setGoalTitle] = useState('');
+  const [goalTarget, setGoalTarget] = useState('');
+  const [goalCurrent, setGoalCurrent] = useState('');
+
+  const currSymbol = CURRENCIES[currency].symbol;
 
   useEffect(() => {
     const sessionData = localStorage.getItem('user_session');
@@ -47,307 +98,705 @@ export default function TareoPage() {
       } catch (e) {
         setUserEmail('jroblestinajeros@gmail.com');
       }
+    } else {
+      setUserEmail('jroblestinajeros@gmail.com');
     }
 
-    const savedShifts = localStorage.getItem('va_tareo_shifts');
-    if (savedShifts) setShifts(JSON.parse(savedShifts));
+    const savedTx = localStorage.getItem('fin_transactions');
+    const savedGoals = localStorage.getItem('fin_goals');
+    const savedSavingsPercent = localStorage.getItem('fin_savings_percent');
+    const savedCurrency = localStorage.getItem('fin_currency') as CurrencyCode;
+
+    if (savedTx) setTransactions(JSON.parse(savedTx));
+    if (savedSavingsPercent) setSavingsTargetPercent(Number(savedSavingsPercent));
+    if (savedCurrency && CURRENCIES[savedCurrency]) setCurrency(savedCurrency);
+
+    if (savedGoals) {
+      setGoals(JSON.parse(savedGoals));
+    } else {
+      setGoals([
+        { id: '1', title: 'Fondo de Emergencia', targetAmount: 10000, currentAmount: 3500 },
+        { id: '2', title: 'Renovación de Equipos', targetAmount: 5000, currentAmount: 1200 },
+      ]);
+    }
 
     setLoading(false);
   }, [router]);
 
-  // Cálculo estricto de descansos según reglas de V&A Consulting
-  function calculateRestDays(days: number, type: 'campo' | 'oficina') {
-    if (type === 'oficina') {
-      return Math.floor(days / 5) * 2 + (days % 5) * 0.4;
-    }
-
-    // Campo:
-    // Si cumple o supera los 14 días -> Régimen Atípico 2x1 (DL / 2)
-    if (days >= 14) {
-      return days / 2;
-    }
-
-    // Si es de 1 a 13 días -> Bloques de 5d = 2d descanso + 0.4 por día remanente
-    const fullBlocks = Math.floor(days / 5);
-    const remainderDays = days % 5;
-    return fullBlocks * 2 + remainderDays * 0.4;
-  }
-
-  function calculateVacationDays(years: number) {
-    return Math.floor(years) * 15;
-  }
-
-  function calculateReturnDate(start: string, workedDays: number, restDays: number) {
-    const startDt = new Date(start);
-    const totalDaysCycle = workedDays + Math.round(restDays);
-    startDt.setDate(startDt.getDate() + totalDaysCycle);
-    return startDt.toLocaleDateString('es-PE');
-  }
-
-  const handleAddShift = (e: React.FormEvent) => {
-    e.preventDefault();
-    const dWorked = parseInt(daysWorked) || 0;
-    const yService = parseFloat(yearsOfService) || 0;
-    if (dWorked <= 0) return;
-
-    const newRecord: WorkShift = {
-      id: Date.now().toString(),
-      workerName: workerName || 'Colaborador',
-      documentId: documentId || 'S/D',
-      position: position || 'Técnico / Operativo',
-      workType,
-      startDate,
-      daysWorked: dWorked,
-      yearsOfService: yService,
-    };
-
-    const updated = [newRecord, ...shifts];
-    setShifts(updated);
-    localStorage.setItem('va_tareo_shifts', JSON.stringify(updated));
-
-    setWorkerName('');
-    setDocumentId('');
-    setPosition('');
-    setDaysWorked('14');
+  const handleCurrencyChange = (newCurr: CurrencyCode) => {
+    setCurrency(newCurr);
+    localStorage.setItem('fin_currency', newCurr);
   };
 
-  const handleDeleteShift = (id: string) => {
-    if (!confirm('¿Deseas eliminar este registro de tareo?')) return;
-    const updated = shifts.filter((s) => s.id !== id);
-    setShifts(updated);
-    localStorage.setItem('va_tareo_shifts', JSON.stringify(updated));
+  const handleSavingsPercentChange = (newPercent: number) => {
+    setSavingsTargetPercent(newPercent);
+    localStorage.setItem('fin_savings_percent', newPercent.toString());
+  };
+
+  const monthTransactions = transactions.filter(
+    (t) => (t.month || t.date.slice(0, 7)) === selectedMonth
+  );
+
+  const totalIncome = monthTransactions
+    .filter((t) => t.type === 'income')
+    .reduce((acc, t) => acc + t.amount, 0);
+
+  const totalExpense = monthTransactions
+    .filter((t) => t.type === 'expense')
+    .reduce((acc, t) => acc + t.amount, 0);
+
+  const fixedExpenses = monthTransactions
+    .filter((t) => t.type === 'expense' && t.nature === 'fixed')
+    .reduce((acc, t) => acc + t.amount, 0);
+
+  const variableExpenses = monthTransactions
+    .filter((t) => t.type === 'expense' && t.nature === 'variable')
+    .reduce((acc, t) => acc + t.amount, 0);
+
+  const plannedSavings = (totalIncome * savingsTargetPercent) / 100;
+  const availableExpenseBudget = Math.max(0, totalIncome - plannedSavings);
+  const budgetRemaining = availableExpenseBudget - totalExpense;
+
+  const budgetPercentage = availableExpenseBudget > 0 
+    ? Math.min(Math.round((totalExpense / availableExpenseBudget) * 100), 100)
+    : 0;
+
+  const totalSavedAllGoals = goals.reduce((acc, g) => acc + g.currentAmount, 0);
+  const fixedExpenseMonthlyAvg = fixedExpenses || (totalExpense * 0.5) || 1;
+  const emergencyCoverageMonths = (totalSavedAllGoals / fixedExpenseMonthlyAvg).toFixed(1);
+
+  const expensesByCategory = EXPENSE_CATEGORIES.map((cat) => {
+    const total = monthTransactions
+      .filter((t) => t.type === 'expense' && t.category === cat)
+      .reduce((acc, t) => acc + t.amount, 0);
+    return { category: cat, amount: total };
+  }).filter((item) => item.amount > 0);
+
+  const availableMonths = Array.from(
+    new Set(transactions.map((t) => t.month || t.date.slice(0, 7)))
+  ).sort().reverse().slice(0, 4);
+
+  const monthlyHistory = availableMonths.map((m) => {
+    const mTx = transactions.filter((t) => (t.month || t.date.slice(0, 7)) === m);
+    const inc = mTx.filter((t) => t.type === 'income').reduce((a, t) => a + t.amount, 0);
+    const exp = mTx.filter((t) => t.type === 'expense').reduce((a, t) => a + t.amount, 0);
+    const sav = (inc * savingsTargetPercent) / 100;
+    return { month: m, income: inc, expense: exp, savings: sav };
+  });
+
+  const handleOpenModal = (type: 'income' | 'expense' | 'goal') => {
+    setModalType(type);
+    setEditingTxId(null);
+    setDescription('');
+    setAmount('');
+    setExpenseNature('variable');
+    setGoalTitle('');
+    setGoalTarget('');
+    setGoalCurrent('');
+    setCategory(type === 'income' ? INCOME_CATEGORIES[0] : EXPENSE_CATEGORIES[0]);
+    setBudgetError(null);
+    setShowModal(true);
+  };
+
+  const handleEditTransaction = (tx: Transaction) => {
+    setModalType(tx.type);
+    setEditingTxId(tx.id);
+    setDescription(tx.description);
+    setAmount(tx.amount.toString());
+    setExpenseNature(tx.nature || 'variable');
+    setCategory(tx.category);
+    setBudgetError(null);
+    setShowModal(true);
+  };
+
+  const handleDeleteTransaction = (id: string) => {
+    if (!confirm('¿Estás seguro de que deseas eliminar este registro?')) return;
+    const updated = transactions.filter((t) => t.id !== id);
+    setTransactions(updated);
+    localStorage.setItem('fin_transactions', JSON.stringify(updated));
+  };
+
+  const handleSave = (e: React.FormEvent) => {
+    e.preventDefault();
+    setBudgetError(null);
+
+    if (modalType === 'goal') {
+      const targetVal = parseFloat(goalTarget);
+      const currentVal = parseFloat(goalCurrent) || 0;
+      if (isNaN(targetVal) || targetVal <= 0) return;
+
+      const newGoal: SavingsGoal = {
+        id: Date.now().toString(),
+        title: goalTitle || 'Nueva Meta',
+        targetAmount: targetVal,
+        currentAmount: currentVal,
+      };
+
+      const updatedGoals = [...goals, newGoal];
+      setGoals(updatedGoals);
+      localStorage.setItem('fin_goals', JSON.stringify(updatedGoals));
+      setShowModal(false);
+      return;
+    }
+
+    const val = parseFloat(amount);
+    if (isNaN(val) || val <= 0) return;
+
+    if (modalType === 'expense') {
+      const currentTxAmount = editingTxId 
+        ? transactions.find(t => t.id === editingTxId)?.amount || 0 
+        : 0;
+      const adjustedRemaining = budgetRemaining + currentTxAmount;
+
+      if (availableExpenseBudget > 0 && val > adjustedRemaining) {
+        setBudgetError(
+          `¡Atención! Este gasto (${currSymbol} ${val.toFixed(2)}) supera el presupuesto disponible para gastos (${currSymbol} ${adjustedRemaining.toFixed(2)}). Preserva tu cuota de ahorro del ${savingsTargetPercent}%.`
+        );
+        return;
+      }
+    }
+
+    if (editingTxId) {
+      const updated = transactions.map((t) => {
+        if (t.id === editingTxId) {
+          return {
+            ...t,
+            description: description || t.description,
+            amount: val,
+            nature: modalType === 'expense' ? expenseNature : undefined,
+            category,
+          };
+        }
+        return t;
+      });
+      setTransactions(updated);
+      localStorage.setItem('fin_transactions', JSON.stringify(updated));
+    } else {
+      const newTx: Transaction = {
+        id: Date.now().toString(),
+        description: description || (modalType === 'income' ? 'Ingreso Variable' : 'Gasto'),
+        amount: val,
+        type: modalType,
+        nature: modalType === 'expense' ? expenseNature : undefined,
+        category,
+        date: new Date().toLocaleDateString('es-PE'),
+        month: selectedMonth,
+      };
+      const updated = [newTx, ...transactions];
+      setTransactions(updated);
+      localStorage.setItem('fin_transactions', JSON.stringify(updated));
+    }
+
+    setShowModal(false);
   };
 
   const exportToExcel = () => {
-    const dataToExport = shifts.map((s) => {
-      const rest = calculateRestDays(s.daysWorked, s.workType);
-      const vacations = calculateVacationDays(s.yearsOfService);
-      const returnDate = calculateReturnDate(s.startDate, s.daysWorked, rest);
+    const summaryData = [
+      { Concepto: 'Moneda Seleccionada', Valor: `${currency} (${currSymbol})` },
+      { Concepto: 'Mes Seleccionado', Valor: selectedMonth },
+      { Concepto: `Ingresos Totales (${currSymbol})`, Valor: totalIncome },
+      { Concepto: `Ahorro Reservado (${savingsTargetPercent}%) (${currSymbol})`, Valor: plannedSavings },
+      { Concepto: `Presupuesto Límite para Gastos (${currSymbol})`, Valor: availableExpenseBudget },
+      { Concepto: `Gastos Fijos (${currSymbol})`, Valor: fixedExpenses },
+      { Concepto: `Gastos Variables (${currSymbol})`, Valor: variableExpenses },
+      { Concepto: `Gastos Ejecutados Totales (${currSymbol})`, Valor: totalExpense },
+      { Concepto: `Saldo Restante para Gastos (${currSymbol})`, Valor: budgetRemaining },
+    ];
 
-      return {
-        'DNI / CE': s.documentId,
-        'Nombre del Colaborador': s.workerName,
-        'Cargo / Especialidad': s.position,
-        'Modalidad / Ubicación': s.workType === 'campo' ? 'Campo' : 'Oficina',
-        'Fecha Inicio': s.startDate,
-        'Días Laborados': s.daysWorked,
-        'Días Descanso Generados': rest.toFixed(1),
-        'Régimen Aplicado':
-          s.workType === 'oficina'
-            ? 'Oficina 5x2'
-            : s.daysWorked >= 14
-            ? 'Atípico 2x1 (≥14 días)'
-            : 'Campo Corto (5x2)',
-        'Fecha Retorno Estimada': returnDate,
-        'Años de Servicio': s.yearsOfService,
-        'Días Vacaciones Acumuladas': vacations,
-      };
-    });
+    const txData = monthTransactions.map((t) => ({
+      Fecha: t.date,
+      Tipo: t.type === 'income' ? 'Ingreso' : 'Gasto',
+      Naturaleza: t.nature === 'fixed' ? 'Fijo (Obligatorio)' : t.nature === 'variable' ? 'Variable' : '-',
+      Descripción: t.description,
+      Categoría: t.category,
+      [`Monto (${currSymbol})`]: t.amount,
+    }));
+
+    const goalsData = goals.map((g) => ({
+      'Meta / Objetivo': g.title,
+      [`Monto Actual (${currSymbol})`]: g.currentAmount,
+      [`Monto Meta (${currSymbol})`]: g.targetAmount,
+      '% Avance': `${Math.round((g.currentAmount / g.targetAmount) * 100)}%`,
+    }));
 
     const wb = XLSX.utils.book_new();
-    const ws = XLSX.utils.json_to_sheet(dataToExport);
-    XLSX.utils.book_append_sheet(wb, ws, 'Tareo_Descansos');
-    XLSX.writeFile(wb, `Matriz_Tareo_VA_Consulting.xlsx`);
+    const wsSummary = XLSX.utils.json_to_sheet(summaryData);
+    const wsTx = XLSX.utils.json_to_sheet(txData);
+    const wsGoals = XLSX.utils.json_to_sheet(goalsData);
+
+    XLSX.utils.book_append_sheet(wb, wsSummary, 'Resumen Mensual');
+    XLSX.utils.book_append_sheet(wb, wsTx, 'Transacciones');
+    XLSX.utils.book_append_sheet(wb, wsGoals, 'Metas de Ahorro');
+
+    XLSX.writeFile(wb, `Reporte_Finanzas_${currency}_${selectedMonth}.xlsx`);
   };
+
+  function handleSignOut() {
+    localStorage.removeItem('user_session');
+    document.cookie = 'user_logged_in=; path=/; expires=Thu, 01 Jan 1970 00:00:01 GMT;';
+    window.location.href = '/login';
+  }
 
   if (loading) return null;
 
   return (
-    <main className="min-h-screen bg-slate-950 text-slate-100 p-6 space-y-8">
-      <header className="max-w-7xl mx-auto flex flex-col md:flex-row justify-between items-start md:items-center pb-6 border-b border-slate-800 gap-4">
+    <main className="min-h-screen bg-slate-950 text-slate-100 p-6">
+      <header className="max-w-7xl mx-auto flex flex-col md:flex-row justify-between items-start md:items-center pb-6 border-b border-slate-800 mb-8 gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-white">Módulo Operativo de Tareo & Descansos</h1>
+          <h1 className="text-2xl font-bold text-white">Control de Finanzas Personales</h1>
           <p className="text-xs text-slate-400">
-            V&A Consulting S.A.C. — Control de Planilla, Jornadas & Vacaciones
+            Usuario: <span className="text-emerald-400 font-medium">{userEmail}</span>
           </p>
         </div>
+        
+        <div className="flex flex-wrap items-center gap-3">
+          {/* Botón de acceso directo a Tareo */}
+          <Link
+            href="/tareo"
+            className="bg-purple-700 hover:bg-purple-600 text-white font-medium text-xs px-3.5 py-2 rounded-lg transition-colors flex items-center space-x-1 shadow-lg shadow-purple-950/40"
+          >
+            <span>📋 Módulo Tareo</span>
+          </Link>
 
-        {shifts.length > 0 && (
+          <select
+            value={currency}
+            onChange={(e) => handleCurrencyChange(e.target.value as CurrencyCode)}
+            className="bg-slate-900 border border-slate-700 text-amber-400 font-bold text-xs px-3 py-2 rounded-lg focus:outline-none focus:border-amber-500"
+          >
+            {Object.entries(CURRENCIES).map(([code, info]) => (
+              <option key={code} value={code}>
+                {info.label}
+              </option>
+            ))}
+          </select>
+
+          <input
+            type="month"
+            value={selectedMonth}
+            onChange={(e) => setSelectedMonth(e.target.value)}
+            className="bg-slate-900 border border-slate-700 text-white text-xs px-3 py-2 rounded-lg focus:outline-none focus:border-emerald-500 font-mono"
+          />
+
           <button
             onClick={exportToExcel}
-            className="bg-emerald-700 hover:bg-emerald-600 text-white font-medium text-xs px-4 py-2 rounded-lg transition-colors shadow-lg"
+            className="bg-emerald-700 hover:bg-emerald-600 text-white font-medium text-xs px-4 py-2 rounded-lg transition-colors flex items-center space-x-1.5 shadow-lg shadow-emerald-950/40"
           >
-            📊 Exportar Matriz a Excel
+            <span>📊 Exportar Excel</span>
           </button>
-        )}
+
+          <button
+            onClick={handleSignOut}
+            className="bg-slate-900 hover:bg-slate-800 border border-slate-700 text-slate-300 text-xs px-3 py-2 rounded-lg transition-colors"
+          >
+            Cerrar Sesión
+          </button>
+        </div>
       </header>
 
-      <section className="max-w-7xl mx-auto space-y-6">
-        {/* Formulario de Registro / Calculadora */}
-        <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-xl space-y-4">
-          <h2 className="text-sm font-semibold text-slate-300 uppercase tracking-wider">
-            Registrar / Calcular Jornada de Trabajo
-          </h2>
+      <section className="max-w-7xl mx-auto space-y-8">
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+          <div className="bg-slate-900 border border-slate-800 p-6 rounded-2xl shadow-lg">
+            <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Ingresos del Mes</h3>
+            <p className="text-3xl font-bold text-blue-400 font-mono">{currSymbol} {totalIncome.toFixed(2)}</p>
+            <p className="text-[11px] text-slate-500">Ingreso variable registrado</p>
+          </div>
 
-          <form onSubmit={handleAddShift} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-            <div>
-              <label className="block text-xs font-semibold text-slate-400 uppercase mb-1">DNI / CE</label>
-              <input
-                type="text"
-                placeholder="Ej. 45892011"
-                value={documentId}
-                onChange={(e) => setDocumentId(e.target.value)}
-                required
-                className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-xs text-white font-mono focus:outline-none focus:border-emerald-500"
-              />
-            </div>
-
-            <div>
-              <label className="block text-xs font-semibold text-slate-400 uppercase mb-1">Nombre Completo</label>
-              <input
-                type="text"
-                placeholder="Ej. Jorge Robles"
-                value={workerName}
-                onChange={(e) => setWorkerName(e.target.value)}
-                required
-                className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-emerald-500"
-              />
-            </div>
-
-            <div>
-              <label className="block text-xs font-semibold text-slate-400 uppercase mb-1">Cargo / Especialidad</label>
-              <input
-                type="text"
-                placeholder="Ej. Especialista en Batimetría"
-                value={position}
-                onChange={(e) => setPosition(e.target.value)}
-                required
-                className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-emerald-500"
-              />
-            </div>
-
-            <div>
-              <label className="block text-xs font-semibold text-slate-400 uppercase mb-1">Modalidad</label>
+          <div className="bg-slate-900 border border-slate-800 p-6 rounded-2xl shadow-lg border-l-4 border-l-purple-500 space-y-2">
+            <div className="flex justify-between items-center">
+              <h3 className="text-xs font-semibold text-purple-300 uppercase tracking-wider">Meta Ahorro</h3>
               <select
-                value={workType}
-                onChange={(e) => setWorkType(e.target.value as 'campo' | 'oficina')}
-                className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-emerald-500"
+                value={savingsTargetPercent}
+                onChange={(e) => handleSavingsPercentChange(Number(e.target.value))}
+                className="bg-slate-950 border border-slate-700 text-purple-300 text-xs font-bold rounded px-2 py-0.5 focus:outline-none focus:border-purple-500"
               >
-                <option value="campo">Campo (Comisión / Planta / Mina)</option>
-                <option value="oficina">Oficina (Sede Administrativa)</option>
+                {Array.from({ length: 18 }, (_, i) => (i + 2) * 5)
+                  .concat(95)
+                  .map((pct) => (
+                    <option key={pct} value={pct}>
+                      {pct}%
+                    </option>
+                  ))}
               </select>
             </div>
+            <p className="text-3xl font-bold text-purple-400 font-mono">{currSymbol} {plannedSavings.toFixed(2)}</p>
+            <p className="text-[11px] text-slate-500">Cuota reservada</p>
+          </div>
 
-            <div>
-              <label className="block text-xs font-semibold text-slate-400 uppercase mb-1">Fecha Inicio</label>
-              <input
-                type="date"
-                value={startDate}
-                onChange={(e) => setStartDate(e.target.value)}
-                required
-                className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-xs text-white font-mono focus:outline-none focus:border-emerald-500"
-              />
-            </div>
+          <div className="bg-slate-900 border border-slate-800 p-6 rounded-2xl shadow-lg border-l-4 border-l-emerald-500">
+            <h3 className="text-xs font-semibold text-emerald-300 uppercase tracking-wider mb-2">Presupuesto Gastos</h3>
+            <p className="text-3xl font-bold text-emerald-400 font-mono">{currSymbol} {availableExpenseBudget.toFixed(2)}</p>
+            <p className="text-[11px] text-slate-500">Límite permitido en el mes</p>
+          </div>
 
-            <div>
-              <label className="block text-xs font-semibold text-slate-400 uppercase mb-1">Días Continuos</label>
-              <input
-                type="number"
-                min="1"
-                value={daysWorked}
-                onChange={(e) => setDaysWorked(e.target.value)}
-                required
-                className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-white font-mono text-xs focus:outline-none focus:border-emerald-500"
-              />
-            </div>
-
-            <div>
-              <label className="block text-xs font-semibold text-slate-400 uppercase mb-1">Años de Servicio</label>
-              <input
-                type="number"
-                min="0"
-                step="1"
-                value={yearsOfService}
-                onChange={(e) => setYearsOfService(e.target.value)}
-                className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-white font-mono text-xs focus:outline-none focus:border-emerald-500"
-              />
-            </div>
-
-            <div className="sm:col-span-2 lg:col-span-4 flex justify-end pt-2">
-              <button
-                type="submit"
-                className="bg-emerald-600 hover:bg-emerald-500 text-white font-medium text-xs px-5 py-2.5 rounded-lg transition-colors shadow-md"
-              >
-                + Guardar Registro de Tareo
-              </button>
-            </div>
-          </form>
+          <div className="bg-slate-900 border border-slate-800 p-6 rounded-2xl shadow-lg">
+            <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Gastos Ejecutados</h3>
+            <p className="text-3xl font-bold text-rose-400 font-mono">{currSymbol} {totalExpense.toFixed(2)}</p>
+            <p className="text-[11px] text-slate-500">Saldo: {currSymbol} {budgetRemaining.toFixed(2)}</p>
+          </div>
         </div>
 
-        {/* Matriz y Tabla de Tareos Acumulados */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <div className="bg-slate-900 border border-slate-800 p-6 rounded-2xl shadow-lg flex flex-col justify-between">
+            <h4 className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Gastos Fijos (Obligatorios)</h4>
+            <p className="text-2xl font-bold text-amber-400 font-mono">{currSymbol} {fixedExpenses.toFixed(2)}</p>
+            <p className="text-[11px] text-slate-500 mt-1">Alquiler, mantenimiento, servicios básicos</p>
+          </div>
+
+          <div className="bg-slate-900 border border-slate-800 p-6 rounded-2xl shadow-lg flex flex-col justify-between">
+            <h4 className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Gastos Variables</h4>
+            <p className="text-2xl font-bold text-indigo-400 font-mono">{currSymbol} {variableExpenses.toFixed(2)}</p>
+            <p className="text-[11px] text-slate-500 mt-1">Salidas, entretenimientos y extras</p>
+          </div>
+
+          <div className="bg-slate-900 border border-slate-800 p-6 rounded-2xl shadow-lg flex flex-col justify-between">
+            <h4 className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Salud Financiera (Fondo)</h4>
+            <p className="text-2xl font-bold text-emerald-400 font-mono">{emergencyCoverageMonths} meses</p>
+            <p className="text-[11px] text-slate-500 mt-1">Cobertura de tus gastos fijos acumulados</p>
+          </div>
+        </div>
+
         <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-xl space-y-4">
-          <h2 className="text-lg font-semibold text-white">Matriz de Tareo & Saldos de Descanso</h2>
-          {shifts.length === 0 ? (
-            <p className="text-xs text-slate-500 text-center py-6">
-              No hay jornadas registradas. Completa el formulario superior para calcular y guardar los tareos.
-            </p>
+          <div className="flex justify-between items-center text-sm">
+            <span className="font-semibold text-slate-300">
+              Distribución de Gastos por Categoría ({selectedMonth})
+            </span>
+            <span className="font-mono text-slate-400">
+              {budgetPercentage}% consumido del presupuesto
+            </span>
+          </div>
+
+          {expensesByCategory.length === 0 ? (
+            <p className="text-xs text-slate-500 py-2">No hay gastos ejecutados en este mes.</p>
+          ) : (
+            <div className="space-y-3">
+              {expensesByCategory.map((item) => {
+                const categoryPct = Math.round((item.amount / (availableExpenseBudget || 1)) * 100);
+                return (
+                  <div key={item.category} className="space-y-1">
+                    <div className="flex justify-between text-xs">
+                      <span className="text-slate-300">{item.category}</span>
+                      <span className="font-mono text-slate-400">
+                        {currSymbol} {item.amount.toFixed(2)} ({categoryPct}%)
+                      </span>
+                    </div>
+                    <div className="w-full bg-slate-950 h-2 rounded-full overflow-hidden border border-slate-800">
+                      <div
+                        className="bg-emerald-500 h-full transition-all duration-500"
+                        style={{ width: `${Math.min(categoryPct, 100)}%` }}
+                      ></div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+
+        <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-xl">
+          <h2 className="text-sm font-semibold text-slate-300 uppercase tracking-wider mb-4">Acciones Rápidas ({selectedMonth})</h2>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <button
+              onClick={() => handleOpenModal('income')}
+              className="bg-emerald-600 hover:bg-emerald-500 text-white font-medium py-3 px-4 rounded-xl text-sm transition-all shadow-lg shadow-emerald-900/20 flex items-center justify-center space-x-2"
+            >
+              <span>+ Registrar Ingreso Variable</span>
+            </button>
+
+            <button
+              onClick={() => handleOpenModal('expense')}
+              className="bg-rose-600 hover:bg-rose-500 text-white font-medium py-3 px-4 rounded-xl text-sm transition-all shadow-lg shadow-rose-900/20 flex items-center justify-center space-x-2"
+            >
+              <span>- Registrar Gasto</span>
+            </button>
+
+            <button
+              onClick={() => handleOpenModal('goal')}
+              className="bg-blue-600 hover:bg-blue-500 text-white font-medium py-3 px-4 rounded-xl text-sm transition-all shadow-lg shadow-blue-900/20 flex items-center justify-center space-x-2"
+            >
+              <span>🎯 Crear Meta de Ahorro</span>
+            </button>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+          <div className="lg:col-span-1 bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-xl space-y-4">
+            <div className="flex justify-between items-center">
+              <h2 className="text-lg font-semibold text-white">Metas & Proyección</h2>
+              <button
+                onClick={() => handleOpenModal('goal')}
+                className="text-xs bg-blue-600 hover:bg-blue-500 text-white px-2.5 py-1 rounded-lg transition-colors font-medium"
+              >
+                + Nueva
+              </button>
+            </div>
+
+            <div className="space-y-4">
+              {goals.map((g) => {
+                const pct = Math.min(Math.round((g.currentAmount / (g.targetAmount || 1)) * 100), 100);
+                const remainingToGoal = Math.max(0, g.targetAmount - g.currentAmount);
+                const monthsToTarget = plannedSavings > 0 
+                  ? Math.ceil(remainingToGoal / plannedSavings)
+                  : 0;
+
+                return (
+                  <div key={g.id} className="bg-slate-950 border border-slate-800 p-4 rounded-xl space-y-2">
+                    <div className="flex justify-between items-center">
+                      <h3 className="font-semibold text-white text-xs">{g.title}</h3>
+                      <span className="text-[10px] font-mono bg-slate-900 text-blue-400 px-2 py-0.5 rounded border border-slate-800">
+                        {pct}%
+                      </span>
+                    </div>
+
+                    <div className="flex justify-between text-[11px] text-slate-400 font-mono">
+                      <span>{currSymbol} {g.currentAmount.toFixed(2)}</span>
+                      <span>{currSymbol} {g.targetAmount.toFixed(2)}</span>
+                    </div>
+
+                    <div className="w-full bg-slate-900 h-2 rounded-full overflow-hidden border border-slate-800">
+                      <div
+                        className="bg-blue-500 h-full transition-all duration-500"
+                        style={{ width: `${pct}%` }}
+                      ></div>
+                    </div>
+
+                    <p className="text-[10px] text-slate-500 font-mono pt-1">
+                      {monthsToTarget > 0 
+                        ? `⏱ Tiempo est. para completar: ~${monthsToTarget} mes(es)`
+                        : '🎉 Meta alcanzada o lista'}
+                    </p>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
+          <div className="lg:col-span-2 bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-xl space-y-4">
+            <h2 className="text-lg font-semibold text-white">Comparativa y Tendencia Mes a Mes</h2>
+            {monthlyHistory.length === 0 ? (
+              <p className="text-sm text-slate-500 py-6 text-center">Registra ingresos y gastos para generar la tendencia histórica.</p>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-sm text-slate-300">
+                  <thead className="bg-slate-950 text-slate-400 uppercase text-xs">
+                    <tr>
+                      <th className="px-4 py-3 rounded-l-lg">Mes</th>
+                      <th className="px-4 py-3 text-right">Ingresos</th>
+                      <th className="px-4 py-3 text-right">Gastos</th>
+                      <th className="px-4 py-3 text-right rounded-r-lg">Ahorro Reservado</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-800 font-mono">
+                    {monthlyHistory.map((h) => (
+                      <tr key={h.month} className="hover:bg-slate-800/50">
+                        <td className="px-4 py-3 text-xs text-white font-medium">{h.month}</td>
+                        <td className="px-4 py-3 text-right text-emerald-400">{currSymbol} {h.income.toFixed(2)}</td>
+                        <td className="px-4 py-3 text-right text-rose-400">{currSymbol} {h.expense.toFixed(2)}</td>
+                        <td className="px-4 py-3 text-right text-purple-400">{currSymbol} {h.savings.toFixed(2)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        </div>
+
+        <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-xl space-y-4">
+          <h2 className="text-lg font-semibold text-white">Transacciones ({selectedMonth})</h2>
+          {monthTransactions.length === 0 ? (
+            <p className="text-sm text-slate-500 py-6 text-center">No hay registros para este mes. Registra tus ingresos o gastos arriba.</p>
           ) : (
             <div className="overflow-x-auto">
-              <table className="w-full text-left text-xs text-slate-300">
-                <thead className="bg-slate-950 text-slate-400 uppercase">
+              <table className="w-full text-left text-sm text-slate-300">
+                <thead className="bg-slate-950 text-slate-400 uppercase text-xs">
                   <tr>
-                    <th className="px-4 py-3 rounded-l-lg">DNI / CE</th>
-                    <th className="px-4 py-3">Colaborador</th>
-                    <th className="px-4 py-3">Cargo</th>
-                    <th className="px-4 py-3">Modalidad</th>
-                    <th className="px-4 py-3 text-center">Laborados</th>
-                    <th className="px-4 py-3 text-center">Descanso Generado</th>
-                    <th className="px-4 py-3">Régimen Aplicado</th>
-                    <th className="px-4 py-3 text-center">Retorno Estimado</th>
-                    <th className="px-4 py-3 text-right">Vacaciones</th>
-                    <th className="px-4 py-3 text-center rounded-r-lg">Acción</th>
+                    <th className="px-4 py-3 rounded-l-lg">Fecha</th>
+                    <th className="px-4 py-3">Tipo / Naturaleza</th>
+                    <th className="px-4 py-3">Descripción</th>
+                    <th className="px-4 py-3">Categoría</th>
+                    <th className="px-4 py-3 text-right">Monto</th>
+                    <th className="px-4 py-3 text-center rounded-r-lg">Acciones</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-800">
-                  {shifts.map((s) => {
-                    const rest = calculateRestDays(s.daysWorked, s.workType);
-                    const vacations = calculateVacationDays(s.yearsOfService);
-                    const returnDate = calculateReturnDate(s.startDate, s.daysWorked, rest);
-
-                    return (
-                      <tr key={s.id} className="hover:bg-slate-800/50 font-mono">
-                        <td className="px-4 py-3 text-amber-300 font-bold">{s.documentId}</td>
-                        <td className="px-4 py-3 font-medium text-white font-sans">{s.workerName}</td>
-                        <td className="px-4 py-3 font-sans text-slate-400">{s.position}</td>
-                        <td className="px-4 py-3 font-sans">
-                          <span className={`px-2 py-0.5 rounded text-[10px] border ${
-                            s.workType === 'campo'
-                              ? 'bg-amber-950/60 border-amber-800 text-amber-300'
-                              : 'bg-blue-950/60 border-blue-800 text-blue-300'
-                          }`}>
-                            {s.workType === 'campo' ? 'Campo' : 'Oficina'}
-                          </span>
-                        </td>
-                        <td className="px-4 py-3 text-center font-bold text-white">{s.daysWorked} días</td>
-                        <td className="px-4 py-3 text-center font-bold text-emerald-400">{rest.toFixed(1)} días</td>
-                        <td className="px-4 py-3 font-sans text-xs text-slate-400">
-                          {s.workType === 'oficina'
-                            ? 'Oficina (5x2)'
-                            : s.daysWorked >= 14
-                            ? 'Atípico 2x1 (14d = 7d descanso)'
-                            : 'Campo Corto (5x2)'}
-                        </td>
-                        <td className="px-4 py-3 text-center text-purple-300">{returnDate}</td>
-                        <td className="px-4 py-3 text-right font-bold text-blue-400">
-                          {vacations} días ({s.yearsOfService} año{s.yearsOfService !== 1 ? 's' : ''})
-                        </td>
-                        <td className="px-4 py-3 text-center">
-                          <button
-                            onClick={() => handleDeleteShift(s.id)}
-                            className="bg-rose-950/80 hover:bg-rose-900 border border-rose-800 text-rose-300 px-2 py-1 rounded text-[10px]"
-                          >
-                            🗑️
-                          </button>
-                        </td>
-                      </tr>
-                    );
-                  })}
+                  {monthTransactions.map((t) => (
+                    <tr key={t.id} className="hover:bg-slate-800/50">
+                      <td className="px-4 py-3 text-xs text-slate-400">{t.date}</td>
+                      <td className="px-4 py-3 text-xs">
+                        <span className={`px-2 py-0.5 rounded text-[10px] border ${
+                          t.type === 'income' 
+                            ? 'bg-emerald-950/60 border-emerald-800 text-emerald-300' 
+                            : t.nature === 'fixed'
+                            ? 'bg-amber-950/60 border-amber-800 text-amber-300'
+                            : 'bg-slate-800 border-slate-700 text-slate-300'
+                        }`}>
+                          {t.type === 'income' ? 'Ingreso' : t.nature === 'fixed' ? 'Gasto Fijo' : 'Gasto Variable'}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3 font-medium text-white">{t.description}</td>
+                      <td className="px-4 py-3 text-xs text-slate-400">{t.category}</td>
+                      <td className={`px-4 py-3 text-right font-mono font-bold ${t.type === 'income' ? 'text-emerald-400' : 'text-rose-400'}`}>
+                        {t.type === 'income' ? '+' : '-'} {currSymbol} {t.amount.toFixed(2)}
+                      </td>
+                      <td className="px-4 py-3 text-center space-x-2">
+                        <button
+                          onClick={() => handleEditTransaction(t)}
+                          title="Editar Registro"
+                          className="text-xs bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-300 px-2 py-1 rounded transition-colors"
+                        >
+                          ✏️
+                        </button>
+                        <button
+                          onClick={() => handleDeleteTransaction(t.id)}
+                          title="Eliminar Registro"
+                          className="text-xs bg-rose-950/80 hover:bg-rose-900 border border-rose-800 text-rose-300 px-2 py-1 rounded transition-colors"
+                        >
+                          🗑️
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
                 </tbody>
               </table>
             </div>
           )}
         </div>
       </section>
+
+      {showModal && (
+        <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+          <div className="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-md p-6 shadow-2xl space-y-4">
+            <h3 className="text-lg font-bold text-white capitalize">
+              {modalType === 'goal'
+                ? 'Crear Meta de Ahorro'
+                : editingTxId
+                ? `Editar ${modalType === 'income' ? 'Ingreso' : 'Gasto'}`
+                : `Registrar ${modalType === 'income' ? 'Ingreso Variable' : 'Gasto'}`}
+            </h3>
+
+            {budgetError && (
+              <div className="p-3 bg-rose-950/80 border border-rose-800 text-rose-300 rounded-lg text-xs font-medium">
+                {budgetError}
+              </div>
+            )}
+
+            <form onSubmit={handleSave} className="space-y-4">
+              {modalType === 'goal' ? (
+                <>
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-300 uppercase mb-1">Nombre de la Meta</label>
+                    <input
+                      type="text"
+                      placeholder="Ej. Fondo de Emergencia, Vacaciones"
+                      value={goalTitle}
+                      onChange={(e) => setGoalTitle(e.target.value)}
+                      required
+                      className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-blue-500 text-sm"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-300 uppercase mb-1">Monto Objetivo ({currSymbol})</label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      placeholder="10000.00"
+                      value={goalTarget}
+                      onChange={(e) => setGoalTarget(e.target.value)}
+                      required
+                      className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-blue-500 font-mono text-sm"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-300 uppercase mb-1">Ahorro Inicial ({currSymbol})</label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      placeholder="0.00"
+                      value={goalCurrent}
+                      onChange={(e) => setGoalCurrent(e.target.value)}
+                      className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-blue-500 font-mono text-sm"
+                    />
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-300 uppercase mb-1">Descripción</label>
+                    <input
+                      type="text"
+                      placeholder="Ej. Alquiler, Consultoría, Supermercado"
+                      value={description}
+                      onChange={(e) => setDescription(e.target.value)}
+                      required
+                      className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-emerald-500 text-sm"
+                    />
+                  </div>
+
+                  {modalType === 'expense' && (
+                    <div>
+                      <label className="block text-xs font-semibold text-slate-300 uppercase mb-1">Naturaleza del Gasto</label>
+                      <select
+                        value={expenseNature}
+                        onChange={(e) => setExpenseNature(e.target.value as 'fixed' | 'variable')}
+                        className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-emerald-500 text-sm"
+                      >
+                        <option value="variable">Variable (Discrecional / Opcional)</option>
+                        <option value="fixed">Fijo (Obligatorio / Inflexible)</option>
+                      </select>
+                    </div>
+                  )}
+
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-300 uppercase mb-1">Monto ({currSymbol})</label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      placeholder="0.00"
+                      value={amount}
+                      onChange={(e) => setAmount(e.target.value)}
+                      required
+                      className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-emerald-500 font-mono text-sm"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-300 uppercase mb-1">Categoría</label>
+                    <select
+                      value={category}
+                      onChange={(e) => setCategory(e.target.value)}
+                      className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-emerald-500 text-sm"
+                    >
+                      {(modalType === 'income' ? INCOME_CATEGORIES : EXPENSE_CATEGORIES).map((cat) => (
+                        <option key={cat} value={cat}>
+                          {cat}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </>
+              )}
+
+              <div className="flex justify-end space-x-3 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setShowModal(false)}
+                  className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg text-sm transition-colors"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-sm font-medium transition-colors"
+                >
+                  {editingTxId ? 'Actualizar' : 'Guardar'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </main>
   );
 }
