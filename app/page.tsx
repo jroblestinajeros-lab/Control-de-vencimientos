@@ -124,15 +124,15 @@ export default function HomePage() {
       setCurrency(savedCurrency);
     }
 
-    if (savedTx) {
-      try {
-        setTransactions(JSON.parse(savedTx));
-      } catch (e) {
-        setTransactions([]);
-      }
-    } else {
-      // SOLO EL USUARIO PRINCIPAL CARGA DATOS DE PRUEBA. NUEVOS USUARIOS ARRANCAN EN 0.
-      if (currentEmail === 'jroblestinajeros@gmail.com') {
+    // SI NO ES EL USUARIO PRINCIPAL, FORZAMOS QUE ARRANQUE VACÍO (IGNORANDO CUALQUIER CACHÉ ANTERIOR)
+    if (currentEmail === 'jroblestinajeros@gmail.com') {
+      if (savedTx) {
+        try {
+          setTransactions(JSON.parse(savedTx));
+        } catch (e) {
+          setTransactions([]);
+        }
+      } else {
         const defaultTransactions: Transaction[] = [
           {
             id: '1731100001',
@@ -196,33 +196,34 @@ export default function HomePage() {
         ];
         setTransactions(defaultTransactions);
         localStorage.setItem(txKey, JSON.stringify(defaultTransactions));
-      } else {
-        setTransactions([]);
-        localStorage.setItem(txKey, JSON.stringify([]));
-      }
-    }
-
-    if (savedGoals) {
-      try {
-        const parsedGoals = JSON.parse(savedGoals);
-        if (Array.isArray(parsedGoals)) {
-          setGoals(parsedGoals);
-        }
-      } catch (err) {
-        setGoals([]);
       }
     } else {
-      if (currentEmail === 'jroblestinajeros@gmail.com') {
+      // Usuario nuevo o secundario: SIEMPRE limpio en 0
+      setTransactions([]);
+      localStorage.setItem(txKey, JSON.stringify([]));
+    }
+
+    if (currentEmail === 'jroblestinajeros@gmail.com') {
+      if (savedGoals) {
+        try {
+          const parsedGoals = JSON.parse(savedGoals);
+          if (Array.isArray(parsedGoals)) {
+            setGoals(parsedGoals);
+          }
+        } catch (err) {
+          setGoals([]);
+        }
+      } else {
         const defaultGoals: SavingsGoal[] = [
           { id: '1', title: 'Fondo de Emergencia Operativa', targetAmount: 10000, currentAmount: 3500 },
           { id: '2', title: 'Renovación de Equipos / ROV', targetAmount: 5000, currentAmount: 1200 },
         ];
         setGoals(defaultGoals);
         localStorage.setItem(goalsKey, JSON.stringify(defaultGoals));
-      } else {
-        setGoals([]);
-        localStorage.setItem(goalsKey, JSON.stringify([]));
       }
+    } else {
+      setGoals([]);
+      localStorage.setItem(goalsKey, JSON.stringify([]));
     }
 
     setLoading(false);
@@ -271,7 +272,6 @@ export default function HomePage() {
   const fixedExpenseMonthlyAvg = fixedExpenses || (totalExpense * 0.5) || 1;
   const emergencyCoverageMonths = (totalSavedAllGoals / fixedExpenseMonthlyAvg).toFixed(1);
 
-  // Cálculo de acumulados para la matriz superior
   let runningCumulative = 0;
   const rawExpenses = EXPENSE_CATEGORIES.map((cat) => {
     const total = monthTransactions
