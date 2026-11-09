@@ -13,7 +13,7 @@ interface WorkShift {
   dailyStatus: 'campo' | 'oficina' | 'libre' | 'tardanza' | 'falta' | 'descanso_medico' | 'vacaciones_tomadas' | 'descanso_tomado';
   startDate: string;
   daysWorked: number;
-  daysTaken: number; // Días específicos descontados según el concepto (vacaciones o descanso)
+  daysTaken: number;
 }
 
 interface WorkerProfile {
@@ -26,6 +26,7 @@ interface WorkerProfile {
 export default function TareoPage() {
   const router = useRouter();
   const [loading, setLoading] = useState(true);
+  const [activeTab, setActiveTab] = useState<'tareo' | 'maestro'>('tareo');
 
   // Estado del Formulario de Tareo
   const [documentId, setDocumentId] = useState('');
@@ -41,8 +42,7 @@ export default function TareoPage() {
   const [workers, setWorkers] = useState<WorkerProfile[]>([]);
   const [shifts, setShifts] = useState<WorkShift[]>([]);
 
-  // Modal para Registrar Nuevo Trabajador
-  const [showNewWorkerModal, setShowNewWorkerModal] = useState(false);
+  // Formulario para Nuevo / Editar Trabajador en el Maestro
   const [newDni, setNewDni] = useState('');
   const [newName, setNewName] = useState('');
   const [newPosition, setNewPosition] = useState('');
@@ -77,7 +77,7 @@ export default function TareoPage() {
     }
   };
 
-  const handleRegisterWorker = (e: React.FormEvent) => {
+  const handleSaveWorker = (e: React.FormEvent) => {
     e.preventDefault();
     if (!newDni.trim() || !newName.trim()) return;
 
@@ -91,13 +91,18 @@ export default function TareoPage() {
 
     setWorkers(updatedWorkers);
     localStorage.setItem('va_workers_db', JSON.stringify(updatedWorkers));
-    setShowNewWorkerModal(false);
     
-    setDocumentId(newDni.trim());
-    setWorkerName(newName);
-    setPosition(newPosition);
     setNewDni('');
     setNewName('');
+    setNewPosition('');
+    alert('¡Trabajador guardado exitosamente en el Maestro de Personal!');
+  };
+
+  const handleDeleteWorker = (dni: string) => {
+    if (!confirm('¿Deseas eliminar a este trabajador del maestro?')) return;
+    const updated = workers.filter(w => w.documentId !== dni);
+    setWorkers(updated);
+    localStorage.setItem('va_workers_db', JSON.stringify(updated));
   };
 
   function calculateRestDays(days: number, status: string) {
@@ -134,7 +139,7 @@ export default function TareoPage() {
     const activeWorker = workers.find((w) => w.documentId === trimmedDni);
 
     if (!activeWorker) {
-      alert('El DNI ingresado no se encuentra en el Maestro de Personal. Regístrese haciendo clic en "+ Registrar Nuevo Trabajador".');
+      alert('El DNI ingresado no se encuentra en el Maestro de Personal. Regístrelo primero en la pestaña "Maestro de Personal".');
       return;
     }
 
@@ -168,12 +173,10 @@ export default function TareoPage() {
   const currentWorkerProfile = workers.find((w) => w.documentId === activeDni);
   const filteredShifts = activeDni ? shifts.filter((s) => s.documentId === activeDni) : [];
 
-  // 1. Cálculos independientes para Descansos
   const totalRestGenerated = filteredShifts.reduce((acc, s) => acc + calculateRestDays(s.daysWorked, s.dailyStatus), 0);
   const totalRestTaken = filteredShifts.filter(s => s.dailyStatus === 'descanso_tomado').reduce((acc, s) => acc + s.daysTaken, 0);
   const netRestAvailable = Math.max(0, totalRestGenerated - totalRestTaken);
 
-  // 2. Cálculos independientes para Vacaciones
   const rawVacationGenerated = currentWorkerProfile ? calculateVacationDays(currentWorkerProfile.hireDate) : 0;
   const totalVacationTaken = filteredShifts.filter(s => s.dailyStatus === 'vacaciones_tomadas').reduce((acc, s) => acc + s.daysTaken, 0);
   const netVacationAvailable = Math.max(0, rawVacationGenerated - totalVacationTaken);
@@ -181,7 +184,6 @@ export default function TareoPage() {
   const exportToExcel = () => {
     const wb = XLSX.utils.book_new();
 
-    // Hoja 1: Maestro de Personal
     const wsWorkers = XLSX.utils.json_to_sheet(workers.map(w => ({
       'DNI / CE': w.documentId,
       'Colaborador': w.workerName,
@@ -191,7 +193,6 @@ export default function TareoPage() {
     })));
     XLSX.utils.book_append_sheet(wb, wsWorkers, 'Maestro_Personal');
 
-    // Hoja 2: Detalle de Tareo
     const dataToExport = shifts.map((s) => {
       const worker = workers.find(w => w.documentId === s.documentId);
       const hire = worker ? worker.hireDate : '2025-01-02';
@@ -218,7 +219,6 @@ export default function TareoPage() {
     const wsDetail = XLSX.utils.json_to_sheet(dataToExport);
     XLSX.utils.book_append_sheet(wb, wsDetail, 'Detalle_Tareo');
 
-    // Hoja 3: Cuadro Resumen Consolidado con Saldos 100% Separados
     const summaryMap: Record<string, { dni: string; name: string; position: string; totalCampo: number; restGen: number; restTaken: number; vacGen: number; vacTaken: number; project: string }> = {};
     
     shifts.forEach((s) => {
@@ -276,255 +276,273 @@ export default function TareoPage() {
         <div>
           <h1 className="text-2xl font-bold text-white">Módulo Operativo de Tareo & Descansos</h1>
           <p className="text-xs text-slate-400">
-            V&A Consulting S.A.C. — Maestro de Personal, Asistencia, Vacaciones MYPE & Control de Saldos Separados
+            V&A Consulting S.A.C. — Control de Asistencia, Maestro de Personal & Vacaciones MYPE
           </p>
         </div>
 
         <div className="flex items-center gap-3">
-          <button
-            onClick={() => setShowNewWorkerModal(true)}
-            className="bg-blue-600 hover:bg-blue-500 text-white font-medium text-xs px-4 py-2 rounded-lg transition-colors shadow-lg"
-          >
-            + Registrar Nuevo Trabajador
-          </button>
+          {/* Pestañas de Navegación del Módulo */}
+          <div className="bg-slate-900 p-1 rounded-xl border border-slate-800 flex gap-1">
+            <button
+              onClick={() => setActiveTab('tareo')}
+              className={`px-4 py-2 rounded-lg text-xs font-medium transition-colors ${
+                activeTab === 'tareo' ? 'bg-emerald-600 text-white' : 'text-slate-400 hover:text-white'
+              }`}
+            >
+              📋 Registro de Tareo
+            </button>
+            <button
+              onClick={() => setActiveTab('maestro')}
+              className={`px-4 py-2 rounded-lg text-xs font-medium transition-colors ${
+                activeTab === 'maestro' ? 'bg-blue-600 text-white' : 'text-slate-400 hover:text-white'
+              }`}
+            >
+              👥 Maestro de Personal
+            </button>
+          </div>
 
           {shifts.length > 0 && (
             <button
               onClick={exportToExcel}
               className="bg-emerald-700 hover:bg-emerald-600 text-white font-medium text-xs px-4 py-2 rounded-lg transition-colors shadow-lg"
             >
-              📊 Exportar Excel Completo
+              📊 Exportar Excel
             </button>
           )}
         </div>
       </header>
 
-      <section className="max-w-7xl mx-auto space-y-6">
-        <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-xl space-y-4">
-          <h2 className="text-sm font-semibold text-slate-300 uppercase tracking-wider">
-            Registro de Asistencia, Vacaciones & Descuentos por Goce Separado
-          </h2>
+      {activeTab === 'tareo' ? (
+        <section className="max-w-7xl mx-auto space-y-6">
+          <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-xl space-y-4">
+            <h2 className="text-sm font-semibold text-slate-300 uppercase tracking-wider">
+              Registro de Asistencia, Vacaciones & Descuentos por Goce
+            </h2>
 
-          <form onSubmit={handleAddShift} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-            <div>
-              <label className="block text-xs font-semibold text-slate-400 uppercase mb-1">DNI / CE (Autocompleta)</label>
-              <input
-                type="text"
-                placeholder="Ej. 45420921"
-                value={documentId}
-                onChange={(e) => handleDocumentIdChange(e.target.value)}
-                required
-                className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-xs text-amber-300 font-mono font-bold focus:outline-none focus:border-emerald-500"
-              />
-            </div>
-
-            <div>
-              <label className="block text-xs font-semibold text-slate-400 uppercase mb-1">Nombre Completo</label>
-              <input
-                type="text"
-                placeholder="Se completa automáticamente"
-                value={workerName}
-                readOnly
-                className="w-full bg-slate-950/60 border border-slate-800 rounded-lg px-3 py-2 text-xs text-slate-300 cursor-not-allowed"
-              />
-            </div>
-
-            <div>
-              <label className="block text-xs font-semibold text-slate-400 uppercase mb-1">Cargo / Especialidad</label>
-              <input
-                type="text"
-                placeholder="Se completa automáticamente"
-                value={position}
-                readOnly
-                className="w-full bg-slate-950/60 border border-slate-800 rounded-lg px-3 py-2 text-xs text-slate-300 cursor-not-allowed"
-              />
-            </div>
-
-            <div>
-              <label className="block text-xs font-semibold text-slate-400 uppercase mb-1">Código de Proyecto</label>
-              <input
-                type="text"
-                placeholder="Ej. PRJ-2026-001"
-                value={projectCode}
-                onChange={(e) => setProjectCode(e.target.value)}
-                required
-                className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-xs text-white font-mono focus:outline-none focus:border-emerald-500"
-              />
-            </div>
-
-            <div>
-              <label className="block text-xs font-semibold text-slate-400 uppercase mb-1">Estado de Asistencia</label>
-              <select
-                value={dailyStatus}
-                onChange={(e) => setDailyStatus(e.target.value as any)}
-                className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-xs text-white font-medium focus:outline-none focus:border-emerald-500"
-              >
-                <option value="campo">🟢 Campo (Comisión / Planta / Mina)</option>
-                <option value="oficina">🔵 Oficina (Sede Administrativa)</option>
-                <option value="libre">⚪ Día Libre / Descanso</option>
-                <option value="tardanza">🟡 Tardanza</option>
-                <option value="falta">🔴 Falta</option>
-                <option value="descanso_medico">🟣 Descanso Médico</option>
-                <option value="vacaciones_tomadas">🏖️ Vacaciones Tomadas (Resta de Vacaciones)</option>
-                <option value="descanso_tomado">🌴 Descanso Tomado (Resta de Descansos)</option>
-              </select>
-            </div>
-
-            <div>
-              <label className="block text-xs font-semibold text-slate-400 uppercase mb-1">Fecha</label>
-              <input
-                type="date"
-                value={startDate}
-                onChange={(e) => setStartDate(e.target.value)}
-                required
-                className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-xs text-white font-mono focus:outline-none focus:border-emerald-500"
-              />
-            </div>
-
-            <div>
-              <label className="block text-xs font-semibold text-slate-400 uppercase mb-1">
-                {['vacaciones_tomadas', 'descanso_tomado'].includes(dailyStatus) ? 'Días Tomados (a descontar)' : 'Días Continuos Laborados'}
-              </label>
-              <input
-                type="number"
-                min="0"
-                value={['vacaciones_tomadas', 'descanso_tomado'].includes(dailyStatus) ? daysTaken : daysWorked}
-                onChange={(e) => {
-                  if (['vacaciones_tomadas', 'descanso_tomado'].includes(dailyStatus)) {
-                    setDaysTaken(e.target.value);
-                  } else {
-                    setDaysWorked(e.target.value);
-                  }
-                }}
-                disabled={['libre', 'falta', 'descanso_medico'].includes(dailyStatus)}
-                className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-white font-mono text-xs focus:outline-none focus:border-emerald-500 disabled:opacity-50"
-              />
-            </div>
-
-            <div className="flex items-end">
-              <button
-                type="submit"
-                className="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-medium text-xs px-5 py-2.5 rounded-lg transition-colors shadow-md"
-              >
-                + Registrar Registro
-              </button>
-            </div>
-          </form>
-        </div>
-
-        {/* Panel de Resumen con Saldos 100% Separados */}
-        {activeDni && currentWorkerProfile && (
-          <div className="bg-slate-900 border border-emerald-800/60 rounded-2xl p-6 shadow-xl grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div className="bg-slate-950 p-5 rounded-xl border border-slate-800 space-y-2">
-              <h3 className="text-xs font-semibold text-emerald-400 uppercase tracking-wider">Bolsa de Descansos (Campo / Oficina)</h3>
-              <div className="flex justify-between text-xs text-slate-400 font-mono pt-1">
-                <span>Generados: {totalRestGenerated.toFixed(1)} días</span>
-                <span>Tomados: {totalRestTaken} días</span>
+            <form onSubmit={handleAddShift} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+              <div>
+                <label className="block text-xs font-semibold text-slate-400 uppercase mb-1">DNI / CE (Autocompleta)</label>
+                <input
+                  type="text"
+                  placeholder="Ej. 45420921"
+                  value={documentId}
+                  onChange={(e) => handleDocumentIdChange(e.target.value)}
+                  required
+                  className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-xs text-amber-300 font-mono font-bold focus:outline-none focus:border-emerald-500"
+                />
               </div>
-              <p className="text-3xl font-bold text-emerald-400 font-mono">{netRestAvailable.toFixed(1)} días</p>
-              <p className="text-[10px] text-slate-500">Saldo neto disponible de descansos compensatorios</p>
-            </div>
 
-            <div className="bg-slate-950 p-5 rounded-xl border border-slate-800 space-y-2">
-              <h3 className="text-xs font-semibold text-blue-400 uppercase tracking-wider">Bolsa de Vacaciones (Ley MYPE)</h3>
-              <div className="flex justify-between text-xs text-slate-400 font-mono pt-1">
-                <span>Generadas: {rawVacationGenerated} días</span>
-                <span>Tomadas: {totalVacationTaken} días</span>
+              <div>
+                <label className="block text-xs font-semibold text-slate-400 uppercase mb-1">Nombre Completo</label>
+                <input
+                  type="text"
+                  placeholder="Se completa automáticamente"
+                  value={workerName}
+                  readOnly
+                  className="w-full bg-slate-950/60 border border-slate-800 rounded-lg px-3 py-2 text-xs text-slate-300 cursor-not-allowed"
+                />
               </div>
-              <p className="text-3xl font-bold text-blue-400 font-mono">{netVacationAvailable} días</p>
-              <p className="text-[10px] text-slate-500">Saldo neto disponible de vacaciones anuales</p>
-            </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-400 uppercase mb-1">Cargo / Especialidad</label>
+                <input
+                  type="text"
+                  placeholder="Se completa automáticamente"
+                  value={position}
+                  readOnly
+                  className="w-full bg-slate-950/60 border border-slate-800 rounded-lg px-3 py-2 text-xs text-slate-300 cursor-not-allowed"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-400 uppercase mb-1">Código de Proyecto</label>
+                <input
+                  type="text"
+                  placeholder="Ej. PRJ-2026-001"
+                  value={projectCode}
+                  onChange={(e) => setProjectCode(e.target.value)}
+                  required
+                  className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-xs text-white font-mono focus:outline-none focus:border-emerald-500"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-400 uppercase mb-1">Estado de Asistencia</label>
+                <select
+                  value={dailyStatus}
+                  onChange={(e) => setDailyStatus(e.target.value as any)}
+                  className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-xs text-white font-medium focus:outline-none focus:border-emerald-500"
+                >
+                  <option value="campo">🟢 Campo (Comisión / Planta / Mina)</option>
+                  <option value="oficina">🔵 Oficina (Sede Administrativa)</option>
+                  <option value="libre">⚪ Día Libre / Descanso</option>
+                  <option value="tardanza">🟡 Tardanza</option>
+                  <option value="falta">🔴 Falta</option>
+                  <option value="descanso_medico">🟣 Descanso Médico</option>
+                  <option value="vacaciones_tomadas">🏖️ Vacaciones Tomadas (Resta de Vacaciones)</option>
+                  <option value="descanso_tomado">🌴 Descanso Tomado (Resta de Descansos)</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-400 uppercase mb-1">Fecha</label>
+                <input
+                  type="date"
+                  value={startDate}
+                  onChange={(e) => setStartDate(e.target.value)}
+                  required
+                  className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-xs text-white font-mono focus:outline-none focus:border-emerald-500"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-400 uppercase mb-1">
+                  {['vacaciones_tomadas', 'descanso_tomado'].includes(dailyStatus) ? 'Días Tomados (a descontar)' : 'Días Continuos Laborados'}
+                </label>
+                <input
+                  type="number"
+                  min="0"
+                  value={['vacaciones_tomadas', 'descanso_tomado'].includes(dailyStatus) ? daysTaken : daysWorked}
+                  onChange={(e) => {
+                    if (['vacaciones_tomadas', 'descanso_tomado'].includes(dailyStatus)) {
+                      setDaysTaken(e.target.value);
+                    } else {
+                      setDaysWorked(e.target.value);
+                    }
+                  }}
+                  disabled={['libre', 'falta', 'descanso_medico'].includes(dailyStatus)}
+                  className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-white font-mono text-xs focus:outline-none focus:border-emerald-500 disabled:opacity-50"
+                />
+              </div>
+
+              <div className="flex items-end">
+                <button
+                  type="submit"
+                  className="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-medium text-xs px-5 py-2.5 rounded-lg transition-colors shadow-md"
+                >
+                  + Registrar Asistencia
+                </button>
+              </div>
+            </form>
           </div>
-        )}
 
-        <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-xl space-y-4">
-          <h2 className="text-lg font-semibold text-white">
-            Matriz de Tareo del Colaborador {activeDni ? `(DNI: ${activeDni})` : '— (Ingrese un DNI arriba para filtrar)'}
-          </h2>
-          {!activeDni ? (
-            <p className="text-xs text-amber-400/80 text-center py-6 bg-slate-950 rounded-xl border border-slate-800">
-              ⚠️ Ingrese un DNI / CE en la parte superior para visualizar únicamente sus registros.
-            </p>
-          ) : filteredShifts.length === 0 ? (
-            <p className="text-xs text-slate-500 text-center py-6">
-              No se encontraron registros para el DNI {activeDni}.
-            </p>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-left text-xs text-slate-300">
-                <thead className="bg-slate-950 text-slate-400 uppercase">
-                  <tr>
-                    <th className="px-4 py-3 rounded-l-lg">DNI / CE</th>
-                    <th className="px-4 py-3">Colaborador</th>
-                    <th className="px-4 py-3">Cargo</th>
-                    <th className="px-4 py-3">Proyecto</th>
-                    <th className="px-4 py-3">Estado</th>
-                    <th className="px-4 py-3 text-center">Laborados / Tomados</th>
-                    <th className="px-4 py-3 text-center">Descanso Generado</th>
-                    <th className="px-4 py-3 text-right">Vacaciones Acum.</th>
-                    <th className="px-4 py-3 text-center rounded-r-lg">Acción</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-800">
-                  {filteredShifts.map((s) => {
-                    const worker = workers.find(w => w.documentId === s.documentId);
-                    const hire = worker ? worker.hireDate : '2025-01-02';
-                    const restGen = calculateRestDays(s.daysWorked, s.dailyStatus);
-                    const vacGen = calculateVacationDays(hire);
+          {/* Panel de Resumen con Saldos Separados */}
+          {activeDni && currentWorkerProfile && (
+            <div className="bg-slate-900 border border-emerald-800/60 rounded-2xl p-6 shadow-xl grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="bg-slate-950 p-5 rounded-xl border border-slate-800 space-y-2">
+                <h3 className="text-xs font-semibold text-emerald-400 uppercase tracking-wider">Bolsa de Descansos (Campo / Oficina)</h3>
+                <div className="flex justify-between text-xs text-slate-400 font-mono pt-1">
+                  <span>Generados: {totalRestGenerated.toFixed(1)} días</span>
+                  <span>Tomados: {totalRestTaken} días</span>
+                </div>
+                <p className="text-3xl font-bold text-emerald-400 font-mono">{netRestAvailable.toFixed(1)} días</p>
+                <p className="text-[10px] text-slate-500">Saldo neto disponible de descansos compensatorios</p>
+              </div>
 
-                    return (
-                      <tr key={s.id} className="hover:bg-slate-800/50 font-mono">
-                        <td className="px-4 py-3 text-amber-300 font-bold">{s.documentId}</td>
-                        <td className="px-4 py-3 font-medium text-white font-sans">{s.workerName}</td>
-                        <td className="px-4 py-3 font-sans text-slate-400">{s.position}</td>
-                        <td className="px-4 py-3 font-sans font-bold text-blue-300">{s.projectCode}</td>
-                        <td className="px-4 py-3 font-sans">
-                          <span className={`px-2 py-0.5 rounded text-[10px] border ${
-                            s.dailyStatus === 'campo'
-                              ? 'bg-amber-950/60 border-amber-800 text-amber-300'
-                              : s.dailyStatus === 'oficina'
-                              ? 'bg-blue-950/60 border-blue-800 text-blue-300'
-                              : s.dailyStatus === 'vacaciones_tomadas'
-                              ? 'bg-indigo-950/60 border-indigo-800 text-indigo-300'
-                              : s.dailyStatus === 'descanso_tomado'
-                              ? 'bg-teal-950/60 border-teal-800 text-teal-300'
-                              : 'bg-slate-800 border-slate-700 text-slate-300'
-                          }`}>
-                            {s.dailyStatus.replace('_', ' ').toUpperCase()}
-                          </span>
-                        </td>
-                        <td className="px-4 py-3 text-center font-bold text-white">
-                          {['vacaciones_tomadas', 'descanso_tomado'].includes(s.dailyStatus) ? `-${s.daysTaken} días (Tomado)` : `${s.daysWorked} días`}
-                        </td>
-                        <td className="px-4 py-3 text-center font-bold text-emerald-400">
-                          {restGen > 0 ? `+${restGen.toFixed(1)} días` : '-'}
-                        </td>
-                        <td className="px-4 py-3 text-right font-bold text-blue-400">{vacGen} días</td>
-                        <td className="px-4 py-3 text-center">
-                          <button
-                            onClick={() => handleDeleteShift(s.id)}
-                            className="bg-rose-950/80 hover:bg-rose-900 border border-rose-800 text-rose-300 px-2 py-1 rounded text-[10px]"
-                          >
-                            🗑️
-                          </button>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
+              <div className="bg-slate-950 p-5 rounded-xl border border-slate-800 space-y-2">
+                <h3 className="text-xs font-semibold text-blue-400 uppercase tracking-wider">Bolsa de Vacaciones (Ley MYPE)</h3>
+                <div className="flex justify-between text-xs text-slate-400 font-mono pt-1">
+                  <span>Generadas: {rawVacationGenerated} días</span>
+                  <span>Tomadas: {totalVacationTaken} días</span>
+                </div>
+                <p className="text-3xl font-bold text-blue-400 font-mono">{netVacationAvailable} días</p>
+                <p className="text-[10px] text-slate-500">Saldo neto disponible de vacaciones anuales</p>
+              </div>
             </div>
           )}
-        </div>
-      </section>
 
-      {/* Modal para Registrar Nuevo Trabajador */}
-      {showNewWorkerModal && (
-        <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-          <div className="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-md p-6 shadow-2xl space-y-4">
-            <h3 className="text-lg font-bold text-white">Registrar Nuevo Trabajador (Maestro)</h3>
+          <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-xl space-y-4">
+            <h2 className="text-lg font-semibold text-white">
+              Matriz de Tareo del Colaborador {activeDni ? `(DNI: ${activeDni})` : '— (Ingrese un DNI arriba para filtrar)'}
+            </h2>
+            {!activeDni ? (
+              <p className="text-xs text-amber-400/80 text-center py-6 bg-slate-950 rounded-xl border border-slate-800">
+                ⚠️ Ingrese un DNI / CE en la parte superior para visualizar únicamente sus registros.
+              </p>
+            ) : filteredShifts.length === 0 ? (
+              <p className="text-xs text-slate-500 text-center py-6">
+                No se encontraron registros para el DNI {activeDni}.
+              </p>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-xs text-slate-300">
+                  <thead className="bg-slate-950 text-slate-400 uppercase">
+                    <tr>
+                      <th className="px-4 py-3 rounded-l-lg">DNI / CE</th>
+                      <th className="px-4 py-3">Colaborador</th>
+                      <th className="px-4 py-3">Cargo</th>
+                      <th className="px-4 py-3">Proyecto</th>
+                      <th className="px-4 py-3">Estado</th>
+                      <th className="px-4 py-3 text-center">Laborados / Tomados</th>
+                      <th className="px-4 py-3 text-center">Descanso Generado</th>
+                      <th className="px-4 py-3 text-right">Vacaciones Acum.</th>
+                      <th className="px-4 py-3 text-center rounded-r-lg">Acción</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-800">
+                    {filteredShifts.map((s) => {
+                      const worker = workers.find(w => w.documentId === s.documentId);
+                      const hire = worker ? worker.hireDate : '2025-01-02';
+                      const restGen = calculateRestDays(s.daysWorked, s.dailyStatus);
+                      const vacGen = calculateVacationDays(hire);
 
-            <form onSubmit={handleRegisterWorker} className="space-y-4">
+                      return (
+                        <tr key={s.id} className="hover:bg-slate-800/50 font-mono">
+                          <td className="px-4 py-3 text-amber-300 font-bold">{s.documentId}</td>
+                          <td className="px-4 py-3 font-medium text-white font-sans">{s.workerName}</td>
+                          <td className="px-4 py-3 font-sans text-slate-400">{s.position}</td>
+                          <td className="px-4 py-3 font-sans font-bold text-blue-300">{s.projectCode}</td>
+                          <td className="px-4 py-3 font-sans">
+                            <span className={`px-2 py-0.5 rounded text-[10px] border ${
+                              s.dailyStatus === 'campo'
+                                ? 'bg-amber-950/60 border-amber-800 text-amber-300'
+                                : s.dailyStatus === 'oficina'
+                                ? 'bg-blue-950/60 border-blue-800 text-blue-300'
+                                : s.dailyStatus === 'vacaciones_tomadas'
+                                ? 'bg-indigo-950/60 border-indigo-800 text-indigo-300'
+                                : s.dailyStatus === 'descanso_tomado'
+                                ? 'bg-teal-950/60 border-teal-800 text-teal-300'
+                                : 'bg-slate-800 border-slate-700 text-slate-300'
+                            }`}>
+                              {s.dailyStatus.replace('_', ' ').toUpperCase()}
+                            </span>
+                          </td>
+                          <td className="px-4 py-3 text-center font-bold text-white">
+                            {['vacaciones_tomadas', 'descanso_tomado'].includes(s.dailyStatus) ? `-${s.daysTaken} días (Tomado)` : `${s.daysWorked} días`}
+                          </td>
+                          <td className="px-4 py-3 text-center font-bold text-emerald-400">
+                            {restGen > 0 ? `+${restGen.toFixed(1)} días` : '-'}
+                          </td>
+                          <td className="px-4 py-3 text-right font-bold text-blue-400">{vacGen} días</td>
+                          <td className="px-4 py-3 text-center">
+                            <button
+                              onClick={() => handleDeleteShift(s.id)}
+                              className="bg-rose-950/80 hover:bg-rose-900 border border-rose-800 text-rose-300 px-2 py-1 rounded text-[10px]"
+                            >
+                              🗑️
+                            </button>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        </section>
+      ) : (
+        /* Vista de Maestro de Personal */
+        <section className="max-w-7xl mx-auto space-y-6">
+          <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-xl space-y-6">
+            <div className="flex justify-between items-center">
+              <div>
+                <h2 className="text-lg font-bold text-white">Directorio del Maestro de Personal</h2>
+                <p className="text-xs text-slate-400">Agregue o edite los datos base y fechas de ingreso de los colaboradores para el cálculo MYPE.</p>
+              </div>
+            </div>
+
+            <form onSubmit={handleSaveWorker} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 bg-slate-950 p-4 rounded-xl border border-slate-800 items-end">
               <div>
                 <label className="block text-xs font-semibold text-slate-300 uppercase mb-1">DNI / CE</label>
                 <input
@@ -533,7 +551,7 @@ export default function TareoPage() {
                   value={newDni}
                   onChange={(e) => setNewDni(e.target.value)}
                   required
-                  className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-white font-mono text-sm"
+                  className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-xs text-white font-mono"
                 />
               </div>
 
@@ -545,7 +563,7 @@ export default function TareoPage() {
                   value={newName}
                   onChange={(e) => setNewName(e.target.value)}
                   required
-                  className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-white text-sm"
+                  className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-xs text-white"
                 />
               </div>
 
@@ -557,39 +575,69 @@ export default function TareoPage() {
                   value={newPosition}
                   onChange={(e) => setNewPosition(e.target.value)}
                   required
-                  className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-white text-sm"
+                  className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-xs text-white"
                 />
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-slate-300 uppercase mb-1">Fecha de Ingreso (Cálculo Vacaciones)</label>
+                <label className="block text-xs font-semibold text-slate-300 uppercase mb-1">Fecha de Ingreso</label>
                 <input
                   type="date"
                   value={newHireDate}
                   onChange={(e) => setNewHireDate(e.target.value)}
                   required
-                  className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-white font-mono text-sm"
+                  className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-xs text-white font-mono"
                 />
               </div>
 
-              <div className="flex justify-end space-x-3 pt-2">
-                <button
-                  type="button"
-                  onClick={() => setShowNewWorkerModal(false)}
-                  className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg text-sm"
-                >
-                  Cancelar
-                </button>
+              <div>
                 <button
                   type="submit"
-                  className="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-lg text-sm font-medium"
+                  className="w-full bg-blue-600 hover:bg-blue-500 text-white font-medium text-xs py-2 px-4 rounded-lg transition-colors shadow-md"
                 >
-                  Guardar Trabajador
+                  💾 Guardar Trabajador
                 </button>
               </div>
             </form>
+
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-xs text-slate-300">
+                <thead className="bg-slate-950 text-slate-400 uppercase">
+                  <tr>
+                    <th className="px-4 py-3 rounded-l-lg">DNI / CE</th>
+                    <th className="px-4 py-3">Colaborador</th>
+                    <th className="px-4 py-3">Cargo</th>
+                    <th className="px-4 py-3">Fecha de Ingreso</th>
+                    <th className="px-4 py-3 text-center">Vacaciones Acumuladas (MYPE)</th>
+                    <th className="px-4 py-3 text-center rounded-r-lg">Acción</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-800">
+                  {workers.map((w) => {
+                    const vacs = calculateVacationDays(w.hireDate);
+                    return (
+                      <tr key={w.documentId} className="hover:bg-slate-800/50 font-mono">
+                        <td className="px-4 py-3 text-amber-300 font-bold">{w.documentId}</td>
+                        <td className="px-4 py-3 font-medium text-white font-sans">{w.workerName}</td>
+                        <td className="px-4 py-3 font-sans text-slate-400">{w.position}</td>
+                        <td className="px-4 py-3 text-slate-300">{w.hireDate}</td>
+                        <td className="px-4 py-3 text-center font-bold text-blue-400">{vacs} días</td>
+                        <td className="px-4 py-3 text-center">
+                          <button
+                            onClick={() => handleDeleteWorker(w.documentId)}
+                            className="bg-rose-950/80 hover:bg-rose-900 border border-rose-800 text-rose-300 px-2 py-1 rounded text-[10px]"
+                          >
+                            🗑️ Eliminar
+                          </button>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
           </div>
-        </div>
+        </section>
       )}
     </main>
   );
