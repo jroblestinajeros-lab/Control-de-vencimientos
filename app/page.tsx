@@ -115,7 +115,7 @@ export default function HomePage() {
       const defaultTransactions: Transaction[] = [
         {
           id: '1731100001',
-          description: 'Sueldo / Honorarios Principales',
+          description: 'Sueldo Principal',
           amount: 2500,
           type: 'income',
           category: 'Sueldo / Salario Principal',
@@ -124,42 +124,52 @@ export default function HomePage() {
         },
         {
           id: '1731100002',
-          description: 'Alquiler de Departamento',
-          amount: 1000,
+          description: 'menu',
+          amount: 350,
           type: 'expense',
           nature: 'fixed',
-          category: 'Vivienda / Alquiler / Mantenimiento',
-          date: '02/11/2026',
+          category: 'Alimentación / Supermercado',
+          date: '09/11/2026',
           month: '2026-11',
         },
         {
           id: '1731100003',
-          description: 'Supermercado y Víveres',
-          amount: 380,
+          description: 'pasaje',
+          amount: 150,
           type: 'expense',
-          nature: 'variable',
-          category: 'Alimentación / Supermercado',
-          date: '03/11/2026',
+          nature: 'fixed',
+          category: 'Transporte / Combustible / Pasajes',
+          date: '09/11/2026',
           month: '2026-11',
         },
         {
           id: '1731100004',
-          description: 'Servicios Básicos (Luz, Agua, Internet)',
-          amount: 420,
+          description: 'celular y disney',
+          amount: 130,
           type: 'expense',
           nature: 'fixed',
           category: 'Servicios (Luz, Agua, Internet, Celular)',
-          date: '04/11/2026',
+          date: '09/11/2026',
           month: '2026-11',
         },
         {
           id: '1731100005',
-          description: 'Combustible y Transportes',
-          amount: 150,
+          description: 'deuda banco',
+          amount: 300,
           type: 'expense',
-          nature: 'variable',
-          category: 'Transporte / Combustible / Pasajes',
-          date: '05/11/2026',
+          nature: 'fixed',
+          category: 'Otros / Varios',
+          date: '09/11/2026',
+          month: '2026-11',
+        },
+        {
+          id: '1731100006',
+          description: 'deuda',
+          amount: 1000,
+          type: 'expense',
+          nature: 'fixed',
+          category: 'Otros / Varios',
+          date: '09/11/2026',
           month: '2026-11',
         },
       ];
@@ -224,12 +234,26 @@ export default function HomePage() {
   const fixedExpenseMonthlyAvg = fixedExpenses || (totalExpense * 0.5) || 1;
   const emergencyCoverageMonths = (totalSavedAllGoals / fixedExpenseMonthlyAvg).toFixed(1);
 
+  // Gastos por categoría con cálculo de acumulado
+  let runningCumulative = 0;
   const expensesByCategory = EXPENSE_CATEGORIES.map((cat) => {
     const total = monthTransactions
       .filter((t) => t.type === 'expense' && t.category === cat)
       .reduce((acc, t) => acc + t.amount, 0);
     return { category: cat, amount: total };
   }).filter((item) => item.amount > 0);
+
+  const expensesWithCumulative = expensesByCategory.map((item) => {
+    runningCumulative += item.amount;
+    const categoryPct = availableExpenseBudget > 0 ? Math.round((item.amount / availableExpenseBudget) * 100) : 0;
+    const shareOfTotal = totalExpense > 0 ? Math.round((item.amount / totalExpense) * 100) : 0;
+    return {
+      ...item,
+      categoryPct,
+      shareOfTotal,
+      cumulative: runningCumulative,
+    };
+  });
 
   const availableMonths = Array.from(
     new Set(transactions.map((t) => t.month || selectedMonth))
@@ -362,6 +386,15 @@ export default function HomePage() {
       { Concepto: `Saldo Restante para Gastos (${currSymbol})`, Valor: budgetRemaining },
     ];
 
+    // Exportar también la distribución detallada con porcentaje y acumulado a Excel
+    const categoryReport = expensesWithCumulative.map((item) => ({
+      'Categoría de Gasto': item.category,
+      [`Monto (${currSymbol})`]: item.amount,
+      '% del Presupuesto': `${item.categoryPct}%`,
+      '% del Gasto Total': `${item.shareOfTotal}%`,
+      [`Acumulado (${currSymbol})`]: item.cumulative,
+    }));
+
     const txData = monthTransactions.map((t) => ({
       Fecha: t.date,
       Tipo: t.type === 'income' ? 'Ingreso' : 'Gasto',
@@ -380,10 +413,12 @@ export default function HomePage() {
 
     const wb = XLSX.utils.book_new();
     const wsSummary = XLSX.utils.json_to_sheet(summaryData);
+    const wsCat = XLSX.utils.json_to_sheet(categoryReport);
     const wsTx = XLSX.utils.json_to_sheet(txData);
     const wsGoals = XLSX.utils.json_to_sheet(goalsData);
 
     XLSX.utils.book_append_sheet(wb, wsSummary, 'Resumen Mensual');
+    XLSX.utils.book_append_sheet(wb, wsCat, 'Gastos por Categoría');
     XLSX.utils.book_append_sheet(wb, wsTx, 'Transacciones');
     XLSX.utils.book_append_sheet(wb, wsGoals, 'Metas de Ahorro');
 
@@ -535,7 +570,7 @@ export default function HomePage() {
           </div>
         </div>
 
-        {/* DISTRIBUCIÓN DE GASTOS CON PORCENTAJE Y ACUMULADO AL FINAL */}
+        {/* DISTRIBUCIÓN DE GASTOS CON PORCENTAJE, ACUMULADO Y DETALLE CLARO */}
         <div 
           className="rounded-3xl p-6 shadow-2xl border space-y-4"
           style={{ backgroundColor: 'rgba(30, 27, 75, 0.75)', borderColor: 'rgba(217, 70, 239, 0.3)', backdropFilter: 'blur(16px)' }}
@@ -549,36 +584,34 @@ export default function HomePage() {
             </span>
           </div>
 
-          {expensesByCategory.length === 0 ? (
+          {expensesWithCumulative.length === 0 ? (
             <p className="text-xs text-purple-300/60 py-2">No hay gastos ejecutados en este mes.</p>
           ) : (
             <div className="space-y-4">
               <div className="space-y-3">
-                {expensesByCategory.map((item) => {
-                  const categoryPct = Math.round((item.amount / (availableExpenseBudget || 1)) * 100);
-                  const shareOfTotalExpense = totalExpense > 0 ? Math.round((item.amount / totalExpense) * 100) : 0;
-                  return (
-                    <div key={item.category} className="space-y-1">
-                      <div className="flex justify-between text-xs">
-                        <span className="text-purple-200">{item.category}</span>
-                        <span className="font-mono text-purple-300">
-                          {currSymbol} {item.amount.toFixed(2)} ({categoryPct}% del presupuesto | <span className="text-teal-300 font-semibold">{shareOfTotalExpense}% del gasto</span>)
-                        </span>
-                      </div>
-                      <div className="w-full bg-indigo-950 h-2.5 rounded-full overflow-hidden border border-purple-500/30">
-                        <div
-                          className="bg-gradient-to-r from-teal-400 to-cyan-400 h-full transition-all duration-500"
-                          style={{ width: `${Math.min(categoryPct, 100)}%` }}
-                        ></div>
-                      </div>
+                {expensesWithCumulative.map((item) => (
+                  <div key={item.category} className="space-y-1 bg-indigo-950/40 border border-purple-500/20 p-3 rounded-2xl">
+                    <div className="flex flex-col sm:flex-row justify-between text-xs gap-1">
+                      <span className="text-purple-100 font-semibold">{item.category}</span>
+                      <span className="font-mono text-purple-300">
+                        {currSymbol} {item.amount.toFixed(2)} &nbsp;|&nbsp; 
+                        <span className="text-fuchsia-300"> {item.categoryPct}% presupuesto</span> &nbsp;|&nbsp; 
+                        <span className="text-cyan-300"> Acumulado: {currSymbol} {item.cumulative.toFixed(2)}</span>
+                      </span>
                     </div>
-                  );
-                })}
+                    <div className="w-full bg-indigo-950 h-2.5 rounded-full overflow-hidden border border-purple-500/30">
+                      <div
+                        className="bg-gradient-to-r from-teal-400 to-cyan-400 h-full transition-all duration-500"
+                        style={{ width: `${Math.min(item.categoryPct, 100)}%` }}
+                      ></div>
+                    </div>
+                  </div>
+                ))}
               </div>
 
-              {/* Fila Acumulada al Final */}
+              {/* Fila Acumulada Total al Final */}
               <div className="pt-4 border-t border-purple-500/30 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 text-xs font-mono">
-                <span className="text-purple-300 font-bold uppercase tracking-wider">Acumulado Total de Gastos del Mes:</span>
+                <span className="text-purple-200 font-bold uppercase tracking-wider">Acumulado Total de Gastos del Mes:</span>
                 <span className="text-rose-400 font-black text-base">
                   {currSymbol} {totalExpense.toFixed(2)} <span className="text-xs font-normal text-purple-300">({budgetPercentage}% del límite disponible)</span>
                 </span>
