@@ -106,17 +106,77 @@ export default function HomePage() {
     const savedSavingsPercent = localStorage.getItem('fin_savings_percent');
     const savedCurrency = localStorage.getItem('fin_currency') as CurrencyCode;
 
-    if (savedTx) setTransactions(JSON.parse(savedTx));
     if (savedSavingsPercent) setSavingsTargetPercent(Number(savedSavingsPercent));
     if (savedCurrency && CURRENCIES[savedCurrency]) setCurrency(savedCurrency);
+
+    // Carga automática por defecto si no existen transacciones previas
+    if (savedTx) {
+      setTransactions(JSON.parse(savedTx));
+    } else {
+      const defaultTransactions: Transaction[] = [
+        {
+          id: '1731100001',
+          description: 'Sueldo / Honorarios Principales',
+          amount: 2500,
+          type: 'income',
+          category: 'Sueldo / Salario Principal',
+          date: '01/11/2026',
+          month: '2026-11',
+        },
+        {
+          id: '1731100002',
+          description: 'Alquiler de Departamento',
+          amount: 1000,
+          type: 'expense',
+          nature: 'fixed',
+          category: 'Vivienda / Alquiler / Mantenimiento',
+          date: '02/11/2026',
+          month: '2026-11',
+        },
+        {
+          id: '1731100003',
+          description: 'Supermercado y Víveres',
+          amount: 380,
+          type: 'expense',
+          nature: 'variable',
+          category: 'Alimentación / Supermercado',
+          date: '03/11/2026',
+          month: '2026-11',
+        },
+        {
+          id: '1731100004',
+          description: 'Servicios Básicos (Luz, Agua, Internet)',
+          amount: 420,
+          type: 'expense',
+          nature: 'fixed',
+          category: 'Servicios (Luz, Agua, Internet, Celular)',
+          date: '04/11/2026',
+          month: '2026-11',
+        },
+        {
+          id: '1731100005',
+          description: 'Combustible y Transportes',
+          amount: 150,
+          type: 'expense',
+          nature: 'variable',
+          category: 'Transporte / Combustible / Pasajes',
+          date: '05/11/2026',
+          month: '2026-11',
+        },
+      ];
+      setTransactions(defaultTransactions);
+      localStorage.setItem('fin_transactions', JSON.stringify(defaultTransactions));
+    }
 
     if (savedGoals) {
       setGoals(JSON.parse(savedGoals));
     } else {
-      setGoals([
-        { id: '1', title: 'Fondo de Emergencia', targetAmount: 10000, currentAmount: 3500 },
-        { id: '2', title: 'Renovación de Equipos', targetAmount: 5000, currentAmount: 1200 },
-      ]);
+      const defaultGoals: SavingsGoal[] = [
+        { id: '1', title: 'Fondo de Emergencia Operativa', targetAmount: 10000, currentAmount: 3500 },
+        { id: '2', title: 'Renovación de Equipos / ROV', targetAmount: 5000, currentAmount: 1200 },
+      ];
+      setGoals(defaultGoals);
+      localStorage.setItem('fin_goals', JSON.stringify(defaultGoals));
     }
 
     setLoading(false);
