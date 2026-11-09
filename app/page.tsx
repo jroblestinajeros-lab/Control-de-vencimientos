@@ -82,7 +82,6 @@ export default function HomePage() {
   const currSymbol = CURRENCIES[currency].symbol;
 
   useEffect(() => {
-    // Actualizar el título de la pestaña del navegador dinámicamente
     document.title = "Finanzas Personales | Control Presupuestario";
 
     const sessionData = localStorage.getItem('user_session');
@@ -109,8 +108,15 @@ export default function HomePage() {
     const savedSavingsPercent = localStorage.getItem('fin_savings_percent');
     const savedCurrency = localStorage.getItem('fin_currency') as CurrencyCode;
 
-    if (savedSavingsPercent) setSavingsTargetPercent(Number(savedSavingsPercent));
-    if (savedCurrency && CURRENCIES[savedCurrency]) setCurrency(savedCurrency);
+    if (savedSavingsPercent !== null && !isNaN(Number(savedSavingsPercent))) {
+      setSavingsTargetPercent(Number(savedSavingsPercent));
+    } else {
+      localStorage.setItem('fin_savings_percent', '20');
+    }
+
+    if (savedCurrency && CURRENCIES[savedCurrency]) {
+      setCurrency(savedCurrency);
+    }
 
     if (savedTx) {
       setTransactions(JSON.parse(savedTx));
@@ -181,7 +187,14 @@ export default function HomePage() {
     }
 
     if (savedGoals) {
-      setGoals(JSON.parse(savedGoals));
+      try {
+        const parsedGoals = JSON.parse(savedGoals);
+        if (Array.isArray(parsedGoals)) {
+          setGoals(parsedGoals);
+        }
+      } catch (err) {
+        setGoals([]);
+      }
     } else {
       const defaultGoals: SavingsGoal[] = [
         { id: '1', title: 'Fondo de Emergencia Operativa', targetAmount: 10000, currentAmount: 3500 },
@@ -300,6 +313,13 @@ export default function HomePage() {
     const updated = transactions.filter((t) => t.id !== id);
     setTransactions(updated);
     localStorage.setItem('fin_transactions', JSON.stringify(updated));
+  };
+
+  const handleDeleteGoal = (id: string) => {
+    if (!confirm('¿Estás seguro de que deseas eliminar esta meta de ahorro?')) return;
+    const updatedGoals = goals.filter((g) => g.id !== id);
+    setGoals(updatedGoals);
+    localStorage.setItem('fin_goals', JSON.stringify(updatedGoals));
   };
 
   const handleSave = (e: React.FormEvent) => {
@@ -451,7 +471,6 @@ export default function HomePage() {
     >
       <header className="max-w-7xl mx-auto flex flex-col md:flex-row justify-between items-start md:items-center pb-6 border-b border-purple-500/30 mb-8 gap-4">
         <div>
-          {/* TÍTULO PRINCIPAL ACTUALIZADO */}
           <h1 className="text-3xl font-black text-transparent bg-clip-text bg-gradient-to-r from-teal-300 via-fuchsia-400 to-cyan-300 tracking-tight">
             Gestión de Finanzas Personales
           </h1>
@@ -677,42 +696,54 @@ export default function HomePage() {
             </div>
 
             <div className="space-y-4">
-              {goals.map((g) => {
-                const pct = Math.min(Math.round((g.currentAmount / (g.targetAmount || 1)) * 100), 100);
-                const remainingToGoal = Math.max(0, g.targetAmount - g.currentAmount);
-                const monthsToTarget = plannedSavings > 0 
-                  ? Math.ceil(remainingToGoal / plannedSavings)
-                  : 0;
+              {goals.length === 0 ? (
+                <p className="text-xs text-purple-300/60 py-4 text-center">No hay metas creadas. Haz clic en "+ Nueva" para agregar una.</p>
+              ) : (
+                goals.map((g) => {
+                  const pct = Math.min(Math.round((g.currentAmount / (g.targetAmount || 1)) * 100), 100);
+                  const remainingToGoal = Math.max(0, g.targetAmount - g.currentAmount);
+                  const monthsToTarget = plannedSavings > 0 
+                    ? Math.ceil(remainingToGoal / plannedSavings)
+                    : 0;
 
-                return (
-                  <div key={g.id} className="bg-indigo-950/60 border border-purple-500/30 p-4 rounded-2xl space-y-2">
-                    <div className="flex justify-between items-center">
-                      <h3 className="font-semibold text-white text-xs">{g.title}</h3>
-                      <span className="text-[10px] font-mono bg-indigo-900 text-cyan-300 px-2 py-0.5 rounded-lg border border-purple-500/30">
-                        {pct}%
-                      </span>
+                  return (
+                    <div key={g.id} className="bg-indigo-950/60 border border-purple-500/30 p-4 rounded-2xl space-y-2 relative group">
+                      <button
+                        onClick={() => handleDeleteGoal(g.id)}
+                        title="Eliminar Meta"
+                        className="absolute top-3 right-3 text-xs text-rose-400 hover:text-rose-300 bg-rose-950/80 border border-rose-500/40 px-2 py-0.5 rounded-lg transition-colors"
+                      >
+                        🗑️
+                      </button>
+
+                      <div className="flex justify-between items-center pr-8">
+                        <h3 className="font-semibold text-white text-xs">{g.title}</h3>
+                        <span className="text-[10px] font-mono bg-indigo-900 text-cyan-300 px-2 py-0.5 rounded-lg border border-purple-500/30">
+                          {pct}%
+                        </span>
+                      </div>
+
+                      <div className="flex justify-between text-[11px] text-purple-200 font-mono">
+                        <span>{currSymbol} {g.currentAmount.toFixed(2)}</span>
+                        <span>{currSymbol} {g.targetAmount.toFixed(2)}</span>
+                      </div>
+
+                      <div className="w-full bg-indigo-950 h-2 rounded-full overflow-hidden border border-purple-500/30">
+                        <div
+                          className="bg-gradient-to-r from-cyan-400 to-fuchsia-400 h-full transition-all duration-500"
+                          style={{ width: `${pct}%` }}
+                        ></div>
+                      </div>
+
+                      <p className="text-[10px] text-purple-300/70 font-mono pt-1">
+                        {monthsToTarget > 0 
+                          ? `⏱ Tiempo est. para completar: ~${monthsToTarget} mes(es)`
+                          : '🎉 Meta alcanzada o lista'}
+                      </p>
                     </div>
-
-                    <div className="flex justify-between text-[11px] text-purple-200 font-mono">
-                      <span>{currSymbol} {g.currentAmount.toFixed(2)}</span>
-                      <span>{currSymbol} {g.targetAmount.toFixed(2)}</span>
-                    </div>
-
-                    <div className="w-full bg-indigo-950 h-2 rounded-full overflow-hidden border border-purple-500/30">
-                      <div
-                        className="bg-gradient-to-r from-cyan-400 to-fuchsia-400 h-full transition-all duration-500"
-                        style={{ width: `${pct}%` }}
-                      ></div>
-                    </div>
-
-                    <p className="text-[10px] text-purple-300/70 font-mono pt-1">
-                      {monthsToTarget > 0 
-                        ? `⏱ Tiempo est. para completar: ~${monthsToTarget} mes(es)`
-                        : '🎉 Meta alcanzada o lista'}
-                    </p>
-                  </div>
-                );
-              })}
+                  );
+                })
+              )}
             </div>
           </div>
 
@@ -853,7 +884,7 @@ export default function HomePage() {
                     <label className="block text-xs font-semibold text-purple-200 uppercase mb-1">Nombre de la Meta</label>
                     <input
                       type="text"
-                      placeholder="Ej. Fondo de Emergencia, Vacaciones"
+                      placeholder="Ej. Viaje, Fondo de Emergencia"
                       value={goalTitle}
                       onChange={(e) => setGoalTitle(e.target.value)}
                       required
@@ -928,7 +959,7 @@ export default function HomePage() {
                   </div>
 
                   <div>
-                    <label className="block text-xs font-semibold text-purple-200 uppercase, mb-1">Categoría</label>
+                    <label className="block text-xs font-semibold text-purple-200 uppercase mb-1">Categoría</label>
                     <select
                       value={category}
                       onChange={(e) => setCategory(e.target.value)}
