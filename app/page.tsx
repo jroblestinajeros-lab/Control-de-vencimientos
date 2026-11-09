@@ -12,23 +12,42 @@ interface Transaction {
   date: string;
 }
 
+const EXPENSE_CATEGORIES = [
+  'Vivienda / Alquiler / Mantenimiento',
+  'Alimentación / Supermercado',
+  'Servicios (Luz, Agua, Internet, Celular)',
+  'Transporte / Combustible / Pasajes',
+  'Salud / Medicinas / Seguros',
+  'Educación / Cursos',
+  'Entretenimiento / Salidas / Suscripciones',
+  'Compras / Ropa / Tecnología',
+  'Ahorro / Inversión',
+  'Otros / Varios',
+];
+
+const INCOME_CATEGORIES = [
+  'Sueldo / Salario Principal',
+  'Consultorías / Servicios Profesionales',
+  'Inversiones / Rendimientos',
+  'Ventas / Negocio Personal',
+  'Otros Ingresos',
+];
+
 export default function HomePage() {
   const router = useRouter();
   const [loading, setLoading] = useState(true);
   const [userEmail, setUserEmail] = useState<string>('');
 
-  // Estado de finanzas
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [monthlyBudget, setMonthlyBudget] = useState<number>(5000);
   
-  // Modales
   const [showModal, setShowModal] = useState<boolean>(false);
   const [modalType, setModalType] = useState<'income' | 'expense' | 'budget'>('expense');
 
-  // Formulario
   const [description, setDescription] = useState('');
   const [amount, setAmount] = useState('');
-  const [category, setCategory] = useState('General');
+  const [category, setCategory] = useState(EXPENSE_CATEGORIES[0]);
+  const [budgetError, setBudgetError] = useState<string | null>(null);
 
   useEffect(() => {
     const sessionData = localStorage.getItem('user_session');
@@ -50,7 +69,6 @@ export default function HomePage() {
       setUserEmail('jroblestinajeros@gmail.com');
     }
 
-    // Cargar datos locales de prueba o persistidos
     const savedTx = localStorage.getItem('fin_transactions');
     const savedBudget = localStorage.getItem('fin_budget');
     if (savedTx) setTransactions(JSON.parse(savedTx));
@@ -59,7 +77,6 @@ export default function HomePage() {
     setLoading(false);
   }, [router]);
 
-  // Cálculos dinámicos
   const totalIncome = transactions
     .filter((t) => t.type === 'income')
     .reduce((acc, t) => acc + t.amount, 0);
@@ -70,29 +87,52 @@ export default function HomePage() {
 
   const balance = totalIncome - totalExpense;
   const budgetRemaining = monthlyBudget - totalExpense;
+  const budgetPercentage = Math.min(Math.round((totalExpense / (monthlyBudget || 1)) * 100), 100);
 
   const handleOpenModal = (type: 'income' | 'expense' | 'budget') => {
     setModalType(type);
     setDescription('');
     setAmount('');
-    setCategory(type === 'income' ? 'Sueldo/Ingreso' : 'Servicios/Varios');
+    setCategory(type === 'income' ? INCOME_CATEGORIES[0] : EXPENSE_CATEGORIES[0]);
+    setBudgetError(null);
     setShowModal(true);
   };
 
   const handleSave = (e: React.FormEvent) => {
     e.preventDefault();
+    setBudgetError(null);
     const val = parseFloat(amount);
     if (isNaN(val) || val <= 0) return;
 
     if (modalType === 'budget') {
       setMonthlyBudget(val);
       localStorage.setItem('fin_budget', val.toString());
+    } else if (modalType === 'expense') {
+      // Validación estricta de presupuesto excedido
+      if (val > budgetRemaining) {
+        setBudgetError(
+          `¡Atención! Este gasto (S/ ${val.toFixed(2)}) supera tu presupuesto disponible de S/ ${budgetRemaining.toFixed(2)}.`
+        );
+        return;
+      }
+
+      const newTx: Transaction = {
+        id: Date.now().toString(),
+        description: description || 'Gasto',
+        amount: val,
+        type: 'expense',
+        category,
+        date: new Date().toLocaleDateString('es-PE'),
+      };
+      const updated = [newTx, ...transactions];
+      setTransactions(updated);
+      localStorage.setItem('fin_transactions', JSON.stringify(updated));
     } else {
       const newTx: Transaction = {
         id: Date.now().toString(),
-        description: description || (modalType === 'income' ? 'Ingreso' : 'Gasto'),
+        description: description || 'Ingreso',
         amount: val,
-        type: modalType,
+        type: 'income',
         category,
         date: new Date().toLocaleDateString('es-PE'),
       };
@@ -121,7 +161,6 @@ export default function HomePage() {
 
   return (
     <main className="min-h-screen bg-slate-950 text-slate-100 p-6">
-      {/* Encabezado */}
       <header className="max-w-7xl mx-auto flex justify-between items-center pb-6 border-b border-slate-800 mb-8">
         <div>
           <h1 className="text-2xl font-bold text-white">Control de Finanzas Personales</h1>
@@ -166,7 +205,23 @@ export default function HomePage() {
           </div>
         </div>
 
-        {/* Panel de Botones de Acción */}
+        {/* Barra Visual de Consumo de Presupuesto */}
+        <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-xl space-y-3">
+          <div className="flex justify-between items-center text-sm">
+            <span className="font-semibold text-slate-300">Uso del Presupuesto Mensual</span>
+            <span className="font-mono text-slate-400">{budgetPercentage}% consumido de S/ {monthlyBudget.toFixed(2)}</span>
+          </div>
+          <div className="w-full bg-slate-950 h-3 rounded-full overflow-hidden border border-slate-800">
+            <div
+              className={`h-full transition-all duration-500 ${
+                budgetPercentage > 90 ? 'bg-rose-500' : budgetPercentage > 70 ? 'bg-amber-500' : 'bg-emerald-500'
+              }`}
+              style={{ width: `${budgetPercentage}%` }}
+            ></div>
+          </div>
+        </div>
+
+        {/* Botones de Acción */}
         <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-xl">
           <h2 className="text-sm font-semibold text-slate-300 uppercase tracking-wider mb-4">Acciones Rápidas</h2>
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
@@ -214,7 +269,11 @@ export default function HomePage() {
                     <tr key={t.id} className="hover:bg-slate-800/50">
                       <td className="px-4 py-3 text-xs text-slate-400">{t.date}</td>
                       <td className="px-4 py-3 font-medium text-white">{t.description}</td>
-                      <td className="px-4 py-3 text-xs text-slate-400">{t.category}</td>
+                      <td className="px-4 py-3 text-xs text-slate-400">
+                        <span className="bg-slate-800 px-2 py-1 rounded-md border border-slate-700">
+                          {t.category}
+                        </span>
+                      </td>
                       <td className={`px-4 py-3 text-right font-mono font-bold ${t.type === 'income' ? 'text-emerald-400' : 'text-rose-400'}`}>
                         {t.type === 'income' ? '+' : '-'} S/ {t.amount.toFixed(2)}
                       </td>
@@ -235,17 +294,23 @@ export default function HomePage() {
               {modalType === 'budget' ? 'Configurar Presupuesto Mensual' : `Registrar ${modalType === 'income' ? 'Ingreso' : 'Gasto'}`}
             </h3>
 
+            {budgetError && (
+              <div className="p-3 bg-rose-950/80 border border-rose-800 text-rose-300 rounded-lg text-xs font-medium">
+                {budgetError}
+              </div>
+            )}
+
             <form onSubmit={handleSave} className="space-y-4">
               {modalType !== 'budget' && (
                 <div>
                   <label className="block text-xs font-semibold text-slate-300 uppercase mb-1">Descripción</label>
                   <input
                     type="text"
-                    placeholder="Ej. Sueldo, Alquiler, Supermercado"
+                    placeholder="Ej. Supermercado, Pago Luz, Consultoría"
                     value={description}
                     onChange={(e) => setDescription(e.target.value)}
                     required
-                    className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-emerald-500"
+                    className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-emerald-500 text-sm"
                   />
                 </div>
               )}
@@ -259,20 +324,24 @@ export default function HomePage() {
                   value={amount}
                   onChange={(e) => setAmount(e.target.value)}
                   required
-                  className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-emerald-500 font-mono"
+                  className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-emerald-500 font-mono text-sm"
                 />
               </div>
 
               {modalType !== 'budget' && (
                 <div>
                   <label className="block text-xs font-semibold text-slate-300 uppercase mb-1">Categoría</label>
-                  <input
-                    type="text"
-                    placeholder="Ej. Casa, Vehículo, Servicios"
+                  <select
                     value={category}
                     onChange={(e) => setCategory(e.target.value)}
-                    className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-emerald-500"
-                  />
+                    className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-emerald-500 text-sm"
+                  >
+                    {(modalType === 'income' ? INCOME_CATEGORIES : EXPENSE_CATEGORIES).map((cat) => (
+                      <option key={cat} value={cat}>
+                        {cat}
+                      </option>
+                    ))}
+                  </select>
                 </div>
               )}
 
@@ -280,13 +349,13 @@ export default function HomePage() {
                 <button
                   type="button"
                   onClick={() => setShowModal(false)}
-                  className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg text-sm"
+                  className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg text-sm transition-colors"
                 >
                   Cancelar
                 </button>
                 <button
                   type="submit"
-                  className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-sm font-medium"
+                  className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-sm font-medium transition-colors"
                 >
                   Guardar
                 </button>
