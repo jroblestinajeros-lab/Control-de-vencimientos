@@ -340,22 +340,14 @@ export default function HomePage() {
   if (loading) return null;
 
   return (
-    <div 
-      style={{
-        position: 'fixed',
-        top: 0,
-        left: 0,
-        width: '100vw',
-        height: '100vh',
-        backgroundColor: '#1e0c38',
-        backgroundImage: 'radial-gradient(circle at 10% 20%, rgb(45, 10, 80) 0%, rgb(18, 8, 38) 90%)',
-        overflowY: 'auto',
-        zIndex: 99999,
-        padding: '24px',
-        color: '#f8fafc'
+    <main 
+      className="min-h-screen text-slate-100 p-6"
+      style={{ 
+        backgroundColor: '#130826', 
+        backgroundImage: 'linear-gradient(135deg, #130826 0%, #1e1b4b 50%, #0f172a 100%)' 
       }}
     >
-      <header className="max-w-7xl mx-auto flex flex-col md:flex-row justify-between items-start md:items-center pb-6 border-b border-purple-500/40 mb-8 gap-4">
+      <header className="max-w-7xl mx-auto flex flex-col md:flex-row justify-between items-start md:items-center pb-6 border-b border-purple-500/30 mb-8 gap-4">
         <div>
           <h1 className="text-3xl font-black text-transparent bg-clip-text bg-gradient-to-r from-teal-300 via-fuchsia-400 to-cyan-300 tracking-tight">
             Control de Finanzas Personales
@@ -369,10 +361,10 @@ export default function HomePage() {
           <select
             value={currency}
             onChange={(e) => handleCurrencyChange(e.target.value as CurrencyCode)}
-            className="bg-purple-950 border border-purple-500 text-amber-300 font-bold text-xs px-3 py-2 rounded-xl focus:outline-none shadow-2xl"
+            className="bg-indigo-950/90 border border-purple-500/50 text-amber-300 font-bold text-xs px-3 py-2 rounded-xl focus:outline-none shadow-xl"
           >
             {Object.entries(CURRENCIES).map(([code, info]) => (
-              <option key={code} value={code} style={{ backgroundColor: '#2d0a50', color: '#fff' }}>
+              <option key={code} value={code} style={{ backgroundColor: '#1e1b4b', color: '#fff' }}>
                 {info.label}
               </option>
             ))}
@@ -382,30 +374,30 @@ export default function HomePage() {
             type="month"
             value={selectedMonth}
             onChange={(e) => setSelectedMonth(e.target.value)}
-            className="bg-purple-950 border border-purple-500 text-white text-xs px-3 py-2 rounded-xl focus:outline-none font-mono shadow-2xl"
+            className="bg-indigo-950/90 border border-purple-500/50 text-white text-xs px-3 py-2 rounded-xl focus:outline-none font-mono shadow-xl"
           />
 
           <button
             onClick={exportToExcel}
-            className="bg-gradient-to-r from-teal-400 to-emerald-500 hover:from-teal-300 hover:to-emerald-400 text-slate-950 font-bold text-xs px-4 py-2.5 rounded-xl transition-all shadow-xl shadow-teal-950/80"
+            className="bg-gradient-to-r from-teal-400 to-emerald-500 hover:from-teal-300 hover:to-emerald-400 text-slate-950 font-bold text-xs px-4 py-2.5 rounded-xl transition-all shadow-lg shadow-teal-950/60"
           >
             <span>📊 Exportar Excel</span>
           </button>
 
           <button
             onClick={handleSignOut}
-            className="bg-purple-950 hover:bg-purple-900 border border-purple-500 text-purple-200 text-xs px-3 py-2 rounded-xl transition-colors shadow-2xl"
+            className="bg-indigo-950/90 hover:bg-indigo-900 border border-purple-500/50 text-purple-200 text-xs px-3 py-2 rounded-xl transition-colors shadow-xl"
           >
             Cerrar Sesión
           </button>
         </div>
       </header>
 
-      <section className="max-w-7xl mx-auto space-y-8 pb-12">
+      <section className="max-w-7xl mx-auto space-y-8">
         <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
           <div 
             className="p-6 rounded-3xl shadow-2xl border transition-all"
-            style={{ backgroundColor: 'rgba(45, 10, 80, 0.75)', borderColor: 'rgba(217, 70, 239, 0.4)', backdropFilter: 'blur(16px)' }}
+            style={{ backgroundColor: 'rgba(30, 27, 75, 0.75)', borderColor: 'rgba(217, 70, 239, 0.3)', backdropFilter: 'blur(16px)' }}
           >
             <h3 className="text-xs font-semibold text-purple-300 uppercase tracking-wider mb-2">Ingresos del Mes</h3>
             <p className="text-3xl font-black text-cyan-300 font-mono tracking-tight">{currSymbol} {totalIncome.toFixed(2)}</p>
@@ -414,19 +406,19 @@ export default function HomePage() {
 
           <div 
             className="p-6 rounded-3xl shadow-2xl border border-t-4 border-t-fuchsia-400 transition-all space-y-2"
-            style={{ backgroundColor: 'rgba(45, 10, 80, 0.75)', borderColor: 'rgba(217, 70, 239, 0.4)', backdropFilter: 'blur(16px)' }}
+            style={{ backgroundColor: 'rgba(30, 27, 75, 0.75)', borderColor: 'rgba(217, 70, 239, 0.3)', backdropFilter: 'blur(16px)' }}
           >
             <div className="flex justify-between items-center">
               <h3 className="text-xs font-semibold text-fuchsia-300 uppercase tracking-wider">Meta Ahorro</h3>
               <select
                 value={savingsTargetPercent}
                 onChange={(e) => handleSavingsPercentChange(Number(e.target.value))}
-                className="bg-purple-950 border border-purple-500 text-fuchsia-300 text-xs font-bold rounded-lg px-2 py-0.5 focus:outline-none"
+                className="bg-indigo-950 border border-purple-500 text-fuchsia-300 text-xs font-bold rounded-lg px-2 py-0.5 focus:outline-none"
               >
                 {Array.from({ length: 18 }, (_, i) => (i + 2) * 5)
                   .concat(95)
                   .map((pct) => (
-                    <option key={pct} value={pct} style={{ backgroundColor: '#2d0a50', color: '#fff' }}>
+                    <option key={pct} value={pct} style={{ backgroundColor: '#1e1b4b', color: '#fff' }}>
                       {pct}%
                     </option>
                   ))}
@@ -438,7 +430,7 @@ export default function HomePage() {
 
           <div 
             className="p-6 rounded-3xl shadow-2xl border border-t-4 border-t-teal-400 transition-all"
-            style={{ backgroundColor: 'rgba(45, 10, 80, 0.75)', borderColor: 'rgba(217, 70, 239, 0.4)', backdropFilter: 'blur(16px)' }}
+            style={{ backgroundColor: 'rgba(30, 27, 75, 0.75)', borderColor: 'rgba(217, 70, 239, 0.3)', backdropFilter: 'blur(16px)' }}
           >
             <h3 className="text-xs font-semibold text-teal-300 uppercase tracking-wider mb-2">Presupuesto Gastos</h3>
             <p className="text-3xl font-black text-teal-300 font-mono tracking-tight">{currSymbol} {availableExpenseBudget.toFixed(2)}</p>
@@ -447,7 +439,7 @@ export default function HomePage() {
 
           <div 
             className="p-6 rounded-3xl shadow-2xl border transition-all"
-            style={{ backgroundColor: 'rgba(45, 10, 80, 0.75)', borderColor: 'rgba(217, 70, 239, 0.4)', backdropFilter: 'blur(16px)' }}
+            style={{ backgroundColor: 'rgba(30, 27, 75, 0.75)', borderColor: 'rgba(217, 70, 239, 0.3)', backdropFilter: 'blur(16px)' }}
           >
             <h3 className="text-xs font-semibold text-rose-300 uppercase tracking-wider mb-2">Gastos Ejecutados</h3>
             <p className="text-3xl font-black text-rose-400 font-mono tracking-tight">{currSymbol} {totalExpense.toFixed(2)}</p>
@@ -458,7 +450,7 @@ export default function HomePage() {
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           <div 
             className="p-6 rounded-3xl shadow-2xl border flex flex-col justify-between transition-all"
-            style={{ backgroundColor: 'rgba(45, 10, 80, 0.75)', borderColor: 'rgba(217, 70, 239, 0.4)', backdropFilter: 'blur(16px)' }}
+            style={{ backgroundColor: 'rgba(30, 27, 75, 0.75)', borderColor: 'rgba(217, 70, 239, 0.3)', backdropFilter: 'blur(16px)' }}
           >
             <h4 className="text-xs font-semibold text-amber-300 uppercase tracking-wider mb-2">Gastos Fijos (Obligatorios)</h4>
             <p className="text-2xl font-bold text-amber-400 font-mono">{currSymbol} {fixedExpenses.toFixed(2)}</p>
@@ -467,7 +459,7 @@ export default function HomePage() {
 
           <div 
             className="p-6 rounded-3xl shadow-2xl border flex flex-col justify-between transition-all"
-            style={{ backgroundColor: 'rgba(45, 10, 80, 0.75)', borderColor: 'rgba(217, 70, 239, 0.4)', backdropFilter: 'blur(16px)' }}
+            style={{ backgroundColor: 'rgba(30, 27, 75, 0.75)', borderColor: 'rgba(217, 70, 239, 0.3)', backdropFilter: 'blur(16px)' }}
           >
             <h4 className="text-xs font-semibold text-fuchsia-300 uppercase tracking-wider mb-2">Gastos Variables</h4>
             <p className="text-2xl font-bold text-fuchsia-200 font-mono">{currSymbol} {variableExpenses.toFixed(2)}</p>
@@ -476,7 +468,7 @@ export default function HomePage() {
 
           <div 
             className="p-6 rounded-3xl shadow-2xl border flex flex-col justify-between transition-all"
-            style={{ backgroundColor: 'rgba(45, 10, 80, 0.75)', borderColor: 'rgba(217, 70, 239, 0.4)', backdropFilter: 'blur(16px)' }}
+            style={{ backgroundColor: 'rgba(30, 27, 75, 0.75)', borderColor: 'rgba(217, 70, 239, 0.3)', backdropFilter: 'blur(16px)' }}
           >
             <h4 className="text-xs font-semibold text-emerald-300 uppercase tracking-wider mb-2">Salud Financiera (Fondo)</h4>
             <p className="text-2xl font-bold text-emerald-400 font-mono">{emergencyCoverageMonths} meses</p>
@@ -486,7 +478,7 @@ export default function HomePage() {
 
         <div 
           className="rounded-3xl p-6 shadow-2xl border space-y-4"
-          style={{ backgroundColor: 'rgba(45, 10, 80, 0.75)', borderColor: 'rgba(217, 70, 239, 0.4)', backdropFilter: 'blur(16px)' }}
+          style={{ backgroundColor: 'rgba(30, 27, 75, 0.75)', borderColor: 'rgba(217, 70, 239, 0.3)', backdropFilter: 'blur(16px)' }}
         >
           <div className="flex justify-between items-center text-sm">
             <span className="font-semibold text-purple-200">
@@ -511,7 +503,7 @@ export default function HomePage() {
                         {currSymbol} {item.amount.toFixed(2)} ({categoryPct}%)
                       </span>
                     </div>
-                    <div className="w-full bg-purple-950 h-2.5 rounded-full overflow-hidden border border-purple-500/40">
+                    <div className="w-full bg-indigo-950 h-2.5 rounded-full overflow-hidden border border-purple-500/30">
                       <div
                         className="bg-gradient-to-r from-teal-400 to-cyan-400 h-full transition-all duration-500"
                         style={{ width: `${Math.min(categoryPct, 100)}%` }}
@@ -526,7 +518,7 @@ export default function HomePage() {
 
         <div 
           className="rounded-3xl p-6 shadow-2xl border"
-          style={{ backgroundColor: 'rgba(45, 10, 80, 0.75)', borderColor: 'rgba(217, 70, 239, 0.4)', backdropFilter: 'blur(16px)' }}
+          style={{ backgroundColor: 'rgba(30, 27, 75, 0.75)', borderColor: 'rgba(217, 70, 239, 0.3)', backdropFilter: 'blur(16px)' }}
         >
           <h2 className="text-sm font-semibold text-purple-200 uppercase tracking-wider mb-4">Acciones Rápidas ({selectedMonth})</h2>
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
@@ -556,7 +548,7 @@ export default function HomePage() {
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           <div 
             className="lg:col-span-1 rounded-3xl p-6 shadow-2xl border space-y-4"
-            style={{ backgroundColor: 'rgba(45, 10, 80, 0.75)', borderColor: 'rgba(217, 70, 239, 0.4)', backdropFilter: 'blur(16px)' }}
+            style={{ backgroundColor: 'rgba(30, 27, 75, 0.75)', borderColor: 'rgba(217, 70, 239, 0.3)', backdropFilter: 'blur(16px)' }}
           >
             <div className="flex justify-between items-center">
               <h2 className="text-lg font-semibold text-white">Metas & Proyección</h2>
@@ -577,10 +569,10 @@ export default function HomePage() {
                   : 0;
 
                 return (
-                  <div key={g.id} className="bg-purple-950/80 border border-purple-500/40 p-4 rounded-2xl space-y-2">
+                  <div key={g.id} className="bg-indigo-950/60 border border-purple-500/30 p-4 rounded-2xl space-y-2">
                     <div className="flex justify-between items-center">
                       <h3 className="font-semibold text-white text-xs">{g.title}</h3>
-                      <span className="text-[10px] font-mono bg-purple-900 text-cyan-300 px-2 py-0.5 rounded-lg border border-purple-500/40">
+                      <span className="text-[10px] font-mono bg-indigo-900 text-cyan-300 px-2 py-0.5 rounded-lg border border-purple-500/30">
                         {pct}%
                       </span>
                     </div>
@@ -590,7 +582,7 @@ export default function HomePage() {
                       <span>{currSymbol} {g.targetAmount.toFixed(2)}</span>
                     </div>
 
-                    <div className="w-full bg-purple-950 h-2 rounded-full overflow-hidden border border-purple-500/40">
+                    <div className="w-full bg-indigo-950 h-2 rounded-full overflow-hidden border border-purple-500/30">
                       <div
                         className="bg-gradient-to-r from-cyan-400 to-fuchsia-400 h-full transition-all duration-500"
                         style={{ width: `${pct}%` }}
@@ -610,7 +602,7 @@ export default function HomePage() {
 
           <div 
             className="lg:col-span-2 rounded-3xl p-6 shadow-2xl border space-y-4"
-            style={{ backgroundColor: 'rgba(45, 10, 80, 0.75)', borderColor: 'rgba(217, 70, 239, 0.4)', backdropFilter: 'blur(16px)' }}
+            style={{ backgroundColor: 'rgba(30, 27, 75, 0.75)', borderColor: 'rgba(217, 70, 239, 0.3)', backdropFilter: 'blur(16px)' }}
           >
             <h2 className="text-lg font-semibold text-white">Comparativa y Tendencia Mes a Mes</h2>
             {monthlyHistory.length === 0 ? (
@@ -618,7 +610,7 @@ export default function HomePage() {
             ) : (
               <div className="overflow-x-auto">
                 <table className="w-full text-left text-sm text-purple-200">
-                  <thead className="bg-purple-950/80 text-purple-300 uppercase text-xs border-b border-purple-500/40">
+                  <thead className="bg-indigo-950/60 text-purple-300 uppercase text-xs border-b border-purple-500/30">
                     <tr>
                       <th className="px-4 py-3 rounded-l-xl">Mes</th>
                       <th className="px-4 py-3 text-right">Ingresos</th>
@@ -628,7 +620,7 @@ export default function HomePage() {
                   </thead>
                   <tbody className="divide-y divide-purple-500/20 font-mono">
                     {monthlyHistory.map((h) => (
-                      <tr key={h.month} className="hover:bg-purple-900/40">
+                      <tr key={h.month} className="hover:bg-indigo-900/30">
                         <td className="px-4 py-3 text-xs text-white font-medium">{h.month}</td>
                         <td className="px-4 py-3 text-right text-cyan-300">{currSymbol} {h.income.toFixed(2)}</td>
                         <td className="px-4 py-3 text-right text-rose-400">{currSymbol} {h.expense.toFixed(2)}</td>
@@ -644,7 +636,7 @@ export default function HomePage() {
 
         <div 
           className="rounded-3xl p-6 shadow-2xl border space-y-4"
-          style={{ backgroundColor: 'rgba(45, 10, 80, 0.75)', borderColor: 'rgba(217, 70, 239, 0.4)', backdropFilter: 'blur(16px)' }}
+          style={{ backgroundColor: 'rgba(30, 27, 75, 0.75)', borderColor: 'rgba(217, 70, 239, 0.3)', backdropFilter: 'blur(16px)' }}
         >
           <h2 className="text-lg font-semibold text-white">Transacciones ({selectedMonth})</h2>
           {monthTransactions.length === 0 ? (
@@ -652,7 +644,7 @@ export default function HomePage() {
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full text-left text-sm text-purple-200">
-                <thead className="bg-purple-950/80 text-purple-300 uppercase text-xs border-b border-purple-500/40">
+                <thead className="bg-indigo-950/60 text-purple-300 uppercase text-xs border-b border-purple-500/30">
                   <tr>
                     <th className="px-4 py-3 rounded-l-xl">Fecha</th>
                     <th className="px-4 py-3">Tipo / Naturaleza</th>
@@ -664,7 +656,7 @@ export default function HomePage() {
                 </thead>
                 <tbody className="divide-y divide-purple-500/20">
                   {monthTransactions.map((t) => (
-                    <tr key={t.id} className="hover:bg-purple-900/40">
+                    <tr key={t.id} className="hover:bg-indigo-900/30">
                       <td className="px-4 py-3 text-xs text-purple-300">{t.date}</td>
                       <td className="px-4 py-3 text-xs">
                         <span className={`px-2 py-0.5 rounded-lg text-[10px] border ${
@@ -672,7 +664,7 @@ export default function HomePage() {
                             ? 'bg-cyan-950 border-cyan-400 text-cyan-300' 
                             : t.nature === 'fixed'
                             ? 'bg-amber-950 border-amber-400 text-amber-300'
-                            : 'bg-purple-900 border-purple-400 text-purple-200'
+                            : 'bg-indigo-900 border-indigo-400 text-indigo-200'
                         }`}>
                           {t.type === 'income' ? 'Ingreso' : t.nature === 'fixed' ? 'Gasto Fijo' : 'Gasto Variable'}
                         </span>
@@ -686,7 +678,7 @@ export default function HomePage() {
                         <button
                           onClick={() => handleEditTransaction(t)}
                           title="Editar Registro"
-                          className="text-xs bg-purple-900 hover:bg-purple-800 border border-purple-400 text-purple-200 px-2.5 py-1 rounded-lg transition-colors"
+                          className="text-xs bg-indigo-900 hover:bg-indigo-800 border border-indigo-400 text-indigo-200 px-2.5 py-1 rounded-lg transition-colors"
                         >
                           ✏️
                         </button>
@@ -711,7 +703,7 @@ export default function HomePage() {
         <div className="fixed inset-0 bg-slate-950/85 backdrop-blur-xl flex items-center justify-center p-4 z-50">
           <div 
             className="border rounded-3xl w-full max-w-md p-6 shadow-2xl space-y-4"
-            style={{ backgroundColor: '#2d0a50', borderColor: 'rgba(217, 70, 239, 0.5)' }}
+            style={{ backgroundColor: '#1e1b4b', borderColor: 'rgba(217, 70, 239, 0.4)' }}
           >
             <h3 className="text-lg font-bold text-white capitalize">
               {modalType === 'goal'
@@ -738,7 +730,7 @@ export default function HomePage() {
                       value={goalTitle}
                       onChange={(e) => setGoalTitle(e.target.value)}
                       required
-                      className="w-full bg-purple-950 border border-purple-500/60 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-teal-300 text-sm"
+                      className="w-full bg-indigo-950 border border-purple-500/50 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-teal-300 text-sm"
                     />
                   </div>
 
@@ -751,7 +743,7 @@ export default function HomePage() {
                       value={goalTarget}
                       onChange={(e) => setGoalTarget(e.target.value)}
                       required
-                      className="w-full bg-purple-950 border border-purple-500/60 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-teal-300 font-mono text-sm"
+                      className="w-full bg-indigo-950 border border-purple-500/50 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-teal-300 font-mono text-sm"
                     />
                   </div>
 
@@ -763,7 +755,7 @@ export default function HomePage() {
                       placeholder="0.00"
                       value={goalCurrent}
                       onChange={(e) => setGoalCurrent(e.target.value)}
-                      className="w-full bg-purple-950 border border-purple-500/60 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-teal-300 font-mono text-sm"
+                      className="w-full bg-indigo-950 border border-purple-500/50 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-teal-300 font-mono text-sm"
                     />
                   </div>
                 </>
@@ -777,7 +769,7 @@ export default function HomePage() {
                       value={description}
                       onChange={(e) => setDescription(e.target.value)}
                       required
-                      className="w-full bg-purple-950 border border-purple-500/60 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-teal-300 text-sm"
+                      className="w-full bg-indigo-950 border border-purple-500/50 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-teal-300 text-sm"
                     />
                   </div>
 
@@ -787,7 +779,7 @@ export default function HomePage() {
                       <select
                         value={expenseNature}
                         onChange={(e) => setExpenseNature(e.target.value as 'fixed' | 'variable')}
-                        className="w-full bg-purple-950 border border-purple-500/60 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-teal-300 text-sm"
+                        className="w-full bg-indigo-950 border border-purple-500/50 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-teal-300 text-sm"
                       >
                         <option value="variable">Variable (Discrecional / Opcional)</option>
                         <option value="fixed">Fijo (Obligatorio / Inflexible)</option>
@@ -804,7 +796,7 @@ export default function HomePage() {
                       value={amount}
                       onChange={(e) => setAmount(e.target.value)}
                       required
-                      className="w-full bg-purple-950 border border-purple-500/60 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-teal-300 font-mono text-sm"
+                      className="w-full bg-indigo-950 border border-purple-500/50 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-teal-300 font-mono text-sm"
                     />
                   </div>
 
@@ -813,10 +805,10 @@ export default function HomePage() {
                     <select
                       value={category}
                       onChange={(e) => setCategory(e.target.value)}
-                      className="w-full bg-purple-950 border border-purple-500/60 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-teal-300 text-sm"
+                      className="w-full bg-indigo-950 border border-purple-500/50 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-teal-300 text-sm"
                     >
                       {(modalType === 'income' ? INCOME_CATEGORIES : EXPENSE_CATEGORIES).map((cat) => (
-                        <option key={cat} value={cat} style={{ backgroundColor: '#2d0a50', color: '#fff' }}>
+                        <option key={cat} value={cat} style={{ backgroundColor: '#1e1b4b', color: '#fff' }}>
                           {cat}
                         </option>
                       ))}
@@ -829,7 +821,7 @@ export default function HomePage() {
                 <button
                   type="button"
                   onClick={() => setShowModal(false)}
-                  className="px-4 py-2 bg-purple-900 hover:bg-purple-800 text-purple-200 rounded-xl text-sm transition-colors"
+                  className="px-4 py-2 bg-indigo-900 hover:bg-indigo-800 text-indigo-200 rounded-xl text-sm transition-colors"
                 >
                   Cancelar
                 </button>
@@ -844,6 +836,6 @@ export default function HomePage() {
           </div>
         </div>
       )}
-    </div>
+    </main>
   );
 }
