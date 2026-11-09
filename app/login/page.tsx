@@ -1,7 +1,6 @@
 'use client';
 
 import React, { useState } from 'react';
-import { supabase } from '@/lib/supabase';
 
 export default function LoginPage() {
   const [isSignUp, setIsSignUp] = useState(false);
@@ -20,37 +19,30 @@ export default function LoginPage() {
     setMessage(null);
 
     try {
+      const res = await fetch('/api/auth', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: isSignUp ? 'signup' : 'signin',
+          email,
+          password,
+          fullName,
+        }),
+      });
+
+      const data = await res.json();
+
+      if (!res.ok || data.error) {
+        throw new Error(data.error || 'Error en la autenticación');
+      }
+
       if (isSignUp) {
-        // Registro del lado del servidor para saltar el firewall de la oficina
-        const res = await fetch('/api/auth', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ action: 'signup', email, password, fullName }),
-        });
-        const data = await res.json();
-        if (!res.ok || data.error) throw new Error(data.error || 'Error al registrar');
-        
         setMessage('Cuenta creada con éxito. Ya puedes iniciar sesión.');
         setIsSignUp(false);
       } else {
-        // Autenticación por servidor para generar las cookies
-        const res = await fetch('/api/auth', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ action: 'signin', email, password }),
-        });
-        const data = await res.json();
-        if (!res.ok || data.error) throw new Error(data.error || 'Error al iniciar sesión');
-
-        // Sincronización de sesión local en el cliente
-        if (data.session) {
-          await supabase.auth.setSession({
-            access_token: data.session.access_token,
-            refresh_token: data.session.refresh_token,
-          });
-        }
-        
-        // Redirección forzada al Dashboard principal
+        // Guardamos la sesión localmente y en cookie de respaldo
+        localStorage.setItem('user_session', JSON.stringify(data.session || { user: { email } }));
+        document.cookie = `user_logged_in=true; path=/; max-age=86400`;
         window.location.href = '/';
       }
     } catch (err: any) {
