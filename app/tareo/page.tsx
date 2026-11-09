@@ -38,17 +38,19 @@ export default function TareoPage() {
   const [regimeInput, setRegimeInput] = useState<'micro' | 'small'>('small');
   const [isEditing, setIsEditing] = useState(false);
 
-  // Inputs Tareo Diario y Filtro
-  const [selectedDni, setSelectedDni] = useState('');
+  // Inputs Tareo Diario
+  const [selectedDni, setSelectedDni] = useState(''); // Filtro de tabla
+  const [tareoDni, setTareoDni] = useState(''); // Formulario de registro
   const [projectCode, setProjectCode] = useState('PRJ-01');
   const [tareoStatus, setTareoStatus] = useState<'campo' | 'oficina' | 'tardanza' | 'falto' | 'descanso_medico' | 'descanso' | 'vacaciones'>('campo');
   const [daysWorkedInput, setDaysWorkedInput] = useState('1');
+  const [tareoDateInput, setTareoDateInput] = useState(new Date().toISOString().slice(0, 10));
 
   useEffect(() => {
     document.title = "Módulo Operativo de Tareo & Vacaciones MYPE | V&A Consulting";
     
-    const savedCollabs = localStorage.getItem('vya_collaborators_permanent');
-    const savedTareos = localStorage.getItem('vya_tareos_permanent');
+    const savedCollabs = localStorage.getItem('vya_collabs_v8');
+    const savedTareos = localStorage.getItem('vya_tareos_v8');
 
     if (savedCollabs) {
       try { setCollaborators(JSON.parse(savedCollabs)); } catch (e) { setCollaborators([]); }
@@ -59,18 +61,17 @@ export default function TareoPage() {
         { dni: '47891234', name: 'Carlos Mendoza', cargo: 'Técnico Batimetrista', startDate: '2026-08-01', regime: 'micro' }
       ];
       setCollaborators(defaultCollabs);
-      localStorage.setItem('vya_collaborators_permanent', JSON.stringify(defaultCollabs));
+      localStorage.setItem('vya_collabs_v8', JSON.stringify(defaultCollabs));
     }
 
     if (savedTareos) {
       try { setTareos(JSON.parse(savedTareos)); } catch (e) { setTareos([]); }
     } else {
       const defaultTareos: TareoRecord[] = [
-        { id: '1', dni: '45572820', name: 'Jorge Luis Robles Tinajeros', cargo: 'Administrativo', projectCode: 'PRJ-01', status: 'campo', daysWorked: 14, date: '2026-09-11' },
-        { id: '2', dni: '45572820', name: 'Jorge Luis Robles Tinajeros', cargo: 'Administrativo', projectCode: 'PRJ-01', status: 'descanso_medico', daysWorked: 2, date: '2026-09-12' }
+        { id: '1', dni: '45572820', name: 'Jorge Luis Robles Tinajeros', cargo: 'Administrativo', projectCode: 'PRJ-01', status: 'campo', daysWorked: 14, date: '2026-09-11' }
       ];
       setTareos(defaultTareos);
-      localStorage.setItem('vya_tareos_permanent', JSON.stringify(defaultTareos));
+      localStorage.setItem('vya_tareos_v8', JSON.stringify(defaultTareos));
     }
 
     setLoading(false);
@@ -134,7 +135,7 @@ export default function TareoPage() {
     }
 
     setCollaborators(updated);
-    localStorage.setItem('vya_collaborators_permanent', JSON.stringify(updated));
+    localStorage.setItem('vya_collabs_v8', JSON.stringify(updated));
 
     setDniInput('');
     setNameInput('');
@@ -158,14 +159,17 @@ export default function TareoPage() {
     if (!confirm('¿Deseas eliminar este colaborador del maestro?')) return;
     const updated = collaborators.filter(c => c.dni !== dni);
     setCollaborators(updated);
-    localStorage.setItem('vya_collaborators_permanent', JSON.stringify(updated));
+    localStorage.setItem('vya_collabs_v8', JSON.stringify(updated));
   };
 
   const handleAddTareo = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!selectedDni) return;
+    if (!tareoDni) {
+      alert('Por favor seleccione un colaborador.');
+      return;
+    }
 
-    const collab = collaborators.find(c => c.dni === selectedDni);
+    const collab = collaborators.find(c => c.dni === tareoDni);
     if (!collab) return;
 
     const valDays = parseFloat(daysWorkedInput) || 1;
@@ -177,21 +181,20 @@ export default function TareoPage() {
       projectCode,
       status: tareoStatus,
       daysWorked: valDays,
-      date: new Date().toISOString().slice(0, 10),
+      date: tareoDateInput,
     };
 
     const updated = [newRecord, ...tareos];
     setTareos(updated);
-    localStorage.setItem('vya_tareos_permanent', JSON.stringify(updated));
+    localStorage.setItem('vya_tareos_v8', JSON.stringify(updated));
   };
 
   const handleDeleteTareo = (id: string) => {
     const updated = tareos.filter(t => t.id !== id);
     setTareos(updated);
-    localStorage.setItem('vya_tareos_permanent', JSON.stringify(updated));
+    localStorage.setItem('vya_tareos_v8', JSON.stringify(updated));
   };
 
-  // Filtrar colaboradores según el DNI seleccionado en el desplegable superior
   const displayedCollaborators = selectedDni 
     ? collaborators.filter(c => c.dni === selectedDni) 
     : collaborators;
@@ -332,19 +335,37 @@ export default function TareoPage() {
           </div>
         ) : (
           <div className="space-y-6">
-            {/* PANEL DE REGISTRO RÁPIDO DE TAREO */}
-            <form onSubmit={handleAddTareo} className="grid grid-cols-1 md:grid-cols-5 gap-3 bg-indigo-950/70 p-4 rounded-3xl border border-purple-500/30 items-end">
-              <div>
-                <label className="block text-[11px] font-semibold text-purple-200 uppercase mb-1">Seleccionar Colaborador</label>
-                <select value={selectedDni} onChange={(e) => setSelectedDni(e.target.value)} required className="w-full bg-indigo-950 border border-purple-500/50 rounded-xl px-3 py-2 text-white text-xs">
-                  <option value="">-- Todos los Colaboradores --</option>
+            {/* FILTRAR TABLA */}
+            <div className="bg-indigo-950/50 p-4 rounded-3xl border border-purple-500/30 flex flex-col md:flex-row items-center justify-between gap-4">
+              <div className="w-full md:w-1/2">
+                <label className="block text-[11px] font-semibold text-purple-200 uppercase mb-1">🔍 Filtrar Resumen y Matriz por Colaborador</label>
+                <select value={selectedDni} onChange={(e) => setSelectedDni(e.target.value)} className="w-full bg-indigo-950 border border-purple-500/50 rounded-xl px-3 py-2 text-white text-xs">
+                  <option value="">-- Ver Todos los Colaboradores --</option>
                   {collaborators.map(c => (
                     <option key={c.dni} value={c.dni}>{c.name} (DNI: {c.dni})</option>
                   ))}
                 </select>
               </div>
+              {selectedDni && (
+                <button onClick={() => setSelectedDni('')} className="text-xs text-teal-300 underline font-bold mt-2 md:mt-6">
+                  Mostrar Todos
+                </button>
+              )}
+            </div>
+
+            {/* FORMULARIO DE REGISTRO */}
+            <form onSubmit={handleAddTareo} className="grid grid-cols-1 md:grid-cols-6 gap-3 bg-indigo-950/80 p-5 rounded-3xl border border-cyan-500/40 items-end shadow-xl">
               <div>
-                <label className="block text-[11px] font-semibold text-purple-200 uppercase mb-1">Estado de Asistencia</label>
+                <label className="block text-[11px] font-semibold text-cyan-200 uppercase mb-1">1. Seleccionar Colaborador *</label>
+                <select value={tareoDni} onChange={(e) => setTareoDni(e.target.value)} required className="w-full bg-indigo-950 border border-cyan-500/50 rounded-xl px-3 py-2 text-white text-xs">
+                  <option value="">-- Seleccione Colaborador --</option>
+                  {collaborators.map(c => (
+                    <option key={c.dni} value={c.dni}>{c.name}</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="block text-[11px] font-semibold text-purple-200 uppercase mb-1">2. Estado / Incidencia</label>
                 <select value={tareoStatus} onChange={(e) => setTareoStatus(e.target.value as any)} className="w-full bg-indigo-950 border border-purple-500/50 rounded-xl px-3 py-2 text-white text-xs">
                   <option value="campo">Campo (Comisión / Planta / Mina)</option>
                   <option value="oficina">Oficina</option>
@@ -356,39 +377,38 @@ export default function TareoPage() {
                 </select>
               </div>
               <div>
-                <label className="block text-[11px] font-semibold text-purple-200 uppercase mb-1">Proyecto / Código</label>
+                <label className="block text-[11px] font-semibold text-purple-200 uppercase mb-1">3. Fecha del Registro</label>
+                <input type="date" value={tareoDateInput} onChange={(e) => setTareoDateInput(e.target.value)} required className="w-full bg-indigo-950 border border-purple-500/50 rounded-xl px-3 py-2 text-white text-xs font-mono" />
+              </div>
+              <div>
+                <label className="block text-[11px] font-semibold text-purple-200 uppercase mb-1">4. Proyecto / Código</label>
                 <input type="text" value={projectCode} onChange={(e) => setProjectCode(e.target.value)} className="w-full bg-indigo-950 border border-purple-500/50 rounded-xl px-3 py-2 text-white text-xs font-mono" />
               </div>
               <div>
-                <label className="block text-[11px] font-semibold text-purple-200 uppercase mb-1">Días</label>
+                <label className="block text-[11px] font-semibold text-purple-200 uppercase mb-1">5. Días</label>
                 <input type="number" step="0.5" value={daysWorkedInput} onChange={(e) => setDaysWorkedInput(e.target.value)} required className="w-full bg-indigo-950 border border-purple-500/50 rounded-xl px-3 py-2 text-white text-xs font-mono" />
               </div>
               <div>
-                <button type="submit" className="w-full bg-teal-500 hover:bg-teal-400 text-slate-950 font-bold text-xs py-2 rounded-xl shadow-md">+ Registrar Estado</button>
+                <button type="submit" className="w-full bg-teal-400 hover:bg-teal-300 text-slate-950 font-black text-xs py-2.5 rounded-xl shadow-lg">+ Registrar</button>
               </div>
             </form>
 
-            {/* BOTÓN PARA LIMPIAR FILTRO SI ESTÁ SELECCIONADO UN COLABORADOR */}
-            {selectedDni && (
-              <div className="flex justify-between items-center bg-cyan-950/40 border border-cyan-500/40 px-4 py-2 rounded-2xl text-xs text-cyan-200">
-                <span>🔍 Mostrando datos filtrados para: <b>{collaborators.find(c => c.dni === selectedDni)?.name}</b></span>
-                <button onClick={() => setSelectedDni('')} className="underline text-teal-300 hover:text-teal-200 font-bold">Ver Todos los Colaboradores</button>
-              </div>
-            )}
-
-            {/* MATRIZ DE TAREO & RESUMEN FILTRADO */}
+            {/* MATRIZ DE TAREO CON COLUMNAS SEPARADAS */}
             <div className="rounded-3xl p-6 shadow-2xl border space-y-4" style={{ backgroundColor: 'rgba(30, 27, 75, 0.75)', borderColor: 'rgba(217, 70, 239, 0.3)' }}>
-              <h2 className="text-sm font-bold text-white uppercase tracking-wider">Módulo de Asistencia, Tareo & Control de Bolsas (Vacaciones y Descansos)</h2>
+              <h2 className="text-sm font-bold text-white uppercase tracking-wider">Módulo de Asistencia, Tareo & Control de Bolsas (Columnas Separadas)</h2>
               
               <div className="overflow-x-auto">
                 <table className="w-full text-left text-sm text-purple-200">
                   <thead className="bg-indigo-950/80 text-purple-300 uppercase text-xs border-b border-purple-500/30">
                     <tr>
-                      <th className="px-4 py-3">Colaborador</th>
-                      <th className="px-4 py-3">Cargo / Régimen</th>
-                      <th className="px-4 py-3 text-center">Labores & Descansos Neto</th>
-                      <th className="px-4 py-3 text-center text-amber-300">Faltas / Tardanzas / DM</th>
-                      <th className="px-4 py-3 text-right">Bolsa Vacacional MYPE (Neto)</th>
+                      <th className="px-3 py-3">Colaborador</th>
+                      <th className="px-3 py-3">Cargo / Régimen</th>
+                      <th className="px-3 py-3 text-center">Días Lab.</th>
+                      <th className="px-3 py-3 text-center">Descansos Neto</th>
+                      <th className="px-3 py-3 text-center text-rose-300">Faltas</th>
+                      <th className="px-3 py-3 text-center text-amber-300">Tardanzas</th>
+                      <th className="px-3 py-3 text-center text-cyan-300">Desc. Médico</th>
+                      <th className="px-3 py-3 text-right">Bolsa Vacacional MYPE (Neto)</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-purple-500/20 font-mono text-xs">
@@ -409,49 +429,36 @@ export default function TareoPage() {
 
                       return (
                         <tr key={c.dni} className="hover:bg-indigo-900/30">
-                          <td className="px-4 py-3 text-white font-sans font-medium">
+                          <td className="px-3 py-3 text-white font-sans font-medium">
                             {c.name}
                             <div className="text-[10px] text-purple-300/60 font-mono">DNI: {c.dni} | Ingreso: {c.startDate}</div>
                           </td>
-                          <td className="px-4 py-3 font-sans">
+                          <td className="px-3 py-3 font-sans">
                             <div className="text-purple-200 font-medium">{c.cargo}</div>
                             <span className={`inline-block mt-0.5 px-2 py-0.5 rounded text-[9px] border ${c.regime === 'micro' ? 'bg-amber-950 border-amber-400 text-amber-300' : 'bg-cyan-950 border-cyan-400 text-cyan-300'}`}>
-                              {c.regime === 'micro' ? 'Microempresa (15d/año)' : 'Pequeña Empresa (30d/año)'}
+                              {c.regime === 'micro' ? 'Micro (15d)' : 'Pequeña (30d)'}
                             </span>
                           </td>
-                          <td className="px-4 py-3 text-center font-sans">
-                            <div className="text-teal-300 font-bold">{totalCampoOficina} días lab.</div>
-                            <div className="text-[10px] text-cyan-200 mt-0.5">
-                              Descansos: <span className="font-bold">{netRest} días netos</span> ({generatedRest} gen. - {takenRest} tom.)
-                            </div>
+                          <td className="px-3 py-3 text-center text-teal-300 font-bold">{totalCampoOficina} d</td>
+                          <td className="px-3 py-3 text-center text-teal-200">
+                            {netRest > 0 ? `${netRest} d` : <span className="text-purple-300/40">0 d</span>}
+                            <div className="text-[9px] text-purple-300/60">({generatedRest}g - {takenRest}t)</div>
                           </td>
-                          {/* COLUMNA DE INCIDENCIAS DETALLADAS Y CLARAS */}
-                          <td className="px-4 py-3 text-center font-sans">
-                            <div className="text-[11px] space-y-0.5">
-                              {totalFaltas > 0 ? (
-                                <div className="text-rose-400 font-bold bg-rose-950/60 px-2 py-0.5 rounded border border-rose-500/30">
-                                  🔴 {totalFaltas} {totalFaltas === 1 ? 'falta' : 'faltas'}
-                                </div>
-                              ) : null}
-                              {totalDescansoMedico > 0 ? (
-                                <div className="text-cyan-300 font-bold bg-cyan-950/60 px-2 py-0.5 rounded border border-cyan-500/30">
-                                  🏥 {totalDescansoMedico} {totalDescansoMedico === 1 ? 'día DM' : 'días DM'}
-                                </div>
-                              ) : null}
-                              {totalTardanzas > 0 ? (
-                                <div className="text-amber-300 font-bold bg-amber-950/60 px-2 py-0.5 rounded border border-amber-500/30">
-                                  🟡 {totalTardanzas} {totalTardanzas === 1 ? 'tardanza' : 'tardanzas'}
-                                </div>
-                              ) : null}
-                              {totalFaltas === 0 && totalDescansoMedico === 0 && totalTardanzas === 0 && (
-                                <span className="text-purple-300/50">Sin incidencias</span>
-                              )}
-                            </div>
+                          {/* COLUMNA FALTAS */}
+                          <td className="px-3 py-3 text-center font-bold text-rose-400">
+                            {totalFaltas > 0 ? `${totalFaltas} d` : <span className="text-purple-300/30">0</span>}
                           </td>
-                          <td className="px-4 py-3 text-right">
+                          {/* COLUMNA TARDANZAS */}
+                          <td className="px-3 py-3 text-center font-bold text-amber-300">
+                            {totalTardanzas > 0 ? `${totalTardanzas} d` : <span className="text-purple-300/30">0</span>}
+                          </td>
+                          {/* COLUMNA DESCANSO MÉDICO */}
+                          <td className="px-3 py-3 text-center font-bold text-cyan-300">
+                            {totalDescansoMedico > 0 ? `${totalDescansoMedico} d` : <span className="text-purple-300/30">0</span>}
+                          </td>
+                          <td className="px-3 py-3 text-right">
                             <div className="text-fuchsia-300 font-black text-sm">{vac.netDays} días netos</div>
-                            <div className="text-[10px] text-purple-200 font-sans">({vac.earnedDays} acumulados - {takenVac} tomados)</div>
-                            <div className="text-[10px] text-cyan-300 font-mono mt-0.5">{vac.statusMessage}</div>
+                            <div className="text-[10px] text-purple-200 font-sans">({vac.earnedDays} ac. - {takenVac} tom.)</div>
                           </td>
                         </tr>
                       );
@@ -461,7 +468,7 @@ export default function TareoPage() {
               </div>
             </div>
 
-            {/* HISTORIAL FILTRADO */}
+            {/* HISTORIAL */}
             <div className="rounded-3xl p-6 shadow-2xl border space-y-4" style={{ backgroundColor: 'rgba(30, 27, 75, 0.75)', borderColor: 'rgba(217, 70, 239, 0.3)' }}>
               <h2 className="text-sm font-bold text-white uppercase tracking-wider">Historial de Registros de Tareo & Vacaciones</h2>
               <div className="overflow-x-auto">
@@ -479,7 +486,7 @@ export default function TareoPage() {
                   <tbody className="divide-y divide-purple-500/20 font-mono text-xs">
                     {displayedTareos.length === 0 ? (
                       <tr>
-                        <td colSpan={6} className="text-center py-4 text-purple-300/50">No hay registros de tareo para este colaborador.</td>
+                        <td colSpan={6} className="text-center py-4 text-purple-300/50">No hay registros de tareo.</td>
                       </tr>
                     ) : (
                       displayedTareos.map((t) => (
