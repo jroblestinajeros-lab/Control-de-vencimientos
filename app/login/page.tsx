@@ -1,131 +1,151 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
-import { useRouter } from 'next/navigation';
+import React, { useState } from 'react';
 import { supabase } from '@/lib/supabase';
 
-export default function HomePage() {
-  const router = useRouter();
-  const [loading, setLoading] = useState(true);
-  const [user, setUser] = useState<any>(null);
+export default function LoginPage() {
+  const [isSignUp, setIsSignUp] = useState(false);
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [fullName, setFullName] = useState('');
+  
+  const [loading, setLoading] = useState(false);
+  const [message, setMessage] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    async function verifyAuth() {
-      try {
-        // 1. Intentar obtener la sesión activa desde el cliente de Supabase
-        const { data: { session } } = await supabase.auth.getSession();
+  async function handleAuth(e: React.FormEvent) {
+    e.preventDefault();
+    setLoading(true);
+    setError(null);
+    setMessage(null);
 
-        if (session?.user) {
-          setUser(session.user);
-          setLoading(false);
-          return;
-        }
-
-        // 2. Si no hay sesión local, verificar si existe la cookie que creó /api/auth
-        const hasAuthCookie = document.cookie.includes('sb-access-token');
+    try {
+      if (isSignUp) {
+        // Registro del lado del servidor para saltar el firewall de la oficina
+        const res = await fetch('/api/auth', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action: 'signup', email, password, fullName }),
+        });
+        const data = await res.json();
+        if (!res.ok || data.error) throw new Error(data.error || 'Error al registrar');
         
-        if (hasAuthCookie) {
-          // Reintentar sincronizar la sesión en el cliente
-          const { data: refreshedSession } = await supabase.auth.getSession();
-          if (refreshedSession?.session?.user) {
-            setUser(refreshedSession.session.user);
-            setLoading(false);
-            return;
-          }
+        setMessage('Cuenta creada con éxito. Ya puedes iniciar sesión.');
+        setIsSignUp(false);
+      } else {
+        // Autenticación por servidor para generar las cookies
+        const res = await fetch('/api/auth', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action: 'signin', email, password }),
+        });
+        const data = await res.json();
+        if (!res.ok || data.error) throw new Error(data.error || 'Error al iniciar sesión');
+
+        // Sincronización de sesión local en el cliente
+        if (data.session) {
+          await supabase.auth.setSession({
+            access_token: data.session.access_token,
+            refresh_token: data.session.refresh_token,
+          });
         }
-
-        // 3. Si definitivamente no hay sesión ni cookie, redirigir al login
-        router.push('/login');
-      } catch (err) {
-        console.error('Error verificando sesión:', err);
-        router.push('/login');
-      } finally {
-        setLoading(false);
+        
+        // Redirección forzada al Dashboard principal
+        window.location.href = '/';
       }
+    } catch (err: any) {
+      setError(err.message || 'Error durante la autenticación.');
+    } finally {
+      setLoading(false);
     }
-
-    verifyAuth();
-
-    // Escuchar cambios de estado en la autenticación (ej. cierre de sesión)
-    const { data: authListener } = supabase.auth.onAuthStateChange((event, session) => {
-      if (event === 'SIGNED_OUT' || !session) {
-        setUser(null);
-        router.push('/login');
-      } else if (session?.user) {
-        setUser(session.user);
-      }
-    });
-
-    return () => {
-      authListener.subscription.unsubscribe();
-    };
-  }, [router]);
-
-  async function handleSignOut() {
-    await supabase.auth.signOut();
-    // Limpiar cookies creadas por el servidor
-    document.cookie = 'sb-access-token=; Path=/; Expires=Thu, 01 Jan 1970 00:00:01 GMT;';
-    document.cookie = 'sb-refresh-token=; Path=/; Expires=Thu, 01 Jan 1970 00:00:01 GMT;';
-    window.location.href = '/login';
   }
-
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-slate-950 flex flex-col items-center justify-center text-white space-y-4">
-        <div className="w-8 h-8 border-4 border-emerald-500 border-t-transparent rounded-full animate-spin"></div>
-        <p className="text-sm text-slate-400">Cargando panel de finanzas...</p>
-      </div>
-    );
-  }
-
-  if (!user) return null;
 
   return (
-    <main className="min-h-screen bg-slate-950 text-slate-100 p-6">
-      {/* Encabezado Principal */}
-      <header className="max-w-7xl mx-auto flex justify-between items-center pb-6 border-b border-slate-800 mb-8">
-        <div>
-          <h1 className="text-2xl font-bold text-white">Control de Finanzas Personales</h1>
+    <div className="min-h-screen bg-slate-950 flex items-center justify-center p-4">
+      <div className="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-md p-8 shadow-2xl space-y-6">
+        <div className="text-center space-y-2">
+          <h1 className="text-2xl font-bold text-white">
+            {isSignUp ? 'Crear Cuenta' : 'Iniciar Sesión'}
+          </h1>
           <p className="text-xs text-slate-400">
-            Bienvenido, <span className="text-emerald-400 font-medium">{user.user_metadata?.full_name || user.email}</span>
+            Control de Finanzas Personales & Ahorro Disciplinado
           </p>
         </div>
-        
-        <button
-          onClick={handleSignOut}
-          className="bg-slate-900 hover:bg-slate-800 border border-slate-700 text-slate-300 text-xs px-4 py-2 rounded-lg transition-colors"
-        >
-          Cerrar Sesión
-        </button>
-      </header>
 
-      {/* Contenido Principal / Dashboard */}
-      <section className="max-w-7xl mx-auto space-y-6">
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          <div className="bg-slate-900 border border-slate-800 p-6 rounded-2xl shadow-lg">
-            <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Balance General</h3>
-            <p className="text-3xl font-bold text-emerald-400 font-mono">S/ 0.00</p>
+        {error && (
+          <div className="p-3 bg-rose-950/60 border border-rose-800 text-rose-300 rounded-lg text-sm text-center">
+            {error}
+          </div>
+        )}
+
+        {message && (
+          <div className="p-3 bg-emerald-950/60 border border-emerald-800 text-emerald-300 rounded-lg text-sm text-center">
+            {message}
+          </div>
+        )}
+
+        <form onSubmit={handleAuth} className="space-y-4">
+          {isSignUp && (
+            <div>
+              <label className="block text-xs font-semibold text-slate-300 uppercase mb-1">Nombre Completo</label>
+              <input
+                type="text"
+                placeholder="Ej. Jorge Robles"
+                value={fullName}
+                onChange={(e) => setFullName(e.target.value)}
+                required
+                className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-emerald-500"
+              />
+            </div>
+          )}
+
+          <div>
+            <label className="block text-xs font-semibold text-slate-300 uppercase mb-1">Correo Electrónico</label>
+            <input
+              type="email"
+              placeholder="tu@email.com"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              required
+              className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-emerald-500"
+            />
           </div>
 
-          <div className="bg-slate-900 border border-slate-800 p-6 rounded-2xl shadow-lg">
-            <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Ingresos del Mes</h3>
-            <p className="text-3xl font-bold text-blue-400 font-mono">S/ 0.00</p>
+          <div>
+            <label className="block text-xs font-semibold text-slate-300 uppercase mb-1">Contraseña</label>
+            <input
+              type="password"
+              placeholder="••••••••"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              required
+              className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-emerald-500"
+            />
           </div>
 
-          <div className="bg-slate-900 border border-slate-800 p-6 rounded-2xl shadow-lg">
-            <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Gastos del Mes</h3>
-            <p className="text-3xl font-bold text-rose-400 font-mono">S/ 0.00</p>
-          </div>
+          <button
+            type="submit"
+            disabled={loading}
+            className="w-full bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white font-medium py-2.5 rounded-lg text-sm transition-colors shadow-lg shadow-emerald-900/20"
+          >
+            {loading ? 'Procesando...' : isSignUp ? 'Registrarse' : 'Ingresar'}
+          </button>
+        </form>
+
+        <div className="text-center pt-2 border-t border-slate-800">
+          <button
+            type="button"
+            onClick={() => {
+              setIsSignUp(!isSignUp);
+              setError(null);
+              setMessage(null);
+            }}
+            className="text-xs text-emerald-400 hover:underline font-medium"
+          >
+            {isSignUp ? '¿Ya tienes cuenta? Inicia Sesión' : '¿No tienes cuenta? Regístrate aquí'}
+          </button>
         </div>
-
-        {/* Sección central para módulos futuros */}
-        <div className="bg-slate-900 border border-slate-800 rounded-2xl p-8 text-center space-y-3">
-          <h2 className="text-lg font-semibold text-white">Plataforma Lista & Autenticada</h2>
-          <p className="text-sm text-slate-400 max-w-md mx-auto">
-            La sesión está conectada correctamente con Supabase. Puedes comenzar a registrar transacciones, metas de ahorro y presupuestos.
-          </p>
-        </div>
-      </section>
-    </main>
+      </div>
+    </div>
   );
 }
