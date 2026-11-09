@@ -9,6 +9,7 @@ interface Transaction {
   description: string;
   amount: number;
   type: 'income' | 'expense';
+  nature?: 'fixed' | 'variable'; // 1. Gastos Fijos vs Variables
   category: string;
   date: string;
   month: string; // Formato YYYY-MM
@@ -71,6 +72,7 @@ export default function HomePage() {
   // Formulario
   const [description, setDescription] = useState('');
   const [amount, setAmount] = useState('');
+  const [expenseNature, setExpenseNature] = useState<'fixed' | 'variable'>('variable');
   const [category, setCategory] = useState(INCOME_CATEGORIES[0]);
   const [budgetError, setBudgetError] = useState<string | null>(null);
 
@@ -132,18 +134,27 @@ export default function HomePage() {
     localStorage.setItem('fin_savings_percent', newPercent.toString());
   };
 
-  // Filtrado de transacciones por mes seleccionado
+  // Transacciones filtradas por mes
   const monthTransactions = transactions.filter(
     (t) => (t.month || t.date.slice(0, 7)) === selectedMonth
   );
 
-  // Cálculos Variables por Mes
+  // Totales por Mes
   const totalIncome = monthTransactions
     .filter((t) => t.type === 'income')
     .reduce((acc, t) => acc + t.amount, 0);
 
   const totalExpense = monthTransactions
     .filter((t) => t.type === 'expense')
+    .reduce((acc, t) => acc + t.amount, 0);
+
+  // 1. Desglose de Gastos Fijos vs Variables
+  const fixedExpenses = monthTransactions
+    .filter((t) => t.type === 'expense' && t.nature === 'fixed')
+    .reduce((acc, t) => acc + t.amount, 0);
+
+  const variableExpenses = monthTransactions
+    .filter((t) => t.type === 'expense' && t.nature === 'variable')
     .reduce((acc, t) => acc + t.amount, 0);
 
   const plannedSavings = (totalIncome * savingsTargetPercent) / 100;
@@ -154,7 +165,13 @@ export default function HomePage() {
     ? Math.min(Math.round((totalExpense / availableExpenseBudget) * 100), 100)
     : 0;
 
-  // Gastos agrupados por categoría para la barra visual
+  // 4. KPIs de Salud Financiera
+  // Cobertura de Fondo de Emergencia basada en Gastos Fijos (Objetivo habitual: 3 a 6 meses)
+  const totalSavedAllGoals = goals.reduce((acc, g) => acc + g.currentAmount, 0);
+  const fixedExpenseMonthlyAvg = fixedExpenses || (totalExpense * 0.5) || 1;
+  const emergencyCoverageMonths = (totalSavedAllGoals / fixedExpenseMonthlyAvg).toFixed(1);
+
+  // Gastos agrupados por categoría
   const expensesByCategory = EXPENSE_CATEGORIES.map((cat) => {
     const total = monthTransactions
       .filter((t) => t.type === 'expense' && t.category === cat)
@@ -162,10 +179,24 @@ export default function HomePage() {
     return { category: cat, amount: total };
   }).filter((item) => item.amount > 0);
 
+  // 5. Histórico y Tendencias (Últimos 4 meses)
+  const availableMonths = Array.from(
+    new Set(transactions.map((t) => t.month || t.date.slice(0, 7)))
+  ).sort().reverse().slice(0, 4);
+
+  const monthlyHistory = availableMonths.map((m) => {
+    const mTx = transactions.filter((t) => (t.month || t.date.slice(0, 7)) === m);
+    const inc = mTx.filter((t) => t.type === 'income').reduce((a, t) => a + t.amount, 0);
+    const exp = mTx.filter((t) => t.type === 'expense').reduce((a, t) => a + t.amount, 0);
+    const sav = (inc * savingsTargetPercent) / 100;
+    return { month: m, income: inc, expense: exp, savings: sav };
+  });
+
   const handleOpenModal = (type: 'income' | 'expense' | 'goal') => {
     setModalType(type);
     setDescription('');
     setAmount('');
+    setExpenseNature('variable');
     setGoalTitle('');
     setGoalTarget('');
     setGoalCurrent('');
@@ -210,9 +241,10 @@ export default function HomePage() {
 
       const newTx: Transaction = {
         id: Date.now().toString(),
-        description: description || 'Gasto Variable',
+        description: description || 'Gasto',
         amount: val,
         type: 'expense',
+        nature: expenseNature,
         category,
         date: new Date().toLocaleDateString('es-PE'),
         month: selectedMonth,
@@ -238,7 +270,6 @@ export default function HomePage() {
     setShowModal(false);
   };
 
-  // Exportar reporte a Excel adaptando la moneda seleccionada
   const exportToExcel = () => {
     const summaryData = [
       { Concepto: 'Moneda Seleccionada', Valor: `${currency} (${currSymbol})` },
@@ -246,13 +277,16 @@ export default function HomePage() {
       { Concepto: `Ingresos Totales (${currSymbol})`, Valor: totalIncome },
       { Concepto: `Ahorro Reservado (${savingsTargetPercent}%) (${currSymbol})`, Valor: plannedSavings },
       { Concepto: `Presupuesto Límite para Gastos (${currSymbol})`, Valor: availableExpenseBudget },
-      { Concepto: `Gastos Ejecutados (${currSymbol})`, Valor: totalExpense },
+      { Concepto: `Gastos Fijos (${currSymbol})`, Valor: fixedExpenses },
+      { Concepto: `Gastos Variables (${currSymbol})`, Valor: variableExpenses },
+      { Concepto: `Gastos Ejecutados Totales (${currSymbol})`, Valor: totalExpense },
       { Concepto: `Saldo Restante para Gastos (${currSymbol})`, Valor: budgetRemaining },
     ];
 
     const txData = monthTransactions.map((t) => ({
       Fecha: t.date,
       Tipo: t.type === 'income' ? 'Ingreso' : 'Gasto',
+      Naturaleza: t.nature === 'fixed' ? 'Fijo (Obligatorio)' : t.nature === 'variable' ? 'Variable' : '-',
       Descripción: t.description,
       Categoría: t.category,
       [`Monto (${currSymbol})`]: t.amount,
@@ -294,7 +328,7 @@ export default function HomePage() {
 
   return (
     <main className="min-h-screen bg-slate-950 text-slate-100 p-6">
-      {/* Encabezado Principal, Selector de Moneda y Mes */}
+      {/* Encabezado */}
       <header className="max-w-7xl mx-auto flex flex-col md:flex-row justify-between items-start md:items-center pb-6 border-b border-slate-800 mb-8 gap-4">
         <div>
           <h1 className="text-2xl font-bold text-white">Control de Finanzas Personales</h1>
@@ -304,7 +338,6 @@ export default function HomePage() {
         </div>
         
         <div className="flex flex-wrap items-center gap-3">
-          {/* Selector de Moneda */}
           <select
             value={currency}
             onChange={(e) => handleCurrencyChange(e.target.value as CurrencyCode)}
@@ -317,7 +350,6 @@ export default function HomePage() {
             ))}
           </select>
 
-          {/* Selector de Mes */}
           <input
             type="month"
             value={selectedMonth}
@@ -325,7 +357,6 @@ export default function HomePage() {
             className="bg-slate-900 border border-slate-700 text-white text-xs px-3 py-2 rounded-lg focus:outline-none focus:border-emerald-500 font-mono"
           />
 
-          {/* Botón Exportar a Excel */}
           <button
             onClick={exportToExcel}
             className="bg-emerald-700 hover:bg-emerald-600 text-white font-medium text-xs px-4 py-2 rounded-lg transition-colors flex items-center space-x-1.5 shadow-lg shadow-emerald-950/40"
@@ -369,7 +400,7 @@ export default function HomePage() {
               </select>
             </div>
             <p className="text-3xl font-bold text-purple-400 font-mono">{currSymbol} {plannedSavings.toFixed(2)}</p>
-            <p className="text-[11px] text-slate-500">Cuota intangible reservada</p>
+            <p className="text-[11px] text-slate-500">Cuota reservada</p>
           </div>
 
           <div className="bg-slate-900 border border-slate-800 p-6 rounded-2xl shadow-lg border-l-4 border-l-emerald-500">
@@ -381,11 +412,32 @@ export default function HomePage() {
           <div className="bg-slate-900 border border-slate-800 p-6 rounded-2xl shadow-lg">
             <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Gastos Ejecutados</h3>
             <p className="text-3xl font-bold text-rose-400 font-mono">{currSymbol} {totalExpense.toFixed(2)}</p>
-            <p className="text-[11px] text-slate-500">Saldo disponible: {currSymbol} {budgetRemaining.toFixed(2)}</p>
+            <p className="text-[11px] text-slate-500">Saldo: {currSymbol} {budgetRemaining.toFixed(2)}</p>
           </div>
         </div>
 
-        {/* Control de Gastos por Categorías (Barra Segmentada) */}
+        {/* 4. Tarjeta de Salud Financiera & Desglose Fijo vs Variable */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <div className="bg-slate-900 border border-slate-800 p-6 rounded-2xl shadow-lg flex flex-col justify-between">
+            <h4 className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Gastos Fijos (Obligatorios)</h4>
+            <p className="text-2xl font-bold text-amber-400 font-mono">{currSymbol} {fixedExpenses.toFixed(2)}</p>
+            <p className="text-[11px] text-slate-500 mt-1">Alquiler, mantenimiento, servicios básicos</p>
+          </div>
+
+          <div className="bg-slate-900 border border-slate-800 p-6 rounded-2xl shadow-lg flex flex-col justify-between">
+            <h4 className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Gastos Variables</h4>
+            <p className="text-2xl font-bold text-indigo-400 font-mono">{currSymbol} {variableExpenses.toFixed(2)}</p>
+            <p className="text-[11px] text-slate-500 mt-1">Salidas, entretenimientos y extras</p>
+          </div>
+
+          <div className="bg-slate-900 border border-slate-800 p-6 rounded-2xl shadow-lg flex flex-col justify-between">
+            <h4 className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Salud Financiera (Fondo)</h4>
+            <p className="text-2xl font-bold text-emerald-400 font-mono">{emergencyCoverageMonths} meses</p>
+            <p className="text-[11px] text-slate-500 mt-1">Cobertura de tus gastos fijos acumulados</p>
+          </div>
+        </div>
+
+        {/* Control de Gastos por Categorías */}
         <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-xl space-y-4">
           <div className="flex justify-between items-center text-sm">
             <span className="font-semibold text-slate-300">
@@ -450,11 +502,12 @@ export default function HomePage() {
           </div>
         </div>
 
-        {/* Metas & Historial */}
+        {/* 2. Metas de Ahorro con Simulación de Tiempo + Histórico Mes a Mes */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+          {/* Metas con Proyección */}
           <div className="lg:col-span-1 bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-xl space-y-4">
             <div className="flex justify-between items-center">
-              <h2 className="text-lg font-semibold text-white">Metas de Ahorro</h2>
+              <h2 className="text-lg font-semibold text-white">Metas & Proyección</h2>
               <button
                 onClick={() => handleOpenModal('goal')}
                 className="text-xs bg-blue-600 hover:bg-blue-500 text-white px-2.5 py-1 rounded-lg transition-colors font-medium"
@@ -466,6 +519,11 @@ export default function HomePage() {
             <div className="space-y-4">
               {goals.map((g) => {
                 const pct = Math.min(Math.round((g.currentAmount / (g.targetAmount || 1)) * 100), 100);
+                const remainingToGoal = Math.max(0, g.targetAmount - g.currentAmount);
+                const monthsToTarget = plannedSavings > 0 
+                  ? Math.ceil(remainingToGoal / plannedSavings)
+                  : 0;
+
                 return (
                   <div key={g.id} className="bg-slate-950 border border-slate-800 p-4 rounded-xl space-y-2">
                     <div className="flex justify-between items-center">
@@ -486,40 +544,41 @@ export default function HomePage() {
                         style={{ width: `${pct}%` }}
                       ></div>
                     </div>
+
+                    <p className="text-[10px] text-slate-500 font-mono pt-1">
+                      {monthsToTarget > 0 
+                        ? `⏱ Tiempo est. para completar: ~${monthsToTarget} mes(es)`
+                        : '🎉 Meta alcanzada o lista'}
+                    </p>
                   </div>
                 );
               })}
             </div>
           </div>
 
+          {/* 5. Comparativa Mes a Mes */}
           <div className="lg:col-span-2 bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-xl space-y-4">
-            <h2 className="text-lg font-semibold text-white">Transacciones ({selectedMonth})</h2>
-            {monthTransactions.length === 0 ? (
-              <p className="text-sm text-slate-500 py-6 text-center">No hay registros para este mes. Registra tus ingresos o gastos arriba.</p>
+            <h2 className="text-lg font-semibold text-white">Comparativa y Tendencia Mes a Mes</h2>
+            {monthlyHistory.length === 0 ? (
+              <p className="text-sm text-slate-500 py-6 text-center">Registra ingresos y gastos para generar la tendencia histórica.</p>
             ) : (
               <div className="overflow-x-auto">
                 <table className="w-full text-left text-sm text-slate-300">
                   <thead className="bg-slate-950 text-slate-400 uppercase text-xs">
                     <tr>
-                      <th className="px-4 py-3 rounded-l-lg">Fecha</th>
-                      <th className="px-4 py-3">Descripción</th>
-                      <th className="px-4 py-3">Categoría</th>
-                      <th className="px-4 py-3 text-right rounded-r-lg">Monto</th>
+                      <th className="px-4 py-3 rounded-l-lg">Mes</th>
+                      <th className="px-4 py-3 text-right">Ingresos</th>
+                      <th className="px-4 py-3 text-right">Gastos</th>
+                      <th className="px-4 py-3 text-right rounded-r-lg">Ahorro Reservado</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-slate-800">
-                    {monthTransactions.map((t) => (
-                      <tr key={t.id} className="hover:bg-slate-800/50">
-                        <td className="px-4 py-3 text-xs text-slate-400">{t.date}</td>
-                        <td className="px-4 py-3 font-medium text-white">{t.description}</td>
-                        <td className="px-4 py-3 text-xs text-slate-400">
-                          <span className="bg-slate-800 px-2 py-1 rounded-md border border-slate-700">
-                            {t.category}
-                          </span>
-                        </td>
-                        <td className={`px-4 py-3 text-right font-mono font-bold ${t.type === 'income' ? 'text-emerald-400' : 'text-rose-400'}`}>
-                          {t.type === 'income' ? '+' : '-'} {currSymbol} {t.amount.toFixed(2)}
-                        </td>
+                  <tbody className="divide-y divide-slate-800 font-mono">
+                    {monthlyHistory.map((h) => (
+                      <tr key={h.month} className="hover:bg-slate-800/50">
+                        <td className="px-4 py-3 text-xs text-white font-medium">{h.month}</td>
+                        <td className="px-4 py-3 text-right text-emerald-400">{currSymbol} {h.income.toFixed(2)}</td>
+                        <td className="px-4 py-3 text-right text-rose-400">{currSymbol} {h.expense.toFixed(2)}</td>
+                        <td className="px-4 py-3 text-right text-purple-400">{currSymbol} {h.savings.toFixed(2)}</td>
                       </tr>
                     ))}
                   </tbody>
@@ -527,6 +586,51 @@ export default function HomePage() {
               </div>
             )}
           </div>
+        </div>
+
+        {/* Historial de Transacciones del Mes Activo */}
+        <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-xl space-y-4">
+          <h2 className="text-lg font-semibold text-white">Transacciones ({selectedMonth})</h2>
+          {monthTransactions.length === 0 ? (
+            <p className="text-sm text-slate-500 py-6 text-center">No hay registros para este mes. Registra tus ingresos o gastos arriba.</p>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-sm text-slate-300">
+                <thead className="bg-slate-950 text-slate-400 uppercase text-xs">
+                  <tr>
+                    <th className="px-4 py-3 rounded-l-lg">Fecha</th>
+                    <th className="px-4 py-3">Tipo / Naturaleza</th>
+                    <th className="px-4 py-3">Descripción</th>
+                    <th className="px-4 py-3">Categoría</th>
+                    <th className="px-4 py-3 text-right rounded-r-lg">Monto</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-800">
+                  {monthTransactions.map((t) => (
+                    <tr key={t.id} className="hover:bg-slate-800/50">
+                      <td className="px-4 py-3 text-xs text-slate-400">{t.date}</td>
+                      <td className="px-4 py-3 text-xs">
+                        <span className={`px-2 py-0.5 rounded text-[10px] border ${
+                          t.type === 'income' 
+                            ? 'bg-emerald-950/60 border-emerald-800 text-emerald-300' 
+                            : t.nature === 'fixed'
+                            ? 'bg-amber-950/60 border-amber-800 text-amber-300'
+                            : 'bg-slate-800 border-slate-700 text-slate-300'
+                        }`}>
+                          {t.type === 'income' ? 'Ingreso' : t.nature === 'fixed' ? 'Gasto Fijo' : 'Gasto Variable'}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3 font-medium text-white">{t.description}</td>
+                      <td className="px-4 py-3 text-xs text-slate-400">{t.category}</td>
+                      <td className={`px-4 py-3 text-right font-mono font-bold ${t.type === 'income' ? 'text-emerald-400' : 'text-rose-400'}`}>
+                        {t.type === 'income' ? '+' : '-'} {currSymbol} {t.amount.toFixed(2)}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
         </div>
       </section>
 
@@ -592,13 +696,27 @@ export default function HomePage() {
                     <label className="block text-xs font-semibold text-slate-300 uppercase mb-1">Descripción</label>
                     <input
                       type="text"
-                      placeholder="Ej. Honorarios Noviembre, Consultoría, Supermercado"
+                      placeholder="Ej. Alquiler, Consultoría, Supermercado"
                       value={description}
                       onChange={(e) => setDescription(e.target.value)}
                       required
                       className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-emerald-500 text-sm"
                     />
                   </div>
+
+                  {modalType === 'expense' && (
+                    <div>
+                      <label className="block text-xs font-semibold text-slate-300 uppercase mb-1">Naturaleza del Gasto</label>
+                      <select
+                        value={expenseNature}
+                        onChange={(e) => setExpenseNature(e.target.value as 'fixed' | 'variable')}
+                        className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-emerald-500 text-sm"
+                      >
+                        <option value="variable">Variable (Discrecional / Opcional)</option>
+                        <option value="fixed">Fijo (Obligatorio / Inflexible)</option>
+                      </select>
+                    </div>
+                  )}
 
                   <div>
                     <label className="block text-xs font-semibold text-slate-300 uppercase mb-1">Monto ({currSymbol})</label>
