@@ -109,7 +109,6 @@ export default function HomePage() {
     if (savedSavingsPercent) setSavingsTargetPercent(Number(savedSavingsPercent));
     if (savedCurrency && CURRENCIES[savedCurrency]) setCurrency(savedCurrency);
 
-    // Carga automática por defecto si no existen transacciones previas
     if (savedTx) {
       setTransactions(JSON.parse(savedTx));
     } else {
@@ -536,6 +535,7 @@ export default function HomePage() {
           </div>
         </div>
 
+        {/* DISTRIBUCIÓN DE GASTOS CON PORCENTAJE Y ACUMULADO AL FINAL */}
         <div 
           className="rounded-3xl p-6 shadow-2xl border space-y-4"
           style={{ backgroundColor: 'rgba(30, 27, 75, 0.75)', borderColor: 'rgba(217, 70, 239, 0.3)', backdropFilter: 'blur(16px)' }}
@@ -552,26 +552,37 @@ export default function HomePage() {
           {expensesByCategory.length === 0 ? (
             <p className="text-xs text-purple-300/60 py-2">No hay gastos ejecutados en este mes.</p>
           ) : (
-            <div className="space-y-3">
-              {expensesByCategory.map((item) => {
-                const categoryPct = Math.round((item.amount / (availableExpenseBudget || 1)) * 100);
-                return (
-                  <div key={item.category} className="space-y-1">
-                    <div className="flex justify-between text-xs">
-                      <span className="text-purple-200">{item.category}</span>
-                      <span className="font-mono text-purple-300">
-                        {currSymbol} {item.amount.toFixed(2)} ({categoryPct}%)
-                      </span>
+            <div className="space-y-4">
+              <div className="space-y-3">
+                {expensesByCategory.map((item) => {
+                  const categoryPct = Math.round((item.amount / (availableExpenseBudget || 1)) * 100);
+                  const shareOfTotalExpense = totalExpense > 0 ? Math.round((item.amount / totalExpense) * 100) : 0;
+                  return (
+                    <div key={item.category} className="space-y-1">
+                      <div className="flex justify-between text-xs">
+                        <span className="text-purple-200">{item.category}</span>
+                        <span className="font-mono text-purple-300">
+                          {currSymbol} {item.amount.toFixed(2)} ({categoryPct}% del presupuesto | <span className="text-teal-300 font-semibold">{shareOfTotalExpense}% del gasto</span>)
+                        </span>
+                      </div>
+                      <div className="w-full bg-indigo-950 h-2.5 rounded-full overflow-hidden border border-purple-500/30">
+                        <div
+                          className="bg-gradient-to-r from-teal-400 to-cyan-400 h-full transition-all duration-500"
+                          style={{ width: `${Math.min(categoryPct, 100)}%` }}
+                        ></div>
+                      </div>
                     </div>
-                    <div className="w-full bg-indigo-950 h-2.5 rounded-full overflow-hidden border border-purple-500/30">
-                      <div
-                        className="bg-gradient-to-r from-teal-400 to-cyan-400 h-full transition-all duration-500"
-                        style={{ width: `${Math.min(categoryPct, 100)}%` }}
-                      ></div>
-                    </div>
-                  </div>
-                );
-              })}
+                  );
+                })}
+              </div>
+
+              {/* Fila Acumulada al Final */}
+              <div className="pt-4 border-t border-purple-500/30 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 text-xs font-mono">
+                <span className="text-purple-300 font-bold uppercase tracking-wider">Acumulado Total de Gastos del Mes:</span>
+                <span className="text-rose-400 font-black text-base">
+                  {currSymbol} {totalExpense.toFixed(2)} <span className="text-xs font-normal text-purple-300">({budgetPercentage}% del límite disponible)</span>
+                </span>
+              </div>
             </div>
           )}
         </div>
