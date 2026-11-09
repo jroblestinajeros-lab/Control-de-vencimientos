@@ -206,4 +206,95 @@ export default function HomePage() {
                     <th className="px-4 py-3 rounded-l-lg">Fecha</th>
                     <th className="px-4 py-3">Descripción</th>
                     <th className="px-4 py-3">Categoría</th>
-                    <th className="px-
+                    <th className="px-4 py-3 text-right rounded-r-lg">Monto</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-800">
+                  {transactions.map((t) => (
+                    <tr key={t.id} className="hover:bg-slate-800/50">
+                      <td className="px-4 py-3 text-xs text-slate-400">{t.date}</td>
+                      <td className="px-4 py-3 font-medium text-white">{t.description}</td>
+                      <td className="px-4 py-3 text-xs text-slate-400">{t.category}</td>
+                      <td className={`px-4 py-3 text-right font-mono font-bold ${t.type === 'income' ? 'text-emerald-400' : 'text-rose-400'}`}>
+                        {t.type === 'income' ? '+' : '-'} S/ {t.amount.toFixed(2)}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      </section>
+
+      {/* Modal Formulario */}
+      {showModal && (
+        <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+          <div className="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-md p-6 shadow-2xl space-y-4">
+            <h3 className="text-lg font-bold text-white capitalize">
+              {modalType === 'budget' ? 'Configurar Presupuesto Mensual' : `Registrar ${modalType === 'income' ? 'Ingreso' : 'Gasto'}`}
+            </h3>
+
+            <form onSubmit={handleSave} className="space-y-4">
+              {modalType !== 'budget' && (
+                <div>
+                  <label className="block text-xs font-semibold text-slate-300 uppercase mb-1">Descripción</label>
+                  <input
+                    type="text"
+                    placeholder="Ej. Sueldo, Alquiler, Supermercado"
+                    value={description}
+                    onChange={(e) => setDescription(e.target.value)}
+                    required
+                    className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-emerald-500"
+                  />
+                </div>
+              )}
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-300 uppercase mb-1">Monto (S/)</label>
+                <input
+                  type="number"
+                  step="0.01"
+                  placeholder="0.00"
+                  value={amount}
+                  onChange={(e) => setAmount(e.target.value)}
+                  required
+                  className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-emerald-500 font-mono"
+                />
+              </div>
+
+              {modalType !== 'budget' && (
+                <div>
+                  <label className="block text-xs font-semibold text-slate-300 uppercase mb-1">Categoría</label>
+                  <input
+                    type="text"
+                    placeholder="Ej. Casa, Vehículo, Servicios"
+                    value={category}
+                    onChange={(e) => setCategory(e.target.value)}
+                    className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-emerald-500"
+                  />
+                </div>
+              )}
+
+              <div className="flex justify-end space-x-3 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setShowModal(false)}
+                  className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg text-sm"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-sm font-medium"
+                >
+                  Guardar
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+    </main>
+  );
+}
