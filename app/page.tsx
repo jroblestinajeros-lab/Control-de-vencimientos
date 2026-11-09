@@ -82,6 +82,9 @@ export default function HomePage() {
   const currSymbol = CURRENCIES[currency].symbol;
 
   useEffect(() => {
+    // Actualizar el título de la pestaña del navegador dinámicamente
+    document.title = "Finanzas Personales | Control Presupuestario";
+
     const sessionData = localStorage.getItem('user_session');
     const isLoggedCookie = document.cookie.includes('user_logged_in');
 
@@ -448,8 +451,9 @@ export default function HomePage() {
     >
       <header className="max-w-7xl mx-auto flex flex-col md:flex-row justify-between items-start md:items-center pb-6 border-b border-purple-500/30 mb-8 gap-4">
         <div>
+          {/* TÍTULO PRINCIPAL ACTUALIZADO */}
           <h1 className="text-3xl font-black text-transparent bg-clip-text bg-gradient-to-r from-teal-300 via-fuchsia-400 to-cyan-300 tracking-tight">
-            Control de Finanzas Personales
+            Gestión de Finanzas Personales
           </h1>
           <p className="text-xs text-purple-200 mt-1">
             Usuario: <span className="text-teal-300 font-semibold">{userEmail}</span>
@@ -924,7 +928,7 @@ export default function HomePage() {
                   </div>
 
                   <div>
-                    <label className="block text-xs font-semibold text-purple-200 uppercase mb-1">Categoría</label>
+                    <label className="block text-xs font-semibold text-purple-200 uppercase, mb-1">Categoría</label>
                     <select
                       value={category}
                       onChange={(e) => setCategory(e.target.value)}
