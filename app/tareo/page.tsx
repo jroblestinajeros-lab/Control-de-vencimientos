@@ -32,12 +32,13 @@ export default function TareoPage() {
   const [collaborators, setCollaborators] = useState<Collaborator[]>([]);
   const [tareos, setTareos] = useState<TareoRecord[]>([]);
 
-  // Inputs Maestro
+  // Estados para el Formulario del Maestro (Incluyendo control de edición)
   const [dniInput, setDniInput] = useState('');
   const [nameInput, setNameInput] = useState('');
   const [cargoInput, setCargoInput] = useState('');
   const [startDateInput, setStartDateInput] = useState('');
   const [regimeInput, setRegimeInput] = useState<'micro' | 'small'>('small');
+  const [isEditing, setIsEditing] = useState(false); // Bandera para saber si estamos editando
 
   // Inputs Tareo Diario
   const [selectedDni, setSelectedDni] = useState('');
@@ -48,8 +49,8 @@ export default function TareoPage() {
   useEffect(() => {
     document.title = "Módulo Operativo de Tareo & Vacaciones MYPE | V&A Consulting";
     
-    const savedCollabs = localStorage.getItem('vya_collaborators');
-    const savedTareos = localStorage.getItem('vya_tareos');
+    const savedCollabs = localStorage.getItem('vya_collaborators_v3');
+    const savedTareos = localStorage.getItem('vya_tareos_v3');
 
     if (savedCollabs) {
       try { setCollaborators(JSON.parse(savedCollabs)); } catch (e) { setCollaborators([]); }
@@ -60,7 +61,7 @@ export default function TareoPage() {
         { dni: '47891234', name: 'Carlos Mendoza', cargo: 'Técnico Batimetrista', startDate: '2026-08-01', regime: 'micro' }
       ];
       setCollaborators(defaultCollabs);
-      localStorage.setItem('vya_collaborators', JSON.stringify(defaultCollabs));
+      localStorage.setItem('vya_collaborators_v3', JSON.stringify(defaultCollabs));
     }
 
     if (savedTareos) {
@@ -70,13 +71,13 @@ export default function TareoPage() {
         { id: '1', dni: '45572820', name: 'Jorge Luis Robles Tinajeros', cargo: 'Administrativo', projectCode: 'PRJ-01', status: 'campo', daysWorked: 7, date: '2026-09-11' }
       ];
       setTareos(defaultTareos);
-      localStorage.setItem('vya_tareos', JSON.stringify(defaultTareos));
+      localStorage.setItem('vya_tareos_v3', JSON.stringify(defaultTareos));
     }
 
     setLoading(false);
   }, []);
 
-  // --- LÓGICA DE CÁLCULO DE VACACIONES MYPE RIGUROSA ---
+  // --- CÁLCULO DE VACACIONES MYPE RIGUROSO ---
   const calculateVacationStatus = (startDateStr: string, regime: 'micro' | 'small') => {
     if (!startDateStr) return { earnedDays: 0, statusMessage: 'Sin fecha de ingreso', totalMonths: 0 };
     
@@ -92,7 +93,7 @@ export default function TareoPage() {
     
     const totalMonthsFraction = Math.max(0, months + (days >= 0 ? days / 30 : 0));
     
-    // Asignación correcta según régimen MYPE: Microempresa = 15 días/año | Pequeña Empresa = 30 días/año
+    // Microempresa = 15 días/año | Pequeña Empresa = 30 días/año
     const annualDays = regime === 'micro' ? 15 : 30;
     const monthlyAccrualRate = annualDays / 12;
 
@@ -111,6 +112,7 @@ export default function TareoPage() {
     };
   };
 
+  // --- GUARDAR O ACTUALIZAR COLABORADOR (CON SOPORTE DE EDICIÓN) ---
   const handleSaveCollaborator = (e: React.FormEvent) => {
     e.preventDefault();
     if (!dniInput || !nameInput || !startDateInput) return;
@@ -134,12 +136,33 @@ export default function TareoPage() {
     }
 
     setCollaborators(updated);
-    localStorage.setItem('vya_collaborators', JSON.stringify(updated));
+    localStorage.setItem('vya_collaborators_v3', JSON.stringify(updated));
 
+    // Limpiar formulario y desactivar modo edición
     setDniInput('');
     setNameInput('');
     setCargoInput('');
     setStartDateInput('');
+    setRegimeInput('small');
+    setIsEditing(false);
+  };
+
+  // --- CARGAR DATOS AL FORMULARIO PARA EDITAR ---
+  const handleEditCollaborator = (collab: Collaborator) => {
+    setDniInput(collab.dni);
+    setNameInput(collab.name);
+    setCargoInput(collab.cargo);
+    setStartDateInput(collab.startDate);
+    setRegimeInput(collab.regime);
+    setIsEditing(true);
+    window.scrollTo({ top: 0, behavior: 'smooth' }); // Subir al formulario
+  };
+
+  const handleDeleteCollaborator = (dni: string) => {
+    if (!confirm('¿Deseas eliminar este colaborador del maestro?')) return;
+    const updated = collaborators.filter(c => c.dni !== dni);
+    setCollaborators(updated);
+    localStorage.setItem('vya_collaborators_v3', JSON.stringify(updated));
   };
 
   const handleAddTareo = (e: React.FormEvent) => {
@@ -163,13 +186,13 @@ export default function TareoPage() {
 
     const updated = [newRecord, ...tareos];
     setTareos(updated);
-    localStorage.setItem('vya_tareos', JSON.stringify(updated));
+    localStorage.setItem('vya_tareos_v3', JSON.stringify(updated));
   };
 
   const handleDeleteTareo = (id: string) => {
     const updated = tareos.filter(t => t.id !== id);
     setTareos(updated);
-    localStorage.setItem('vya_tareos', JSON.stringify(updated));
+    localStorage.setItem('vya_tareos_v3', JSON.stringify(updated));
   };
 
   if (loading) return null;
@@ -203,12 +226,40 @@ export default function TareoPage() {
       <section className="max-w-7xl mx-auto space-y-6">
         {activeTab === 'maestro' ? (
           <div className="rounded-3xl p-6 shadow-2xl border space-y-6" style={{ backgroundColor: 'rgba(30, 27, 75, 0.75)', borderColor: 'rgba(217, 70, 239, 0.3)' }}>
-            <h2 className="text-sm font-bold text-white uppercase tracking-wider">Directorio del Maestro de Personal</h2>
+            <div className="flex justify-between items-center">
+              <h2 className="text-sm font-bold text-white uppercase tracking-wider">
+                {isEditing ? '✏️ Editando Colaborador' : 'Directorio del Maestro de Personal'}
+              </h2>
+              {isEditing && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsEditing(false);
+                    setDniInput('');
+                    setNameInput('');
+                    setCargoInput('');
+                    setStartDateInput('');
+                  }}
+                  className="text-xs text-rose-300 bg-rose-950 border border-rose-500 px-3 py-1 rounded-xl"
+                >
+                  Cancelar Edición
+                </button>
+              )}
+            </div>
             
+            {/* FORMULARIO DE REGISTRO / EDICIÓN */}
             <form onSubmit={handleSaveCollaborator} className="grid grid-cols-1 md:grid-cols-5 gap-3 bg-indigo-950/60 p-4 rounded-2xl border border-purple-500/30 items-end">
               <div>
                 <label className="block text-[11px] font-semibold text-purple-200 uppercase mb-1">DNI / CE</label>
-                <input type="text" placeholder="Ej. 45572820" value={dniInput} onChange={(e) => setDniInput(e.target.value)} required className="w-full bg-indigo-950 border border-purple-500/50 rounded-xl px-3 py-2 text-white text-xs font-mono" />
+                <input 
+                  type="text" 
+                  placeholder="Ej. 45572820" 
+                  value={dniInput} 
+                  onChange={(e) => setDniInput(e.target.value)} 
+                  disabled={isEditing} // El DNI no se cambia si estamos editando para mantener integridad
+                  required 
+                  className="w-full bg-indigo-950 border border-purple-500/50 rounded-xl px-3 py-2 text-white text-xs font-mono disabled:opacity-50" 
+                />
               </div>
               <div>
                 <label className="block text-[11px] font-semibold text-purple-200 uppercase mb-1">Nombre Completo</label>
@@ -228,7 +279,9 @@ export default function TareoPage() {
                   <option value="small">Pequeña Empresa (30d)</option>
                   <option value="micro">Microempresa (15d)</option>
                 </select>
-                <button type="submit" className="w-full bg-teal-500 hover:bg-teal-400 text-slate-950 font-bold text-xs py-2 rounded-xl">💾 Guardar</button>
+                <button type="submit" className={`w-full font-bold text-xs py-2 rounded-xl shadow-md ${isEditing ? 'bg-amber-400 text-slate-950 hover:bg-amber-300' : 'bg-teal-500 text-slate-950 hover:bg-teal-400'}`}>
+                  {isEditing ? '🔄 Actualizar' : '💾 Guardar'}
+                </button>
               </div>
             </form>
 
@@ -241,7 +294,8 @@ export default function TareoPage() {
                     <th className="px-4 py-3">Cargo</th>
                     <th className="px-4 py-3">Fecha Ingreso</th>
                     <th className="px-4 py-3">Régimen</th>
-                    <th className="px-4 py-3 text-right">Vacaciones MYPE Acumuladas</th>
+                    <th className="px-4 py-3 text-right">Vacaciones Acumuladas</th>
+                    <th className="px-4 py-3 text-center">Acciones</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-purple-500/20 font-mono text-xs">
@@ -258,7 +312,23 @@ export default function TareoPage() {
                             {c.regime === 'micro' ? 'Microempresa (15d)' : 'Pequeña Empresa (30d)'}
                           </span>
                         </td>
-                        <td className="px-4 py-3 text-right font-bold text-fuchsia-300">{vac.earnedDays} días ({vac.statusMessage})</td>
+                        <td className="px-4 py-3 text-right font-bold text-fuchsia-300">{vac.earnedDays} días</td>
+                        <td className="px-4 py-3 text-center space-x-2">
+                          <button
+                            onClick={() => handleEditCollaborator(c)}
+                            title="Editar Colaborador"
+                            className="bg-indigo-900 hover:bg-indigo-800 border border-indigo-400 text-indigo-200 px-2.5 py-1 rounded-lg text-xs"
+                          >
+                            ✏️
+                          </button>
+                          <button
+                            onClick={() => handleDeleteCollaborator(c.dni)}
+                            title="Eliminar Colaborador"
+                            className="bg-rose-950 hover:bg-rose-900 border border-rose-500 text-rose-300 px-2.5 py-1 rounded-lg text-xs"
+                          >
+                            🗑️
+                          </button>
+                        </td>
                       </tr>
                     );
                   })}
@@ -268,7 +338,7 @@ export default function TareoPage() {
           </div>
         ) : (
           <div className="space-y-6">
-            {/* PANEL DE REGISTRO RÁPIDO */}
+            {/* PANEL DE REGISTRO RÁPIDO DE TAREO */}
             <form onSubmit={handleAddTareo} className="grid grid-cols-1 md:grid-cols-5 gap-3 bg-indigo-950/70 p-4 rounded-3xl border border-purple-500/30 items-end">
               <div>
                 <label className="block text-[11px] font-semibold text-purple-200 uppercase mb-1">Seleccionar Colaborador</label>
@@ -303,7 +373,7 @@ export default function TareoPage() {
               </div>
             </form>
 
-            {/* MATRIZ DE TAREO DETALLADA CON RÉGIMEN Y VACACIONES MYPE CORRECTAS */}
+            {/* MATRIZ DE TAREO & RESUMEN VACACIONAL */}
             <div className="rounded-3xl p-6 shadow-2xl border space-y-4" style={{ backgroundColor: 'rgba(30, 27, 75, 0.75)', borderColor: 'rgba(217, 70, 239, 0.3)' }}>
               <h2 className="text-sm font-bold text-white uppercase tracking-wider">Módulo de Asistencia, Tareo & Resumen Vacacional MYPE</h2>
               
@@ -335,7 +405,6 @@ export default function TareoPage() {
                           </td>
                           <td className="px-4 py-3 font-sans">
                             <div className="text-purple-200 font-medium">{c.cargo}</div>
-                            {/* ETIQUETA DINÁMICA SEGÚN EL RÉGIMEN REAL */}
                             <span className={`inline-block mt-0.5 px-2 py-0.5 rounded text-[9px] border ${c.regime === 'micro' ? 'bg-amber-950 border-amber-400 text-amber-300' : 'bg-cyan-950 border-cyan-400 text-cyan-300'}`}>
                               {c.regime === 'micro' ? 'Microempresa (15d/año)' : 'Pequeña Empresa (30d/año)'}
                             </span>
@@ -351,7 +420,7 @@ export default function TareoPage() {
                           </td>
                           <td className="px-4 py-3 text-right">
                             <div className="text-fuchsia-300 font-black text-sm">{vac.earnedDays} días acumulados</div>
-                            <div className="text-[10px] text-purple-200 font-sans">{vac.statusMessage}</div>
+                            <div className="text-[10px] text-purple-200 font-sans">Vacaciones proporcionales MYPE ({vac.annualDays} días/año)</div>
                             <div className="text-[10px] text-cyan-300 font-mono mt-0.5">Tiempo laborado: {vac.totalMonths} meses</div>
                           </td>
                         </tr>
