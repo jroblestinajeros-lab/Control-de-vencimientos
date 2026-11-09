@@ -340,7 +340,7 @@ export default function HomePage() {
   if (loading) return null;
 
   return (
-    <main className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-blue-950/40 text-slate-100 p-6">
+    <main className="min-h-screen bg-[#070e1b] text-slate-100 p-6">
       <header className="max-w-7xl mx-auto flex flex-col md:flex-row justify-between items-start md:items-center pb-6 border-b border-slate-800/80 mb-8 gap-4">
         <div>
           <h1 className="text-2xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-white via-slate-200 to-slate-400">
@@ -355,7 +355,7 @@ export default function HomePage() {
           <select
             value={currency}
             onChange={(e) => handleCurrencyChange(e.target.value as CurrencyCode)}
-            className="bg-slate-900/90 border border-slate-700/80 text-amber-400 font-bold text-xs px-3 py-2 rounded-xl focus:outline-none focus:border-amber-500 shadow-lg"
+            className="bg-[#0f172a] border border-slate-700/80 text-amber-400 font-bold text-xs px-3 py-2 rounded-xl focus:outline-none focus:border-amber-500 shadow-lg"
           >
             {Object.entries(CURRENCIES).map(([code, info]) => (
               <option key={code} value={code}>
@@ -368,7 +368,7 @@ export default function HomePage() {
             type="month"
             value={selectedMonth}
             onChange={(e) => setSelectedMonth(e.target.value)}
-            className="bg-slate-900/90 border border-slate-700/80 text-white text-xs px-3 py-2 rounded-xl focus:outline-none focus:border-emerald-500 font-mono shadow-lg"
+            className="bg-[#0f172a] border border-slate-700/80 text-white text-xs px-3 py-2 rounded-xl focus:outline-none focus:border-emerald-500 font-mono shadow-lg"
           />
 
           <button
@@ -380,7 +380,7 @@ export default function HomePage() {
 
           <button
             onClick={handleSignOut}
-            className="bg-slate-900/90 hover:bg-slate-800 border border-slate-700/80 text-slate-300 text-xs px-3 py-2 rounded-xl transition-colors shadow-lg"
+            className="bg-[#0f172a] hover:bg-slate-800 border border-slate-700/80 text-slate-300 text-xs px-3 py-2 rounded-xl transition-colors shadow-lg"
           >
             Cerrar Sesión
           </button>
@@ -389,13 +389,13 @@ export default function HomePage() {
 
       <section className="max-w-7xl mx-auto space-y-8">
         <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-          <div className="bg-slate-900/80 backdrop-blur-xl border border-slate-800/80 p-6 rounded-2xl shadow-xl shadow-slate-950/50 hover:border-slate-700 transition-all">
+          <div className="bg-[#0f172a] border border-slate-700/80 p-6 rounded-2xl shadow-xl hover:border-slate-600 transition-all">
             <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Ingresos del Mes</h3>
             <p className="text-3xl font-bold text-blue-400 font-mono">{currSymbol} {totalIncome.toFixed(2)}</p>
             <p className="text-[11px] text-slate-500 mt-1">Ingreso variable registrado</p>
           </div>
 
-          <div className="bg-slate-900/80 backdrop-blur-xl border border-slate-800/80 p-6 rounded-2xl shadow-xl shadow-slate-950/50 border-l-4 border-l-purple-500 hover:border-slate-700 transition-all space-y-2">
+          <div className="bg-[#0f172a] border border-slate-700/80 p-6 rounded-2xl shadow-xl border-l-4 border-l-purple-500 hover:border-slate-600 transition-all space-y-2">
             <div className="flex justify-between items-center">
               <h3 className="text-xs font-semibold text-purple-300 uppercase tracking-wider">Meta Ahorro</h3>
               <select
@@ -416,13 +416,13 @@ export default function HomePage() {
             <p className="text-[11px] text-slate-500">Cuota reservada</p>
           </div>
 
-          <div className="bg-slate-900/80 backdrop-blur-xl border border-slate-800/80 p-6 rounded-2xl shadow-xl shadow-slate-950/50 border-l-4 border-l-emerald-500 hover:border-slate-700 transition-all">
+          <div className="bg-[#0f172a] border border-slate-700/80 p-6 rounded-2xl shadow-xl border-l-4 border-l-emerald-500 hover:border-slate-600 transition-all">
             <h3 className="text-xs font-semibold text-emerald-300 uppercase tracking-wider mb-2">Presupuesto Gastos</h3>
             <p className="text-3xl font-bold text-emerald-400 font-mono">{currSymbol} {availableExpenseBudget.toFixed(2)}</p>
             <p className="text-[11px] text-slate-500 mt-1">Límite permitido en el mes</p>
           </div>
 
-          <div className="bg-slate-900/80 backdrop-blur-xl border border-slate-800/80 p-6 rounded-2xl shadow-xl shadow-slate-950/50 hover:border-slate-700 transition-all">
+          <div className="bg-[#0f172a] border border-slate-700/80 p-6 rounded-2xl shadow-xl hover:border-slate-600 transition-all">
             <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Gastos Ejecutados</h3>
             <p className="text-3xl font-bold text-rose-400 font-mono">{currSymbol} {totalExpense.toFixed(2)}</p>
             <p className="text-[11px] text-slate-500 mt-1">Saldo: {currSymbol} {budgetRemaining.toFixed(2)}</p>
@@ -430,26 +430,26 @@ export default function HomePage() {
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          <div className="bg-slate-900/80 backdrop-blur-xl border border-slate-800/80 p-6 rounded-2xl shadow-xl shadow-slate-950/50 flex flex-col justify-between hover:border-slate-700 transition-all">
+          <div className="bg-[#0f172a] border border-slate-700/80 p-6 rounded-2xl shadow-xl flex flex-col justify-between hover:border-slate-600 transition-all">
             <h4 className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Gastos Fijos (Obligatorios)</h4>
             <p className="text-2xl font-bold text-amber-400 font-mono">{currSymbol} {fixedExpenses.toFixed(2)}</p>
             <p className="text-[11px] text-slate-500 mt-1">Alquiler, mantenimiento, servicios básicos</p>
           </div>
 
-          <div className="bg-slate-900/80 backdrop-blur-xl border border-slate-800/80 p-6 rounded-2xl shadow-xl shadow-slate-950/50 flex flex-col justify-between hover:border-slate-700 transition-all">
+          <div className="bg-[#0f172a] border border-slate-700/80 p-6 rounded-2xl shadow-xl flex flex-col justify-between hover:border-slate-600 transition-all">
             <h4 className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Gastos Variables</h4>
             <p className="text-2xl font-bold text-indigo-400 font-mono">{currSymbol} {variableExpenses.toFixed(2)}</p>
             <p className="text-[11px] text-slate-500 mt-1">Salidas, entretenimientos y extras</p>
           </div>
 
-          <div className="bg-slate-900/80 backdrop-blur-xl border border-slate-800/80 p-6 rounded-2xl shadow-xl shadow-slate-950/50 flex flex-col justify-between hover:border-slate-700 transition-all">
+          <div className="bg-[#0f172a] border border-slate-700/80 p-6 rounded-2xl shadow-xl flex flex-col justify-between hover:border-slate-600 transition-all">
             <h4 className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Salud Financiera (Fondo)</h4>
             <p className="text-2xl font-bold text-emerald-400 font-mono">{emergencyCoverageMonths} meses</p>
             <p className="text-[11px] text-slate-500 mt-1">Cobertura de tus gastos fijos acumulados</p>
           </div>
         </div>
 
-        <div className="bg-slate-900/80 backdrop-blur-xl border border-slate-800/80 rounded-2xl p-6 shadow-xl shadow-slate-950/50 space-y-4">
+        <div className="bg-[#0f172a] border border-slate-700/80 rounded-2xl p-6 shadow-xl space-y-4">
           <div className="flex justify-between items-center text-sm">
             <span className="font-semibold text-slate-300">
               Distribución de Gastos por Categoría ({selectedMonth})
@@ -486,7 +486,7 @@ export default function HomePage() {
           )}
         </div>
 
-        <div className="bg-slate-900/80 backdrop-blur-xl border border-slate-800/80 rounded-2xl p-6 shadow-xl shadow-slate-950/50">
+        <div className="bg-[#0f172a] border border-slate-700/80 rounded-2xl p-6 shadow-xl">
           <h2 className="text-sm font-semibold text-slate-300 uppercase tracking-wider mb-4">Acciones Rápidas ({selectedMonth})</h2>
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             <button
@@ -513,7 +513,7 @@ export default function HomePage() {
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          <div className="lg:col-span-1 bg-slate-900/80 backdrop-blur-xl border border-slate-800/80 rounded-2xl p-6 shadow-xl shadow-slate-950/50 space-y-4">
+          <div className="lg:col-span-1 bg-[#0f172a] border border-slate-700/80 rounded-2xl p-6 shadow-xl space-y-4">
             <div className="flex justify-between items-center">
               <h2 className="text-lg font-semibold text-white">Metas & Proyección</h2>
               <button
@@ -564,7 +564,7 @@ export default function HomePage() {
             </div>
           </div>
 
-          <div className="lg:col-span-2 bg-slate-900/80 backdrop-blur-xl border border-slate-800/80 rounded-2xl p-6 shadow-xl shadow-slate-950/50 space-y-4">
+          <div className="lg:col-span-2 bg-[#0f172a] border border-slate-700/80 rounded-2xl p-6 shadow-xl space-y-4">
             <h2 className="text-lg font-semibold text-white">Comparativa y Tendencia Mes a Mes</h2>
             {monthlyHistory.length === 0 ? (
               <p className="text-sm text-slate-500 py-6 text-center">Registra ingresos y gastos para generar la tendencia histórica.</p>
@@ -595,7 +595,7 @@ export default function HomePage() {
           </div>
         </div>
 
-        <div className="bg-slate-900/80 backdrop-blur-xl border border-slate-800/80 rounded-2xl p-6 shadow-xl shadow-slate-950/50 space-y-4">
+        <div className="bg-[#0f172a] border border-slate-700/80 rounded-2xl p-6 shadow-xl space-y-4">
           <h2 className="text-lg font-semibold text-white">Transacciones ({selectedMonth})</h2>
           {monthTransactions.length === 0 ? (
             <p className="text-sm text-slate-500 py-6 text-center">No hay registros para este mes. Registra tus ingresos o gastos arriba.</p>
@@ -659,7 +659,7 @@ export default function HomePage() {
 
       {showModal && (
         <div className="fixed inset-0 bg-slate-950/85 backdrop-blur-md flex items-center justify-center p-4 z-50">
-          <div className="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-md p-6 shadow-2xl space-y-4">
+          <div className="bg-[#0f172a] border border-slate-700 rounded-2xl w-full max-w-md p-6 shadow-2xl space-y-4">
             <h3 className="text-lg font-bold text-white capitalize">
               {modalType === 'goal'
                 ? 'Crear Meta de Ahorro'
@@ -685,7 +685,7 @@ export default function HomePage() {
                       value={goalTitle}
                       onChange={(e) => setGoalTitle(e.target.value)}
                       required
-                      className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-blue-500 text-sm"
+                      className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-blue-500 text-sm"
                     />
                   </div>
 
@@ -698,7 +698,7 @@ export default function HomePage() {
                       value={goalTarget}
                       onChange={(e) => setGoalTarget(e.target.value)}
                       required
-                      className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-blue-500 font-mono text-sm"
+                      className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-blue-500 font-mono text-sm"
                     />
                   </div>
 
@@ -710,7 +710,7 @@ export default function HomePage() {
                       placeholder="0.00"
                       value={goalCurrent}
                       onChange={(e) => setGoalCurrent(e.target.value)}
-                      className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-blue-500 font-mono text-sm"
+                      className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-blue-500 font-mono text-sm"
                     />
                   </div>
                 </>
@@ -724,7 +724,7 @@ export default function HomePage() {
                       value={description}
                       onChange={(e) => setDescription(e.target.value)}
                       required
-                      className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-emerald-500 text-sm"
+                      className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-emerald-500 text-sm"
                     />
                   </div>
 
@@ -734,7 +734,7 @@ export default function HomePage() {
                       <select
                         value={expenseNature}
                         onChange={(e) => setExpenseNature(e.target.value as 'fixed' | 'variable')}
-                        className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-emerald-500 text-sm"
+                        className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-emerald-500 text-sm"
                       >
                         <option value="variable">Variable (Discrecional / Opcional)</option>
                         <option value="fixed">Fijo (Obligatorio / Inflexible)</option>
@@ -751,7 +751,7 @@ export default function HomePage() {
                       value={amount}
                       onChange={(e) => setAmount(e.target.value)}
                       required
-                      className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-emerald-500 font-mono text-sm"
+                      className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-emerald-500 font-mono text-sm"
                     />
                   </div>
 
@@ -760,7 +760,7 @@ export default function HomePage() {
                     <select
                       value={category}
                       onChange={(e) => setCategory(e.target.value)}
-                      className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-emerald-500 text-sm"
+                      className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-emerald-500 text-sm"
                     >
                       {(modalType === 'income' ? INCOME_CATEGORIES : EXPENSE_CATEGORIES).map((cat) => (
                         <option key={cat} value={cat}>
