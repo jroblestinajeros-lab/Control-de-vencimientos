@@ -92,26 +92,33 @@ export default function HomePage() {
       return;
     }
 
+    let currentEmail = 'jroblestinajeros@gmail.com';
     if (sessionData) {
       try {
         const parsed = JSON.parse(sessionData);
-        setUserEmail(parsed?.user?.email || 'jroblestinajeros@gmail.com');
+        currentEmail = parsed?.user?.email || 'jroblestinajeros@gmail.com';
       } catch (e) {
-        setUserEmail('jroblestinajeros@gmail.com');
+        currentEmail = 'jroblestinajeros@gmail.com';
       }
-    } else {
-      setUserEmail('jroblestinajeros@gmail.com');
     }
+    setUserEmail(currentEmail);
 
-    const savedTx = localStorage.getItem('fin_transactions');
-    const savedGoals = localStorage.getItem('fin_goals');
-    const savedSavingsPercent = localStorage.getItem('fin_savings_percent');
-    const savedCurrency = localStorage.getItem('fin_currency') as CurrencyCode;
+    // LLAVES PERSONALIZADAS POR USUARIO PARA AISLAR DATOS
+    const txKey = `fin_transactions_${currentEmail}`;
+    const goalsKey = `fin_goals_${currentEmail}`;
+    const percentKey = `fin_savings_percent_${currentEmail}`;
+    const currencyKey = `fin_currency_${currentEmail}`;
+
+    const savedTx = localStorage.getItem(txKey);
+    const savedGoals = localStorage.getItem(goalsKey);
+    const savedSavingsPercent = localStorage.getItem(percentKey);
+    const savedCurrency = localStorage.getItem(currencyKey) as CurrencyCode;
 
     if (savedSavingsPercent !== null && !isNaN(Number(savedSavingsPercent))) {
       setSavingsTargetPercent(Number(savedSavingsPercent));
     } else {
-      localStorage.setItem('fin_savings_percent', '20');
+      setSavingsTargetPercent(20);
+      localStorage.setItem(percentKey, '20');
     }
 
     if (savedCurrency && CURRENCIES[savedCurrency]) {
@@ -119,71 +126,15 @@ export default function HomePage() {
     }
 
     if (savedTx) {
-      setTransactions(JSON.parse(savedTx));
+      try {
+        setTransactions(JSON.parse(savedTx));
+      } catch (e) {
+        setTransactions([]);
+      }
     } else {
-      const defaultTransactions: Transaction[] = [
-        {
-          id: '1731100001',
-          description: 'Sueldo Principal',
-          amount: 2500,
-          type: 'income',
-          category: 'Sueldo / Salario Principal',
-          date: '09/11/2026',
-          month: '2026-11',
-        },
-        {
-          id: '1731100002',
-          description: 'menu',
-          amount: 350,
-          type: 'expense',
-          nature: 'fixed',
-          category: 'Alimentación / Supermercado',
-          date: '09/11/2026',
-          month: '2026-11',
-        },
-        {
-          id: '1731100003',
-          description: 'pasaje',
-          amount: 150,
-          type: 'expense',
-          nature: 'fixed',
-          category: 'Transporte / Combustible / Pasajes',
-          date: '09/11/2026',
-          month: '2026-11',
-        },
-        {
-          id: '1731100004',
-          description: 'celular y disney',
-          amount: 130,
-          type: 'expense',
-          nature: 'fixed',
-          category: 'Servicios (Luz, Agua, Internet, Celular)',
-          date: '09/11/2026',
-          month: '2026-11',
-        },
-        {
-          id: '1731100005',
-          description: 'deuda banco',
-          amount: 300,
-          type: 'expense',
-          nature: 'fixed',
-          category: 'Otros / Varios',
-          date: '09/11/2026',
-          month: '2026-11',
-        },
-        {
-          id: '1731100006',
-          description: 'deuda',
-          amount: 1000,
-          type: 'expense',
-          nature: 'fixed',
-          category: 'Otros / Varios',
-          date: '09/11/2026',
-          month: '2026-11',
-        },
-      ];
-      setTransactions(defaultTransactions);
-      localStorage.setItem('fin_transactions', JSON.stringify(defaultTransactions));
+      // Si es un usuario nuevo (como Sthefanie), arranca limpio con 0 transacciones
+      setTransactions([]);
+      localStorage.setItem(txKey, JSON.stringify([]));
     }
 
     if (savedGoals) {
@@ -196,12 +147,12 @@ export default function HomePage() {
         setGoals([]);
       }
     } else {
+      // Metas iniciales limpias o vacías para usuarios nuevos
       const defaultGoals: SavingsGoal[] = [
-        { id: '1', title: 'Fondo de Emergencia Operativa', targetAmount: 10000, currentAmount: 3500 },
-        { id: '2', title: 'Renovación de Equipos / ROV', targetAmount: 5000, currentAmount: 1200 },
+        { id: '1', title: 'Fondo de Emergencia', targetAmount: 5000, currentAmount: 0 },
       ];
       setGoals(defaultGoals);
-      localStorage.setItem('fin_goals', JSON.stringify(defaultGoals));
+      localStorage.setItem(goalsKey, JSON.stringify(defaultGoals));
     }
 
     setLoading(false);
@@ -209,12 +160,12 @@ export default function HomePage() {
 
   const handleCurrencyChange = (newCurr: CurrencyCode) => {
     setCurrency(newCurr);
-    localStorage.setItem('fin_currency', newCurr);
+    localStorage.setItem(`fin_currency_${userEmail}`, newCurr);
   };
 
   const handleSavingsPercentChange = (newPercent: number) => {
     setSavingsTargetPercent(newPercent);
-    localStorage.setItem('fin_savings_percent', newPercent.toString());
+    localStorage.setItem(`fin_savings_percent_${userEmail}`, newPercent.toString());
   };
 
   const monthTransactions = transactions.filter((t) => {
@@ -312,14 +263,14 @@ export default function HomePage() {
     if (!confirm('¿Estás seguro de que deseas eliminar este registro?')) return;
     const updated = transactions.filter((t) => t.id !== id);
     setTransactions(updated);
-    localStorage.setItem('fin_transactions', JSON.stringify(updated));
+    localStorage.setItem(`fin_transactions_${userEmail}`, JSON.stringify(updated));
   };
 
   const handleDeleteGoal = (id: string) => {
     if (!confirm('¿Estás seguro de que deseas eliminar esta meta de ahorro?')) return;
     const updatedGoals = goals.filter((g) => g.id !== id);
     setGoals(updatedGoals);
-    localStorage.setItem('fin_goals', JSON.stringify(updatedGoals));
+    localStorage.setItem(`fin_goals_${userEmail}`, JSON.stringify(updatedGoals));
   };
 
   const handleSave = (e: React.FormEvent) => {
@@ -340,7 +291,7 @@ export default function HomePage() {
 
       const updatedGoals = [...goals, newGoal];
       setGoals(updatedGoals);
-      localStorage.setItem('fin_goals', JSON.stringify(updatedGoals));
+      localStorage.setItem(`fin_goals_${userEmail}`, JSON.stringify(updatedGoals));
       setShowModal(false);
       return;
     }
@@ -362,8 +313,9 @@ export default function HomePage() {
       }
     }
 
+    let updated: Transaction[];
     if (editingTxId) {
-      const updated = transactions.map((t) => {
+      updated = transactions.map((t) => {
         if (t.id === editingTxId) {
           return {
             ...t,
@@ -375,8 +327,6 @@ export default function HomePage() {
         }
         return t;
       });
-      setTransactions(updated);
-      localStorage.setItem('fin_transactions', JSON.stringify(updated));
     } else {
       const newTx: Transaction = {
         id: Date.now().toString(),
@@ -388,11 +338,11 @@ export default function HomePage() {
         date: new Date().toLocaleDateString('es-PE'),
         month: selectedMonth,
       };
-      const updated = [newTx, ...transactions];
-      setTransactions(updated);
-      localStorage.setItem('fin_transactions', JSON.stringify(updated));
+      updated = [newTx, ...transactions];
     }
 
+    setTransactions(updated);
+    localStorage.setItem(`fin_transactions_${userEmail}`, JSON.stringify(updated));
     setShowModal(false);
   };
 
