@@ -234,7 +234,7 @@ export default function HomePage() {
   const fixedExpenseMonthlyAvg = fixedExpenses || (totalExpense * 0.5) || 1;
   const emergencyCoverageMonths = (totalSavedAllGoals / fixedExpenseMonthlyAvg).toFixed(1);
 
-  // Cálculo de gastos con acumulados y porcentajes precisos
+  // Cálculo de acumulados y porcentajes
   let runningCumulative = 0;
   const rawExpenses = EXPENSE_CATEGORIES.map((cat) => {
     const total = monthTransactions
@@ -374,25 +374,23 @@ export default function HomePage() {
   };
 
   const exportToExcel = () => {
-    // Hoja 1: Resumen General con Porcentaje y Acumulado incluidos en la misma tabla
     const summaryData = [
-      { Concepto: 'Moneda Seleccionada', Valor: `${currency} (${currSymbol})`, Porcentaje: '-', Acumulado: '-' },
-      { Concepto: 'Mes Seleccionado', Valor: selectedMonth, Porcentaje: '-', Acumulado: '-' },
-      { Concepto: 'Ingresos Totales', Valor: totalIncome, Porcentaje: '-', Acumulado: '-' },
-      { Concepto: `Ahorro Reservado (${savingsTargetPercent}%)`, Valor: plannedSavings, Porcentaje: `${savingsTargetPercent}%`, Acumulado: '-' },
-      { Concepto: 'Presupuesto Límite para Gastos', Valor: availableExpenseBudget, Porcentaje: '100%', Acumulado: '-' },
-      { Concepto: 'Gastos Fijos', Valor: fixedExpenses, Porcentaje: availableExpenseBudget > 0 ? `${Math.round((fixedExpenses / availableExpenseBudget) * 100)}%` : '0%', Acumulado: fixedExpenses },
-      { Concepto: 'Gastos Variables', Valor: variableExpenses, Porcentaje: availableExpenseBudget > 0 ? `${Math.round((variableExpenses / availableExpenseBudget) * 100)}%` : '0%', Acumulado: fixedExpenses + variableExpenses },
-      { Concepto: 'Gastos Ejecutados Totales', Valor: totalExpense, Porcentaje: `${budgetPercentage}% del Presupuesto`, Acumulado: totalExpense },
-      { Concepto: 'Saldo Restante para Gastos', Valor: budgetRemaining, Porcentaje: '-', Acumulado: '-' },
+      { Concepto: 'Moneda Seleccionada', Valor: `${currency} (${currSymbol})` },
+      { Concepto: 'Mes Seleccionado', Valor: selectedMonth },
+      { Concepto: `Ingresos Totales (${currSymbol})`, Valor: totalIncome },
+      { Concepto: `Ahorro Reservado (${savingsTargetPercent}%) (${currSymbol})`, Valor: plannedSavings },
+      { Concepto: `Presupuesto Límite para Gastos (${currSymbol})`, Valor: availableExpenseBudget },
+      { Concepto: `Gastos Fijos (${currSymbol})`, Valor: fixedExpenses },
+      { Concepto: `Gastos Variables (${currSymbol})`, Valor: variableExpenses },
+      { Concepto: `Gastos Ejecutados Totales (${currSymbol})`, Valor: totalExpense },
+      { Concepto: `Saldo Restante para Gastos (${currSymbol})`, Valor: budgetRemaining },
     ];
 
-    // Hoja 2: Detalle por Categoría con Porcentajes y Acumulados
     const categoryReport = expensesWithCumulative.map((item) => ({
       'Categoría de Gasto': item.category,
       [`Monto (${currSymbol})`]: item.amount,
-      '% del Presupuesto': `${item.categoryPct}%`,
-      '% del Gasto Total': `${item.shareOfTotal}%`,
+      '% Presupuesto': `${item.categoryPct}%`,
+      '% Gasto Total': `${item.shareOfTotal}%`,
       [`Acumulado (${currSymbol})`]: item.cumulative,
     }));
 
@@ -418,8 +416,8 @@ export default function HomePage() {
     const wsTx = XLSX.utils.json_to_sheet(txData);
     const wsGoals = XLSX.utils.json_to_sheet(goalsData);
 
-    XLSX.utils.book_append_sheet(wb, wsSummary, 'Resumen Mensual');
-    XLSX.utils.book_append_sheet(wb, wsCat, 'Gastos por Categoría');
+    XLSX.utils.book_append_sheet(wb, wsSummary, 'Resumen General');
+    XLSX.utils.book_append_sheet(wb, wsCat, 'Gastos por Categoría (% y Acum)');
     XLSX.utils.book_append_sheet(wb, wsTx, 'Transacciones');
     XLSX.utils.book_append_sheet(wb, wsGoals, 'Metas de Ahorro');
 
@@ -571,14 +569,14 @@ export default function HomePage() {
           </div>
         </div>
 
-        {/* TABLA FORMAL DE RESUMEN Y DISTRIBUCIÓN DE GASTOS CON % Y ACUMULADO */}
+        {/* MATRIZ DE GASTOS POR CATEGORÍA CON % Y ACUMULADO */}
         <div 
           className="rounded-3xl p-6 shadow-2xl border space-y-4"
           style={{ backgroundColor: 'rgba(30, 27, 75, 0.75)', borderColor: 'rgba(217, 70, 239, 0.3)', backdropFilter: 'blur(16px)' }}
         >
           <div className="flex justify-between items-center text-sm pb-2 border-b border-purple-500/30">
             <span className="font-bold text-white uppercase tracking-wider">
-              Resumen de Gastos por Categoría, Porcentaje y Acumulado ({selectedMonth})
+              Matriz de Gastos por Categoría, Porcentaje y Acumulado ({selectedMonth})
             </span>
             <span className="font-mono text-teal-300 font-bold">
               {budgetPercentage}% consumido del presupuesto
