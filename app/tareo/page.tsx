@@ -9,6 +9,8 @@ interface Collaborator {
   cargo: string;
   startDate: string; // Formato YYYY-MM-DD
   regime: 'micro' | 'small'; // micro = 15 días/año, small = 30 días/año
+  initialRestDays: number; // Saldo inicial o de corte de descansos
+  initialVacationDays: number; // Saldo inicial o de corte de vacaciones truncas/acumuladas
 }
 
 interface TareoRecord {
@@ -30,12 +32,14 @@ export default function TareoPage() {
   const [collaborators, setCollaborators] = useState<Collaborator[]>([]);
   const [tareos, setTareos] = useState<TareoRecord[]>([]);
 
-  // Estados Maestro
+  // Estados Maestro (incluyendo saldos iniciales de corte)
   const [dniInput, setDniInput] = useState('');
   const [nameInput, setNameInput] = useState('');
   const [cargoInput, setCargoInput] = useState('');
   const [startDateInput, setStartDateInput] = useState('');
   const [regimeInput, setRegimeInput] = useState<'micro' | 'small'>('small');
+  const [initialRestInput, setInitialRestInput] = useState('0');
+  const [initialVacInput, setInitialVacInput] = useState('0');
   const [isEditing, setIsEditing] = useState(false);
 
   // Inputs Tareo Diario
@@ -49,19 +53,28 @@ export default function TareoPage() {
   useEffect(() => {
     document.title = "Módulo Operativo de Tareo & Vacaciones MYPE | V&A Consulting";
     
-    const savedCollabs = localStorage.getItem('vya_collabs_v8');
-    const savedTareos = localStorage.getItem('vya_tareos_v8');
+    const savedCollabs = localStorage.getItem('vya_collabs_v9');
+    const savedTareos = localStorage.getItem('vya_tareos_v9');
 
     if (savedCollabs) {
-      try { setCollaborators(JSON.parse(savedCollabs)); } catch (e) { setCollaborators([]); }
+      try { 
+        // Migración automática por si los registros antiguos no tienen los nuevos campos
+        const parsed: Collaborator[] = JSON.parse(savedCollabs);
+        const migrated = parsed.map(c => ({
+          ...c,
+          initialRestDays: c.initialRestDays ?? 0,
+          initialVacationDays: c.initialVacationDays ?? 0
+        }));
+        setCollaborators(migrated); 
+      } catch (e) { setCollaborators([]); }
     } else {
       const defaultCollabs: Collaborator[] = [
-        { dni: '45572820', name: 'Jorge Luis Robles Tinajeros', cargo: 'Administrativo', startDate: '2026-01-08', regime: 'small' },
-        { dni: '45420921', name: 'Jefferson Aliaga Araujo', cargo: 'Gerente de Finanzas', startDate: '2015-01-01', regime: 'small' },
-        { dni: '47891234', name: 'Carlos Mendoza', cargo: 'Técnico Batimetrista', startDate: '2026-08-01', regime: 'micro' }
+        { dni: '45572820', name: 'Jorge Luis Robles Tinajeros', cargo: 'Administrativo', startDate: '2026-01-08', regime: 'small', initialRestDays: 0, initialVacationDays: 0 },
+        { dni: '45420921', name: 'Jefferson Aliaga Araujo', cargo: 'Gerente de Finanzas', startDate: '2015-01-01', regime: 'small', initialRestDays: 0, initialVacationDays: 0 },
+        { dni: '47891234', name: 'Carlos Mendoza', cargo: 'Técnico Batimetrista', startDate: '2026-08-01', regime: 'micro', initialRestDays: 0, initialVacationDays: 0 }
       ];
       setCollaborators(defaultCollabs);
-      localStorage.setItem('vya_collabs_v8', JSON.stringify(defaultCollabs));
+      localStorage.setItem('vya_collabs_v9', JSON.stringify(defaultCollabs));
     }
 
     if (savedTareos) {
@@ -71,14 +84,14 @@ export default function TareoPage() {
         { id: '1', dni: '45572820', name: 'Jorge Luis Robles Tinajeros', cargo: 'Administrativo', projectCode: 'PRJ-01', status: 'campo', daysWorked: 14, date: '2026-09-11' }
       ];
       setTareos(defaultTareos);
-      localStorage.setItem('vya_tareos_v8', JSON.stringify(defaultTareos));
+      localStorage.setItem('vya_tareos_v9', JSON.stringify(defaultTareos));
     }
 
     setLoading(false);
   }, []);
 
-  // --- CÁLCULO DE VACACIONES MYPE ---
-  const calculateVacationStatus = (startDateStr: string, regime: 'micro' | 'small', takenVacationDays: number) => {
+  // --- CÁLCULO DE VACACIONES MYPE (Con saldo inicial de corte) ---
+  const calculateVacationStatus = (startDateStr: string, regime: 'micro' | 'small', initialVac: number, takenVacationDays: number) => {
     if (!startDateStr) return { earnedDays: 0, netDays: 0, statusMessage: 'Sin fecha de ingreso', totalMonths: 0 };
     
     const start = new Date(startDateStr);
@@ -96,7 +109,8 @@ export default function TareoPage() {
     const monthlyAccrualRate = annualDays / 12;
 
     const earnedDays = totalMonthsFraction * monthlyAccrualRate;
-    const netDays = Math.max(0, earnedDays - takenVacationDays);
+    // Total neto = Inicial (corte) + Generado por tiempo transcurrido - Tomadas en el sistema
+    const netDays = Math.max(0, initialVac + earnedDays - takenVacationDays);
     const completedFullMonth = diffDaysTotal >= 30;
 
     let statusMessage = !completedFullMonth 
@@ -124,7 +138,9 @@ export default function TareoPage() {
       name: nameInput,
       cargo: cargoInput || 'Operaciones',
       startDate: startDateInput,
-      regime: regimeInput
+      regime: regimeInput,
+      initialRestDays: parseFloat(initialRestInput) || 0,
+      initialVacationDays: parseFloat(initialVacInput) || 0
     };
 
     if (existingIndex >= 0) {
@@ -135,13 +151,15 @@ export default function TareoPage() {
     }
 
     setCollaborators(updated);
-    localStorage.setItem('vya_collabs_v8', JSON.stringify(updated));
+    localStorage.setItem('vya_collabs_v9', JSON.stringify(updated));
 
     setDniInput('');
     setNameInput('');
     setCargoInput('');
     setStartDateInput('');
     setRegimeInput('small');
+    setInitialRestInput('0');
+    setInitialVacInput('0');
     setIsEditing(false);
   };
 
@@ -151,6 +169,8 @@ export default function TareoPage() {
     setCargoInput(collab.cargo);
     setStartDateInput(collab.startDate);
     setRegimeInput(collab.regime);
+    setInitialRestInput(collab.initialRestDays.toString());
+    setInitialVacInput(collab.initialVacationDays.toString());
     setIsEditing(true);
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
@@ -159,7 +179,7 @@ export default function TareoPage() {
     if (!confirm('¿Deseas eliminar este colaborador del maestro?')) return;
     const updated = collaborators.filter(c => c.dni !== dni);
     setCollaborators(updated);
-    localStorage.setItem('vya_collabs_v8', JSON.stringify(updated));
+    localStorage.setItem('vya_collabs_v9', JSON.stringify(updated));
   };
 
   const handleAddTareo = (e: React.FormEvent) => {
@@ -186,13 +206,13 @@ export default function TareoPage() {
 
     const updated = [newRecord, ...tareos];
     setTareos(updated);
-    localStorage.setItem('vya_tareos_v8', JSON.stringify(updated));
+    localStorage.setItem('vya_tareos_v9', JSON.stringify(updated));
   };
 
   const handleDeleteTareo = (id: string) => {
     const updated = tareos.filter(t => t.id !== id);
     setTareos(updated);
-    localStorage.setItem('vya_tareos_v8', JSON.stringify(updated));
+    localStorage.setItem('vya_tareos_v9', JSON.stringify(updated));
   };
 
   const displayedCollaborators = selectedDni 
@@ -236,7 +256,7 @@ export default function TareoPage() {
           <div className="rounded-3xl p-6 shadow-2xl border space-y-6" style={{ backgroundColor: 'rgba(30, 27, 75, 0.75)', borderColor: 'rgba(217, 70, 239, 0.3)' }}>
             <div className="flex justify-between items-center">
               <h2 className="text-sm font-bold text-white uppercase tracking-wider">
-                {isEditing ? '✏️ Editando Colaborador' : 'Directorio del Maestro de Personal'}
+                {isEditing ? '✏️ Editando Colaborador' : 'Directorio del Maestro de Personal (Con Corte de Saldos)'}
               </h2>
               {isEditing && (
                 <button
@@ -247,6 +267,8 @@ export default function TareoPage() {
                     setNameInput('');
                     setCargoInput('');
                     setStartDateInput('');
+                    setInitialRestInput('0');
+                    setInitialVacInput('0');
                   }}
                   className="text-xs text-rose-300 bg-rose-950 border border-rose-500 px-3 py-1 rounded-xl"
                 >
@@ -255,9 +277,9 @@ export default function TareoPage() {
               )}
             </div>
             
-            <form onSubmit={handleSaveCollaborator} className="grid grid-cols-1 md:grid-cols-5 gap-3 bg-indigo-950/60 p-4 rounded-2xl border border-purple-500/30 items-end">
+            <form onSubmit={handleSaveCollaborator} className="grid grid-cols-1 md:grid-cols-4 lg:grid-cols-7 gap-3 bg-indigo-950/60 p-4 rounded-2xl border border-purple-500/30 items-end">
               <div>
-                <label className="block text-[11px] font-semibold text-purple-200 uppercase mb-1">DNI / CE</label>
+                <label className="block text-[11px] font-semibold text-purple-200 uppercase mb-1">DNI / CE *</label>
                 <input 
                   type="text" 
                   placeholder="Ej. 45572820" 
@@ -269,7 +291,7 @@ export default function TareoPage() {
                 />
               </div>
               <div>
-                <label className="block text-[11px] font-semibold text-purple-200 uppercase mb-1">Nombre Completo</label>
+                <label className="block text-[11px] font-semibold text-purple-200 uppercase mb-1">Nombre Completo *</label>
                 <input type="text" placeholder="Ej. Jorge Robles" value={nameInput} onChange={(e) => setNameInput(e.target.value)} required className="w-full bg-indigo-950 border border-purple-500/50 rounded-xl px-3 py-2 text-white text-xs" />
               </div>
               <div>
@@ -277,15 +299,23 @@ export default function TareoPage() {
                 <input type="text" placeholder="Ej. Logística" value={cargoInput} onChange={(e) => setCargoInput(e.target.value)} className="w-full bg-indigo-950 border border-purple-500/50 rounded-xl px-3 py-2 text-white text-xs" />
               </div>
               <div>
-                <label className="block text-[11px] font-semibold text-purple-200 uppercase mb-1">Fecha de Ingreso</label>
+                <label className="block text-[11px] font-semibold text-purple-200 uppercase mb-1">Fecha de Ingreso *</label>
                 <input type="date" value={startDateInput} onChange={(e) => setStartDateInput(e.target.value)} required className="w-full bg-indigo-950 border border-purple-500/50 rounded-xl px-3 py-2 text-white text-xs font-mono" />
               </div>
               <div>
                 <label className="block text-[11px] font-semibold text-purple-200 uppercase mb-1">Régimen MYPE</label>
-                <select value={regimeInput} onChange={(e) => setRegimeInput(e.target.value as 'micro' | 'small')} className="w-full bg-indigo-950 border border-purple-500/50 rounded-xl px-3 py-2 text-white text-xs mb-1">
-                  <option value="small">Pequeña Empresa (30d)</option>
-                  <option value="micro">Microempresa (15d)</option>
+                <select value={regimeInput} onChange={(e) => setRegimeInput(e.target.value as 'micro' | 'small')} className="w-full bg-indigo-950 border border-purple-500/50 rounded-xl px-3 py-2 text-white text-xs">
+                  <option value="small">Pequeña (30d/año)</option>
+                  <option value="micro">Micro (15d/año)</option>
                 </select>
+              </div>
+              <div>
+                <label className="block text-[11px] font-semibold text-teal-300 uppercase mb-1">Saldo Ini. Descansos</label>
+                <input type="number" step="0.5" value={initialRestInput} onChange={(e) => setInitialRestInput(e.target.value)} className="w-full bg-indigo-950 border border-teal-500/50 rounded-xl px-3 py-2 text-white text-xs font-mono" />
+              </div>
+              <div>
+                <label className="block text-[11px] font-semibold text-fuchsia-300 uppercase mb-1">Saldo Ini. Vacaciones</label>
+                <input type="number" step="0.5" value={initialVacInput} onChange={(e) => setInitialVacInput(e.target.value)} className="w-full bg-indigo-950 border border-fuchsia-500/50 rounded-xl px-3 py-2 text-white text-xs font-mono mb-1" />
                 <button type="submit" className={`w-full font-bold text-xs py-2 rounded-xl shadow-md ${isEditing ? 'bg-amber-400 text-slate-950 hover:bg-amber-300' : 'bg-teal-500 text-slate-950 hover:bg-teal-400'}`}>
                   {isEditing ? '🔄 Actualizar' : '💾 Guardar'}
                 </button>
@@ -298,37 +328,35 @@ export default function TareoPage() {
                   <tr>
                     <th className="px-4 py-3">DNI</th>
                     <th className="px-4 py-3">Colaborador</th>
-                    <th className="px-4 py-3">Cargo</th>
-                    <th className="px-4 py-3">Fecha Ingreso</th>
+                    <th className="px-4 py-3">Cargo / Ingreso</th>
                     <th className="px-4 py-3">Régimen</th>
-                    <th className="px-4 py-3 text-right">Vacaciones Netas</th>
+                    <th className="px-4 py-3 text-center text-teal-300">Descansos Corte (Ini)</th>
+                    <th className="px-4 py-3 text-center text-fuchsia-300">Vacaciones Corte (Ini)</th>
                     <th className="px-4 py-3 text-center">Acciones</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-purple-500/20 font-mono text-xs">
-                  {collaborators.map((c) => {
-                    const collabTareos = tareos.filter(t => t.dni === c.dni);
-                    const takenVac = collabTareos.filter(t => t.status === 'vacaciones').reduce((acc, t) => acc + t.daysWorked, 0);
-                    const vac = calculateVacationStatus(c.startDate, c.regime, takenVac);
-                    return (
-                      <tr key={c.dni} className="hover:bg-indigo-900/30">
-                        <td className="px-4 py-3 text-teal-300">{c.dni}</td>
-                        <td className="px-4 py-3 text-white font-sans font-medium">{c.name}</td>
-                        <td className="px-4 py-3 text-purple-300">{c.cargo}</td>
-                        <td className="px-4 py-3">{c.startDate}</td>
-                        <td className="px-4 py-3">
-                          <span className={`px-2 py-0.5 rounded text-[10px] border ${c.regime === 'micro' ? 'bg-amber-950 border-amber-400 text-amber-300' : 'bg-cyan-950 border-cyan-400 text-cyan-300'}`}>
-                            {c.regime === 'micro' ? 'Microempresa (15d)' : 'Pequeña Empresa (30d)'}
-                          </span>
-                        </td>
-                        <td className="px-4 py-3 text-right font-bold text-fuchsia-300">{vac.netDays} días netos</td>
-                        <td className="px-4 py-3 text-center space-x-2">
-                          <button onClick={() => handleEditCollaborator(c)} title="Editar" className="bg-indigo-900 hover:bg-indigo-800 border border-indigo-400 text-indigo-200 px-2.5 py-1 rounded-lg text-xs">✏️</button>
-                          <button onClick={() => handleDeleteCollaborator(c.dni)} title="Eliminar" className="bg-rose-950 hover:bg-rose-900 border border-rose-500 text-rose-300 px-2.5 py-1 rounded-lg text-xs">🗑️</button>
-                        </td>
-                      </tr>
-                    );
-                  })}
+                  {collaborators.map((c) => (
+                    <tr key={c.dni} className="hover:bg-indigo-900/30">
+                      <td className="px-4 py-3 text-teal-300">{c.dni}</td>
+                      <td className="px-4 py-3 text-white font-sans font-medium">{c.name}</td>
+                      <td className="px-4 py-3 text-purple-300">
+                        {c.cargo}
+                        <div className="text-[10px] text-purple-300/60 font-mono">Ingreso: {c.startDate}</div>
+                      </td>
+                      <td className="px-4 py-3">
+                        <span className={`px-2 py-0.5 rounded text-[10px] border ${c.regime === 'micro' ? 'bg-amber-950 border-amber-400 text-amber-300' : 'bg-cyan-950 border-cyan-400 text-cyan-300'}`}>
+                          {c.regime === 'micro' ? 'Micro (15d)' : 'Pequeña (30d)'}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3 text-center font-bold text-teal-200">{c.initialRestDays ?? 0} d</td>
+                      <td className="px-4 py-3 text-center font-bold text-fuchsia-300">{c.initialVacationDays ?? 0} d</td>
+                      <td className="px-4 py-3 text-center space-x-2">
+                        <button onClick={() => handleEditCollaborator(c)} title="Editar" className="bg-indigo-900 hover:bg-indigo-800 border border-indigo-400 text-indigo-200 px-2.5 py-1 rounded-lg text-xs">✏️</button>
+                        <button onClick={() => handleDeleteCollaborator(c.dni)} title="Eliminar" className="bg-rose-950 hover:bg-rose-900 border border-rose-500 text-rose-300 px-2.5 py-1 rounded-lg text-xs">🗑️</button>
+                      </td>
+                    </tr>
+                  ))}
                 </tbody>
               </table>
             </div>
@@ -370,7 +398,7 @@ export default function TareoPage() {
                   <option value="campo">Campo (Comisión / Planta / Mina)</option>
                   <option value="oficina">Oficina</option>
                   <option value="tardanza">Tardanza</option>
-                  <option value="falto">Falta Injustificada</option>
+                  <option value="falto">Falta Injustificada (Descuenta Descansos)</option>
                   <option value="descanso_medico">Descanso Médico</option>
                   <option value="descanso">Descanso Compensatorio (Tomado)</option>
                   <option value="vacaciones">Vacaciones (Tomadas)</option>
@@ -393,9 +421,9 @@ export default function TareoPage() {
               </div>
             </form>
 
-            {/* MATRIZ DE TAREO CON COLUMNAS SEPARADAS */}
+            {/* MATRIZ DE TAREO CON CÁLCULO DE DESCANSOS (MENOS FALTAS) Y VACACIONES */}
             <div className="rounded-3xl p-6 shadow-2xl border space-y-4" style={{ backgroundColor: 'rgba(30, 27, 75, 0.75)', borderColor: 'rgba(217, 70, 239, 0.3)' }}>
-              <h2 className="text-sm font-bold text-white uppercase tracking-wider">Módulo de Asistencia, Tareo & Control de Bolsas (Columnas Separadas)</h2>
+              <h2 className="text-sm font-bold text-white uppercase tracking-wider">Módulo de Asistencia, Tareo & Control de Bolsas (Con Corte Inicial & Descuento de Faltas)</h2>
               
               <div className="overflow-x-auto">
                 <table className="w-full text-left text-sm text-purple-200">
@@ -404,7 +432,7 @@ export default function TareoPage() {
                       <th className="px-3 py-3">Colaborador</th>
                       <th className="px-3 py-3">Cargo / Régimen</th>
                       <th className="px-3 py-3 text-center">Días Lab.</th>
-                      <th className="px-3 py-3 text-center">Descansos Neto</th>
+                      <th className="px-3 py-3 text-center">Descansos Netos</th>
                       <th className="px-3 py-3 text-center text-rose-300">Faltas</th>
                       <th className="px-3 py-3 text-center text-amber-300">Tardanzas</th>
                       <th className="px-3 py-3 text-center text-cyan-300">Desc. Médico</th>
@@ -418,14 +446,16 @@ export default function TareoPage() {
                       
                       const generatedRest = Number((totalCampoOficina * 0.333).toFixed(1));
                       const takenRest = collabTareos.filter(t => t.status === 'descanso').reduce((acc, t) => acc + t.daysWorked, 0);
-                      const netRest = Math.max(0, generatedRest - takenRest);
+                      const totalFaltas = collabTareos.filter(t => t.status === 'falto').reduce((acc, t) => acc + t.daysWorked, 0);
+                      
+                      // CÁLCULO DE DESCANSOS NETOS: Saldo Corte (Ini) + Generados - Tomados - Faltas
+                      const netRest = Math.max(0, (c.initialRestDays || 0) + generatedRest - takenRest - totalFaltas);
 
                       const totalTardanzas = collabTareos.filter(t => t.status === 'tardanza').reduce((acc, t) => acc + t.daysWorked, 0);
-                      const totalFaltas = collabTareos.filter(t => t.status === 'falto').reduce((acc, t) => acc + t.daysWorked, 0);
                       const totalDescansoMedico = collabTareos.filter(t => t.status === 'descanso_medico').reduce((acc, t) => acc + t.daysWorked, 0);
                       
                       const takenVac = collabTareos.filter(t => t.status === 'vacaciones').reduce((acc, t) => acc + t.daysWorked, 0);
-                      const vac = calculateVacationStatus(c.startDate, c.regime, takenVac);
+                      const vac = calculateVacationStatus(c.startDate, c.regime, c.initialVacationDays || 0, takenVac);
 
                       return (
                         <tr key={c.dni} className="hover:bg-indigo-900/30">
@@ -442,23 +472,20 @@ export default function TareoPage() {
                           <td className="px-3 py-3 text-center text-teal-300 font-bold">{totalCampoOficina} d</td>
                           <td className="px-3 py-3 text-center text-teal-200">
                             {netRest > 0 ? `${netRest} d` : <span className="text-purple-300/40">0 d</span>}
-                            <div className="text-[9px] text-purple-300/60">({generatedRest}g - {takenRest}t)</div>
+                            <div className="text-[9px] text-purple-300/60">({c.initialRestDays || 0}ini + {generatedRest}g - {takenRest}t - {totalFaltas}f)</div>
                           </td>
-                          {/* COLUMNA FALTAS */}
                           <td className="px-3 py-3 text-center font-bold text-rose-400">
                             {totalFaltas > 0 ? `${totalFaltas} d` : <span className="text-purple-300/30">0</span>}
                           </td>
-                          {/* COLUMNA TARDANZAS */}
                           <td className="px-3 py-3 text-center font-bold text-amber-300">
                             {totalTardanzas > 0 ? `${totalTardanzas} d` : <span className="text-purple-300/30">0</span>}
                           </td>
-                          {/* COLUMNA DESCANSO MÉDICO */}
                           <td className="px-3 py-3 text-center font-bold text-cyan-300">
                             {totalDescansoMedico > 0 ? `${totalDescansoMedico} d` : <span className="text-purple-300/30">0</span>}
                           </td>
                           <td className="px-3 py-3 text-right">
                             <div className="text-fuchsia-300 font-black text-sm">{vac.netDays} días netos</div>
-                            <div className="text-[10px] text-purple-200 font-sans">({vac.earnedDays} ac. - {takenVac} tom.)</div>
+                            <div className="text-[10px] text-purple-200 font-sans">({c.initialVacationDays || 0}ini + {vac.earnedDays}ac - {takenVac}tom)</div>
                           </td>
                         </tr>
                       );
