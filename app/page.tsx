@@ -186,14 +186,12 @@ export default function HomePage() {
   const currentSavingsPercent = monthlySavingsPercentages[selectedMonth] ?? 20;
 
   const handleSavingsPercentChange = async (newPercent: number) => {
-    // Actualizamos el estado local de manera inmutable reflejando el mes exacto
     const updated = {
       ...monthlySavingsPercentages,
       [selectedMonth]: newPercent,
     };
     setMonthlySavingsPercentages(updated);
 
-    // Guardado o actualización directa en Supabase para el mes seleccionado
     const { error } = await supabase
       .from('finanzas_config')
       .upsert(
@@ -259,7 +257,6 @@ export default function HomePage() {
     };
   });
 
-  // Lista de meses disponibles para la tabla comparativa
   const allMonthsSet = new Set<string>([
     selectedMonth,
     ...transactions.map((t) => t.month || (t.date ? t.date.split('/').reverse().join('-').slice(0, 7) : selectedMonth)),
@@ -275,7 +272,6 @@ export default function HomePage() {
     const inc = mTx.filter((t) => t.type === 'income').reduce((a, t) => a + t.amount, 0);
     const exp = mTx.filter((t) => t.type === 'expense').reduce((a, t) => a + t.amount, 0);
     
-    // Cada fila de la tabla usa rigurosamente el porcentaje configurado para ese mes 'm' específico
     const mPct = monthlySavingsPercentages[m] ?? 20;
     const sav = (inc * mPct) / 100;
     return { month: m, income: inc, expense: exp, savings: sav, percent: mPct };
@@ -574,7 +570,7 @@ export default function HomePage() {
             <div className="flex justify-between items-center">
               <h3 className="text-xs font-semibold text-fuchsia-300 uppercase tracking-wider">Meta Ahorro ({selectedMonth})</h3>
               <select
-                key={selectedMonth} // Fuerza la actualización inmediata del desplegable al cambiar de mes
+                key={selectedMonth}
                 value={currentSavingsPercent}
                 onChange={(e) => handleSavingsPercentChange(Number(e.target.value))}
                 className="bg-indigo-950 border border-purple-500 text-fuchsia-300 text-xs font-bold rounded-lg px-2 py-0.5 focus:outline-none"
