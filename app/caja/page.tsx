@@ -56,6 +56,7 @@ export default function CajaChicaHome() {
   const [registros, setRegistros] = useState<RegistroCaja[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [subiendoArchivo, setSubiendoArchivo] = useState<boolean>(false);
+  const [descargandoZip, setDescargandoZip] = useState<boolean>(false);
   const [idEditando, setIdEditando] = useState<number | null>(null);
   const [esAdmin, setEsAdmin] = useState<boolean>(false);
 
@@ -464,54 +465,87 @@ export default function CajaChicaHome() {
     });
   }, [registrosFiltrados, saldoInicialCalculado, totalGastosRendidos]);
 
-  // DESCARGA MASIVA GLOBAL DE EVIDENCIAS SEGÚN EL PROYECTO FILTRADO
-  const descargarEvidenciasGlobales = async () => {
+  // DESCARGAR TODAS LAS EVIDENCIAS DEL PROYECTO EN UN SOLO ZIP ORGANIZADO POR CARPETAS
+  const descargarZipGlobalProyecto = async () => {
     if (!proyectoSeleccionado) {
-      alert('Por favor especifica o selecciona un Código de Proyecto para descargar sus evidencias.');
+      alert('Por favor especifica o selecciona un Código de Proyecto arriba.');
       return;
     }
 
-    const evidenciasProyecto = registrosFiltrados.filter((r) => r.url_comprobante);
+    // Obtenemos todos los registros del proyecto (sin importar el filtro de caja individual) para que sea global del proyecto
+    const prjTarget = proyectoSeleccionado.toUpperCase().trim();
+    const evidenciasProyecto = registros.filter(
+      (r) =>
+        (r.codigo_proyecto || '').toUpperCase().trim() === prjTarget &&
+        r.url_comprobante &&
+        r.tipo_documento !== 'Apertura'
+    );
 
     if (evidenciasProyecto.length === 0) {
-      alert(`No hay comprobantes con archivos adjuntos para el proyecto ${proyectoSeleccionado}.`);
+      alert(`No hay comprobantes con evidencias adjuntas para el proyecto ${proyectoSeleccionado}.`);
       return;
     }
 
-    if (!confirm(`Se procederá a descargar automáticamente ${evidenciasProyecto.length} archivos de evidencia del proyecto ${proyectoSeleccionado}. ¿Deseas continuar?`)) {
-      return;
-    }
+    setDescargandoZip(true);
 
-    alert('Iniciando descarga en lote de las evidencias. Por favor permite las descargas múltiples en tu navegador si se solicita.');
-
-    for (let i = 0; i < evidenciasProyecto.length; i++) {
-      const item = evidenciasProyecto[i];
-      const url = item.url_comprobante;
-      if (!url) continue;
-
-      try {
-        const response = await fetch(url);
-        const blob = await response.blob();
-        const extension = url.split('.').pop()?.split('?')[0] || 'jpg';
-        const nombreArchivo = `${item.codigo_proyecto}_${item.numero_caja}_${item.tipo_gasto}_${item.numero_documento || i}.${extension}`;
-
-        const blobUrl = window.URL.createObjectURL(blob);
-        const link = document.createElement('a');
-        link.href = blobUrl;
-        link.download = nombreArchivo;
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-        window.URL.revokeObjectURL(blobUrl);
-
-        // Pequeña pausa para evitar bloqueo del navegador por descargas simultáneas masivas
-        await new Promise((resolve) => setTimeout(resolve, 400));
-      } catch (error) {
-        console.error(`Error al descargar archivo ${url}:`, error);
+    try {
+      // Cargamos JSZip dinámicamente desde CDN sin requerir terminal ni npm install
+      if (!(window as any).JSZip) {
+        await new Promise((resolve, reject) => {
+          const script = document.createElement('script');
+          script.src = 'https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js';
+          script.onload = resolve;
+          script.onerror = reject;
+          document.head.appendChild(script);
+        });
       }
-    }
 
-    alert('✅ Descarga masiva de evidencias finalizada.');
+      const JSZip = (window as any).JSZip;
+      const zip = new JSZip();
+      
+      // Creamos una carpeta con el nombre del proyecto
+      const carpetaProyecto = zip.folder(`Proyecto_${proyectoSeleccionado}`);
+
+      alert(`Iniciando descarga y compresión de ${evidenciasProyecto.length} archivos para el proyecto ${proyectoSeleccionado}. Por favor espera un momento...`);
+
+      for (let i = 0; i < evidenciasProyecto.length; i++) {
+        const item = evidenciasProyecto[i];
+        const url = item.url_comprobante;
+        if (!url) continue;
+
+        try {
+          const response = await fetch(url);
+          const blob = await response.blob();
+          const rawExt = url.split('.').pop()?.split('?')[0] || 'jpg';
+          const extension = rawExt.toLowerCase().replace(/[^a-z0-9]/g, '');
+          
+          // Nombre limpio y ordenado para cada archivo dentro de la carpeta
+          const nombreArchivo = `Caja_${item.numero_caja || 'General'}_${item.tipo_gasto || 'Gasto'}_${item.numero_documento || i}.${extension}`;
+          
+          carpetaProyecto.file(nombreArchivo, blob);
+        } catch (err) {
+          console.error(`Error al incluir archivo ${url}:`, err);
+        }
+      }
+
+      // Generar el archivo ZIP final y forzar su descarga en el navegador
+      const contenidoZip = await zip.generateAsync({ type: 'blob' });
+      
+      const urlBlob = window.URL.createObjectURL(contenidoZip);
+      const link = document.createElement('a');
+      link.href = urlBlob;
+      link.download = `Evidencias_Proyecto_${proyectoSeleccionado}.zip`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(urlBlob);
+
+      alert(`✅ ¡Archivo ZIP global del proyecto ${proyectoSeleccionado} descargado con éxito!`);
+    } catch (error: any) {
+      alert('Error al generar el archivo ZIP: ' + error.message);
+    } finally {
+      setDescargandoZip(false);
+    }
   };
 
   const exportarAExcel = () => {
@@ -709,12 +743,17 @@ export default function CajaChicaHome() {
               )
             )}
 
-            <button type="button" onClick={descargarEvidenciasGlobales} className="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-2 px-3 rounded-lg text-xs shadow cursor-pointer transition-colors">
-              📦 Descargar Evidencias (Proyecto)
+            <button 
+              type="button" 
+              onClick={descargarZipGlobalProyecto} 
+              disabled={descargandoZip}
+              className="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-2 px-3 rounded-lg text-xs shadow cursor-pointer transition-colors disabled:bg-gray-400"
+            >
+              {descargandoZip ? '📦 Empaquetando ZIP...' : '📦 Descargar ZIP Global (Proyecto)'}
             </button>
 
             <button type="button" onClick={exportarAExcel} className="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold py-2 px-3 rounded-lg text-xs shadow cursor-pointer transition-colors">
-              📊 Exportar Excel + Global Evidencias
+              📊 Exportar Excel + Global
             </button>
           </div>
         </div>
