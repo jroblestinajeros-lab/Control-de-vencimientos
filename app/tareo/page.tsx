@@ -79,16 +79,62 @@ export default function TareoPage() {
   const [q7, setQ7] = useState(0);
   const [q8, setQ8] = useState(0);
 
+  // --- CARGA INICIAL CON RECUPERACIÓN Y PERSISTENCIA PERMANENTE ---
   useEffect(() => {
-    document.title = "Módulo Operativo POL-RH-004 & Test de Fatiga | V&A Consulting";
+    document.title = "Módulo POL-RH-004 & Test de Fatiga | V&A Consulting";
     
-    const savedCollabs = localStorage.getItem('vya_collabs_v14');
-    const savedTareos = localStorage.getItem('vya_tareos_v14');
-    const savedFatigue = localStorage.getItem('vya_fatigue_v14');
+    try {
+      let savedCollabs = localStorage.getItem('vya_collabs_permanent');
+      let savedTareos = localStorage.getItem('vya_tareos_permanent');
+      let savedFatigue = localStorage.getItem('vya_fatigue_permanent');
 
-    if (savedCollabs) { try { setCollaborators(JSON.parse(savedCollabs)); } catch (e) { setCollaborators([]); } }
-    if (savedTareos) { try { setTareos(JSON.parse(savedTareos)); } catch (e) { setTareos([]); } }
-    if (savedFatigue) { try { setFatigueRecords(JSON.parse(savedFatigue)); } catch (e) { setFatigueRecords([]); } }
+      // Rescate automático de versiones anteriores por si acaso
+      if (!savedCollabs) {
+        for (let i = 20; i >= 1; i--) {
+          const old = localStorage.getItem(`vya_collabs_v${i}`);
+          if (old) { savedCollabs = old; break; }
+        }
+      }
+      if (!savedTareos) {
+        for (let i = 20; i >= 1; i--) {
+          const old = localStorage.getItem(`vya_tareos_v${i}`);
+          if (old) { savedTareos = old; break; }
+        }
+      }
+      if (!savedFatigue) {
+        for (let i = 20; i >= 1; i--) {
+          const old = localStorage.getItem(`vya_fatigue_v${i}`);
+          if (old) { savedFatigue = old; break; }
+        }
+      }
+
+      if (savedCollabs) {
+        setCollaborators(JSON.parse(savedCollabs));
+      } else {
+        const defaultCollabs: Collaborator[] = [
+          { dni: '45572820', name: 'Jorge Luis Robles Tinajeros', cargo: 'Administrativo', startDate: '2026-01-08', mypeRegime: 'small', initialRestDays: 0, initialVacationDays: 0 },
+          { dni: '45420921', name: 'Jefferson Aliaga Araujo', cargo: 'Gerente de Finanzas', startDate: '2015-01-01', mypeRegime: 'small', initialRestDays: 0, initialVacationDays: 0 }
+        ];
+        setCollaborators(defaultCollabs);
+        localStorage.setItem('vya_collabs_permanent', JSON.stringify(defaultCollabs));
+      }
+
+      if (savedTareos) {
+        setTareos(JSON.parse(savedTareos));
+      } else {
+        const defaultTareos: TareoRecord[] = [
+          { id: '1', dni: '45572820', name: 'Jorge Luis Robles Tinajeros', cargo: 'Administrativo', projectCode: 'PRJ-01', status: 'campo', daysWorked: 14, date: '2026-09-11' }
+        ];
+        setTareos(defaultTareos);
+        localStorage.setItem('vya_tareos_permanent', JSON.stringify(defaultTareos));
+      }
+
+      if (savedFatigue) {
+        setFatigueRecords(JSON.parse(savedFatigue));
+      }
+    } catch (e) {
+      console.error("Error al cargar localStorage:", e);
+    }
 
     setLoading(false);
   }, []);
@@ -136,7 +182,7 @@ export default function TareoPage() {
     };
   };
 
-  // --- GUARDAR TEST DE FATIGA (MEJORADO) ---
+  // --- GUARDAR TEST DE FATIGA ---
   const handleSaveFatigueTest = (e: React.FormEvent) => {
     e.preventDefault();
     if (!fatigueDni) { alert('Seleccione un colaborador.'); return; }
@@ -150,7 +196,7 @@ export default function TareoPage() {
     const sleepHours = parseFloat(sleepHoursInput) || 7;
 
     let riskLevel: FatigueRecord['riskLevel'] = 'APTO (Bajo Riesgo)';
-    if (totalScore >= 11 && totalScore <= 15 || sleepHours < 5) {
+    if ((totalScore >= 11 && totalScore <= 15) || sleepHours < 5) {
       riskLevel = 'ATENCIÓN (Riesgo Moderado)';
     }
     if (totalScore >= 16 || physicalFatigueInput === 'Extrema' || sleepHours < 4) {
@@ -171,7 +217,7 @@ export default function TareoPage() {
 
     const updated = [newRecord, ...fatigueRecords];
     setFatigueRecords(updated);
-    localStorage.setItem('vya_fatigue_v14', JSON.stringify(updated));
+    localStorage.setItem('vya_fatigue_permanent', JSON.stringify(updated));
 
     alert(`Test Registrado.\nPuntaje Somnolencia: ${totalScore} pts\nSueño previo: ${sleepHours}h\nDictamen Ocupacional: ${riskLevel}`);
     setDeclarationAccepted(false);
@@ -183,13 +229,12 @@ export default function TareoPage() {
     const collab = collaborators.find(c => c.dni === tareoDni);
     if (!collab) return;
 
+    let updated: TareoRecord[];
     if (editingTareoId) {
-      const updated = tareos.map(t => t.id === editingTareoId ? {
+      updated = tareos.map(t => t.id === editingTareoId ? {
         ...t, dni: collab.dni, name: collab.name, cargo: collab.cargo,
         projectCode, status: tareoStatus, daysWorked: parseFloat(daysWorkedInput) || 1, date: tareoDateInput
       } : t);
-      setTareos(updated);
-      localStorage.setItem('vya_tareos_v14', JSON.stringify(updated));
       setEditingTareoId(null);
       alert('Tareo actualizado con éxito.');
     } else {
@@ -197,10 +242,10 @@ export default function TareoPage() {
         id: Date.now().toString(), dni: collab.dni, name: collab.name, cargo: collab.cargo,
         projectCode, status: tareoStatus, daysWorked: parseFloat(daysWorkedInput) || 1, date: tareoDateInput,
       };
-      const updated = [newRecord, ...tareos];
-      setTareos(updated);
-      localStorage.setItem('vya_tareos_v14', JSON.stringify(updated));
+      updated = [newRecord, ...tareos];
     }
+    setTareos(updated);
+    localStorage.setItem('vya_tareos_permanent', JSON.stringify(updated));
     setDaysWorkedInput('1');
   };
 
@@ -223,7 +268,7 @@ export default function TareoPage() {
     if (!confirm('¿Eliminar este registro de tareo?')) return;
     const updated = tareos.filter(t => t.id !== id);
     setTareos(updated);
-    localStorage.setItem('vya_tareos_v14', JSON.stringify(updated));
+    localStorage.setItem('vya_tareos_permanent', JSON.stringify(updated));
     if (editingTareoId === id) handleCancelEditTareo();
   };
 
@@ -245,7 +290,7 @@ export default function TareoPage() {
       updated = [newCollab, ...collaborators];
     }
     setCollaborators(updated);
-    localStorage.setItem('vya_collabs_v14', JSON.stringify(updated));
+    localStorage.setItem('vya_collabs_permanent', JSON.stringify(updated));
     setDniInput(''); setNameInput(''); setCargoInput(''); setStartDateInput(''); setInitialRestInput('0'); setInitialVacInput('0'); setIsEditingCollab(false);
   };
 
@@ -260,7 +305,7 @@ export default function TareoPage() {
     if (!confirm('¿Eliminar colaborador?')) return;
     const updated = collaborators.filter(c => c.dni !== dni);
     setCollaborators(updated);
-    localStorage.setItem('vya_collabs_v14', JSON.stringify(updated));
+    localStorage.setItem('vya_collabs_permanent', JSON.stringify(updated));
   };
 
   const handleExportExcel = () => {
@@ -445,7 +490,7 @@ export default function TareoPage() {
                       <th className="px-4 py-3">Fecha</th>
                       <th className="px-4 py-3">Colaborador</th>
                       <th className="px-4 py-3 text-center">Puntaje</th>
-                      <th className="px-4 py-3 text-center">Sueño / Fatiga Físcia</th>
+                      <th className="px-4 py-3 text-center">Sueño / Fatiga Física</th>
                       <th className="px-4 py-3 text-center">Dictamen</th>
                     </tr>
                   </thead>
@@ -614,8 +659,8 @@ export default function TareoPage() {
                           </td>
                           <td className="px-4 py-3 text-right text-teal-300">{t.daysWorked} días</td>
                           <td className="px-4 py-3 text-center space-x-2">
-                            <button onClick={() => handleEditTareo(t)} title="Editar Registro" className="bg-indigo-900 hover:bg-indigo-800 border border-indigo-400 text-indigo-200 px-2.5 py-1 rounded-lg text-xs">✏️</button>
-                            <button onClick={() => handleDeleteTareo(t.id)} title="Eliminar Registro" className="bg-rose-950 hover:bg-rose-900 border border-rose-500 text-rose-300 px-2.5 py-1 rounded-lg text-xs">🗑️</button>
+                            <button onClick={() => handleEditTareo(t)} title="Editar Registro" className="bg-indigo-900 hover:bg-indigo-800 border border-indigo-400 text-indigo-200 px-2.5 py-1 rounded-xl text-xs">✏️</button>
+                            <button onClick={() => handleDeleteTareo(t.id)} title="Eliminar Registro" className="bg-rose-950 hover:bg-rose-900 border border-rose-500 text-rose-300 px-2.5 py-1 rounded-xl text-xs">🗑️</button>
                           </td>
                         </tr>
                       ))
