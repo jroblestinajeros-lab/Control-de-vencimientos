@@ -67,13 +67,15 @@ export default function TareoPage() {
   const [tareoDateInput, setTareoDateInput] = useState(new Date().toISOString().slice(0, 10));
   const [editingTareoId, setEditingTareoId] = useState<string | null>(null);
 
-  // Estados Test de Fatiga (Fecha, Proyecto, Contexto + Escala Epworth + Jurada)
+  // Estados Test de Fatiga (Fecha, Proyecto, Contexto + Escala Epworth + Jurada + Edición)
   const [fatigueDni, setFatigueDni] = useState('');
   const [fatigueDateInput, setFatigueDateInput] = useState(new Date().toISOString().slice(0, 10));
   const [fatigueProjectCode, setFatigueProjectCode] = useState('PRJ-01');
   const [sleepHoursInput, setSleepHoursInput] = useState('7');
   const [physicalFatigueInput, setPhysicalFatigueInput] = useState<'Leve' | 'Moderada' | 'Extrema'>('Leve');
   const [declarationAccepted, setDeclarationAccepted] = useState(false);
+  const [editingFatigueId, setEditingFatigueId] = useState<string | null>(null);
+
   const [q1, setQ1] = useState(0);
   const [q2, setQ2] = useState(0);
   const [q3, setQ3] = useState(0);
@@ -185,7 +187,7 @@ export default function TareoPage() {
     };
   };
 
-  // --- GUARDAR TEST DE FATIGA CON FECHA Y PROYECTO ---
+  // --- GUARDAR / ACTUALIZAR TEST DE FATIGA ---
   const handleSaveFatigueTest = (e: React.FormEvent) => {
     e.preventDefault();
     if (!fatigueDni) { alert('Seleccione un colaborador.'); return; }
@@ -206,26 +208,69 @@ export default function TareoPage() {
       riskLevel = 'NO APTO (Alto Riesgo - Descanso Inmediato)';
     }
 
-    const newRecord: FatigueRecord = {
-      id: Date.now().toString(),
-      dni: collab.dni,
-      name: collab.name,
-      cargo: collab.cargo,
-      date: fatigueDateInput,
-      projectCode: fatigueProjectCode,
-      score: totalScore,
-      sleepHours,
-      physicalFatigue: physicalFatigueInput,
-      riskLevel,
-      declarationAccepted
-    };
+    let updatedFatigue: FatigueRecord[];
 
-    const updated = [newRecord, ...fatigueRecords];
+    if (editingFatigueId) {
+      updatedFatigue = fatigueRecords.map(f => f.id === editingFatigueId ? {
+        ...f,
+        dni: collab.dni,
+        name: collab.name,
+        cargo: collab.cargo,
+        date: fatigueDateInput,
+        projectCode: fatigueProjectCode,
+        score: totalScore,
+        sleepHours,
+        physicalFatigue: physicalFatigueInput,
+        riskLevel,
+        declarationAccepted
+      } : f);
+      setEditingFatigueId(null);
+      alert('Test de Fatiga actualizado correctamente.');
+    } else {
+      const newRecord: FatigueRecord = {
+        id: Date.now().toString(),
+        dni: collab.dni,
+        name: collab.name,
+        cargo: collab.cargo,
+        date: fatigueDateInput,
+        projectCode: fatigueProjectCode,
+        score: totalScore,
+        sleepHours,
+        physicalFatigue: physicalFatigueInput,
+        riskLevel,
+        declarationAccepted
+      };
+      updatedFatigue = [newRecord, ...fatigueRecords];
+      alert(`Test Registrado para el Proyecto ${fatigueProjectCode}.\nFecha: ${fatigueDateInput}\nPuntaje Somnolencia: ${totalScore} pts\nDictamen: ${riskLevel}`);
+    }
+
+    setFatigueRecords(updatedFatigue);
+    localStorage.setItem('vya_fatigue_permanent', JSON.stringify(updatedFatigue));
+    setDeclarationAccepted(false);
+  };
+
+  const handleEditFatigue = (f: FatigueRecord) => {
+    setEditingFatigueId(f.id);
+    setFatigueDni(f.dni);
+    setFatigueDateInput(f.date);
+    setFatigueProjectCode(f.projectCode);
+    setSleepHoursInput(f.sleepHours.toString());
+    setPhysicalFatigueInput(f.physicalFatigue);
+    setDeclarationAccepted(true);
+    window.scrollTo({ top: 150, behavior: 'smooth' });
+  };
+
+  const handleCancelEditFatigue = () => {
+    setEditingFatigueId(null);
+    setDeclarationAccepted(false);
+  };
+
+  const handleDeleteFatigue = (id: string) => {
+    if (!confirm('¿Deseas eliminar este registro de fatiga?')) return;
+    const updated = fatigueRecords.filter(f => f.id !== id);
     setFatigueRecords(updated);
     localStorage.setItem('vya_fatigue_permanent', JSON.stringify(updated));
-
-    alert(`Test Registrado para el Proyecto ${fatigueProjectCode}.\nFecha: ${fatigueDateInput}\nPuntaje Somnolencia: ${totalScore} pts\nDictamen Ocupacional: ${riskLevel}`);
-    setDeclarationAccepted(false);
+    if (editingFatigueId === id) handleCancelEditFatigue();
   };
 
   // --- EXPORTAR HISTORIAL DE FATIGA A EXCEL ---
@@ -449,8 +494,17 @@ export default function TareoPage() {
           </div>
         ) : activeTab === 'fatigue' ? (
           <div className="space-y-6">
-            <div className="rounded-3xl p-6 shadow-2xl border bg-indigo-950/90 border-rose-500/40 space-y-4">
-              <h2 className="text-sm font-bold text-rose-300 uppercase tracking-wider">🚨 Test de Evaluación de Fatiga y Somnolencia (Regímenes Atípicos &gt;28 Días)</h2>
+            <div className={`rounded-3xl p-6 shadow-2xl border transition-all ${editingFatigueId ? 'bg-amber-950/30 border-amber-500/60' : 'bg-indigo-950/90 border-rose-500/40'} space-y-4`}>
+              <div className="flex justify-between items-center">
+                <h2 className="text-sm font-bold text-rose-300 uppercase tracking-wider">
+                  {editingFatigueId ? '✏️ Editando Evaluación de Fatiga y Somnolencia' : '🚨 Test de Evaluación de Fatiga y Somnolencia (Regímenes Atípicos >28 Días)'}
+                </h2>
+                {editingFatigueId && (
+                  <button type="button" onClick={handleCancelEditFatigue} className="text-[11px] bg-rose-950 border border-rose-500 text-rose-300 px-3 py-1 rounded-lg">
+                    Cancelar Edición
+                  </button>
+                )}
+              </div>
               <p className="text-xs text-purple-200">Evaluación obligatoria con fecha, código de proyecto, validación de contexto físico y escala Epworth.</p>
               
               <form onSubmit={handleSaveFatigueTest} className="space-y-4">
@@ -514,14 +568,14 @@ export default function TareoPage() {
                   </label>
                 </div>
 
-                <button type="submit" className="w-full bg-rose-500 hover:bg-rose-400 text-slate-950 font-black text-xs py-3 rounded-xl shadow-lg uppercase">
-                  📥 Registrar Dictamen de Aptitud Ocupacional
+                <button type="submit" className={`w-full font-black text-xs py-3 rounded-xl shadow-lg uppercase ${editingFatigueId ? 'bg-amber-400 hover:bg-amber-300 text-slate-950' : 'bg-rose-500 hover:bg-rose-400 text-slate-950'}`}>
+                  {editingFatigueId ? '🔄 Actualizar Dictamen de Aptitud' : '📥 Registrar Dictamen de Aptitud Ocupacional'}
                 </button>
               </form>
             </div>
 
             <div className="rounded-3xl p-6 shadow-2xl border bg-indigo-950/75 border-purple-500/30 space-y-4">
-              <div className="flex justify-between items-center">
+              <div className="flex justify-between items-center flex-wrap gap-3">
                 <h2 className="text-sm font-bold text-white uppercase tracking-wider">Historial de Evaluaciones de Fatiga & Dictámenes</h2>
                 <button onClick={handleExportFatigueExcel} className="bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black text-xs px-4 py-2 rounded-xl shadow-lg flex items-center gap-2">
                   📥 Descargar Reporte Fatiga (Excel)
@@ -537,20 +591,25 @@ export default function TareoPage() {
                       <th className="px-4 py-3 text-center">Puntaje</th>
                       <th className="px-4 py-3 text-center">Sueño / Fatiga</th>
                       <th className="px-4 py-3 text-center">Dictamen</th>
+                      <th className="px-4 py-3 text-center">Acciones</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-purple-500/20 font-mono text-xs">
                     {fatigueRecords.length === 0 ? (
-                      <tr><td colSpan={6} className="text-center py-4 text-purple-300/50">No hay registros de fatiga.</td></tr>
+                      <tr><td colSpan={7} className="text-center py-4 text-purple-300/50">No hay registros de fatiga.</td></tr>
                     ) : (
                       fatigueRecords.map(f => (
-                        <tr key={f.id} className="hover:bg-indigo-900/30">
+                        <tr key={f.id} className={`hover:bg-indigo-900/30 ${editingFatigueId === f.id ? 'bg-amber-950/30 border-l-4 border-amber-400' : ''}`}>
                           <td className="px-4 py-3 text-purple-300">{f.date}</td>
                           <td className="px-4 py-3 text-cyan-300">{f.projectCode}</td>
                           <td className="px-4 py-3 text-white font-sans font-medium">{f.name}</td>
                           <td className="px-4 py-3 text-center text-cyan-300">{f.score} pts</td>
                           <td className="px-4 py-3 text-center text-purple-200">{f.sleepHours}h / {f.physicalFatigue}</td>
                           <td className="px-4 py-3 text-center font-bold text-rose-300">{f.riskLevel}</td>
+                          <td className="px-4 py-3 text-center space-x-2">
+                            <button onClick={() => handleEditFatigue(f)} title="Editar Test" className="bg-indigo-900 hover:bg-indigo-800 border border-indigo-400 text-indigo-200 px-2.5 py-1 rounded-xl text-xs">✏️</button>
+                            <button onClick={() => handleDeleteFatigue(f.id)} title="Eliminar Test" className="bg-rose-950 hover:bg-rose-900 border border-rose-500 text-rose-300 px-2.5 py-1 rounded-xl text-xs">🗑️</button>
+                          </td>
                         </tr>
                       ))
                     )}
