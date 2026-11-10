@@ -119,15 +119,14 @@ export default function HomePage() {
   const cargarDatosRemotos = async (email: string) => {
     setLoading(true);
     try {
-      // 1. Cargar Transacciones desde Supabase
+      // 1. Cargar Transacciones
       const { data: txData, error: txError } = await supabase
         .from('finanzas_transacciones')
         .select('*')
         .eq('user_email', email)
         .order('created_at', { ascending: false });
 
-      if (txError) console.error('Error al cargar transacciones:', txError);
-      else if (txData) {
+      if (!txError && txData) {
         setTransactions(
           txData.map((t: any) => ({
             id: t.id,
@@ -142,14 +141,13 @@ export default function HomePage() {
         );
       }
 
-      // 2. Cargar Metas desde Supabase
+      // 2. Cargar Metas
       const { data: goalsData, error: goalsError } = await supabase
         .from('finanzas_metas')
         .select('*')
         .eq('user_email', email);
 
-      if (goalsError) console.error('Error al cargar metas:', goalsError);
-      else if (goalsData) {
+      if (!goalsError && goalsData) {
         setGoals(
           goalsData.map((g: any) => ({
             id: g.id,
@@ -160,7 +158,7 @@ export default function HomePage() {
         );
       }
 
-      // 3. Cargar Porcentajes de Ahorro por Mes desde Supabase
+      // 3. Cargar Configuración de Porcentajes Mensuales
       const { data: configData, error: configError } = await supabase
         .from('finanzas_config')
         .select('*')
@@ -185,6 +183,7 @@ export default function HomePage() {
     localStorage.setItem(`fin_currency_${userEmail}`, newCurr);
   };
 
+  // Obtiene el porcentaje del mes seleccionado actualmente (por defecto 20%)
   const currentSavingsPercent = monthlySavingsPercentages[selectedMonth] ?? 20;
 
   const handleSavingsPercentChange = async (newPercent: number) => {
@@ -194,10 +193,17 @@ export default function HomePage() {
     };
     setMonthlySavingsPercentages(updated);
 
-    // Guardar en Supabase para que no se pierda
-    await supabase
+    // Guardado robusto en Supabase asegurando la combinación de usuario y mes
+    const { error } = await supabase
       .from('finanzas_config')
-      .upsert({ user_email: userEmail, month: selectedMonth, savings_percent: newPercent }, { onConflict: 'user_email,month' });
+      .upsert(
+        { user_email: userEmail, month: selectedMonth, savings_percent: newPercent },
+        { onConflict: 'user_email,month' }
+      );
+
+    if (error) {
+      console.error('Error al guardar porcentaje de ahorro en Supabase:', error.message);
+    }
   };
 
   const monthTransactions = transactions.filter((t) => {
