@@ -158,20 +158,26 @@ export default function HomePage() {
       }
 
       // 3. Cargar Configuración de Porcentajes por Mes desde Supabase
-      const { data: configData } = await supabase
+      const { data: configData, error: configError } = await supabase
         .from('finanzas_config')
         .select('*')
         .eq('user_email', email);
 
+      if (configError) {
+        console.error('Error al cargar config:', configError.message);
+      }
+
       if (configData) {
         const mapConfig: Record<string, number> = {};
         configData.forEach((c: any) => {
-          mapConfig[c.month] = Number(c.savings_percent);
+          if (c.month && c.savings_percent !== undefined) {
+            mapConfig[c.month] = Number(c.savings_percent);
+          }
         });
         setMonthlySavingsPercentages(mapConfig);
       }
     } catch (err) {
-      console.error('Error cargando datos:', err);
+      console.error('Error general cargando datos:', err);
     } finally {
       setLoading(false);
     }
@@ -182,8 +188,8 @@ export default function HomePage() {
     localStorage.setItem(`fin_currency_${userEmail}`, newCurr);
   };
 
-  // Porcentaje estrictamente independiente para el mes seleccionado actual (por defecto 20%)
-  const currentSavingsPercent = monthlySavingsPercentages[selectedMonth] ?? 20;
+  // Porcentaje estrictamente independiente para el mes seleccionado actual (por defecto 15% o 20%)
+  const currentSavingsPercent = monthlySavingsPercentages[selectedMonth] ?? 15;
 
   const handleSavingsPercentChange = async (newPercent: number) => {
     const updated = {
@@ -192,15 +198,20 @@ export default function HomePage() {
     };
     setMonthlySavingsPercentages(updated);
 
+    // Guardado y actualización con upsert utilizando user_email y month como restricciones
     const { error } = await supabase
       .from('finanzas_config')
       .upsert(
-        { user_email: userEmail, month: selectedMonth, savings_percent: newPercent },
+        { 
+          user_email: userEmail, 
+          month: selectedMonth, 
+          savings_percent: newPercent 
+        },
         { onConflict: 'user_email,month' }
       );
 
     if (error) {
-      console.error('Error al actualizar el porcentaje de ahorro:', error.message);
+      console.error('Error al guardar el porcentaje de ahorro en Supabase:', error.message);
     }
   };
 
@@ -272,7 +283,8 @@ export default function HomePage() {
     const inc = mTx.filter((t) => t.type === 'income').reduce((a, t) => a + t.amount, 0);
     const exp = mTx.filter((t) => t.type === 'expense').reduce((a, t) => a + t.amount, 0);
     
-    const mPct = monthlySavingsPercentages[m] ?? 20;
+    // Asigna rigurosamente el porcentaje configurado para cada mes específico en la tabla histórica
+    const mPct = monthlySavingsPercentages[m] ?? 15;
     const sav = (inc * mPct) / 100;
     return { month: m, income: inc, expense: exp, savings: sav, percent: mPct };
   });
