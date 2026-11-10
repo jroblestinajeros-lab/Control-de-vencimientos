@@ -182,15 +182,18 @@ export default function HomePage() {
     localStorage.setItem(`fin_currency_${userEmail}`, newCurr);
   };
 
+  // Porcentaje estrictamente independiente para el mes seleccionado actual (por defecto 20% si no se ha configurado)
   const currentSavingsPercent = monthlySavingsPercentages[selectedMonth] ?? 20;
 
   const handleSavingsPercentChange = async (newPercent: number) => {
+    // Actualizamos el estado local exclusivamente para el mes activo actual
     const updated = {
       ...monthlySavingsPercentages,
       [selectedMonth]: newPercent,
     };
     setMonthlySavingsPercentages(updated);
 
+    // Guardamos en Supabase vinculado de forma única al mes seleccionado
     const { error } = await supabase
       .from('finanzas_config')
       .upsert(
@@ -256,14 +259,23 @@ export default function HomePage() {
     };
   });
 
-  const availableMonths = Array.from(
-    new Set(transactions.map((t) => t.month || selectedMonth))
-  ).sort().reverse().slice(0, 4);
+  // Lista de todos los meses que tienen transacciones o configuración guardada
+  const allMonthsSet = new Set<string>([
+    selectedMonth,
+    ...transactions.map((t) => t.month || (t.date ? t.date.split('/').reverse().join('-').slice(0, 7) : selectedMonth)),
+    ...Object.keys(monthlySavingsPercentages)
+  ]);
+  const availableMonths = Array.from(allMonthsSet).sort().reverse().slice(0, 4);
 
   const monthlyHistory = availableMonths.map((m) => {
-    const mTx = transactions.filter((t) => t.month === m);
+    const mTx = transactions.filter((t) => {
+      const tMonth = t.month || (t.date ? t.date.split('/').reverse().join('-').slice(0, 7) : '');
+      return tMonth === m;
+    });
     const inc = mTx.filter((t) => t.type === 'income').reduce((a, t) => a + t.amount, 0);
     const exp = mTx.filter((t) => t.type === 'expense').reduce((a, t) => a + t.amount, 0);
+    
+    // Obtiene el porcentaje específico de ESTE mes exacto en la iteración
     const mPct = monthlySavingsPercentages[m] ?? 20;
     const sav = (inc * mPct) / 100;
     return { month: m, income: inc, expense: exp, savings: sav, percent: mPct };
