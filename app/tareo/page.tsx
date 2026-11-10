@@ -67,7 +67,7 @@ export default function TareoPage() {
   const [tareoDateInput, setTareoDateInput] = useState(new Date().toISOString().slice(0, 10));
   const [editingTareoId, setEditingTareoId] = useState<string | null>(null);
 
-  // Estados Test de Fatiga (Fecha, Proyecto, Contexto + Escala Epworth + Jurada + Edición)
+  // Estados Test de Fatiga
   const [fatigueDni, setFatigueDni] = useState('');
   const [fatigueDateInput, setFatigueDateInput] = useState(new Date().toISOString().slice(0, 10));
   const [fatigueProjectCode, setFatigueProjectCode] = useState('PRJ-01');
@@ -157,31 +157,43 @@ export default function TareoPage() {
   const calculateRestBalance = (collabTareos: TareoRecord[], initialRest: number) => {
     let generatedRest = 0;
     let continuousFieldDays = 0;
+    let totalOficina = 0;
+    let totalCampo = 0;
+    let totalTardanzas = 0;
+    let totalFaltas = 0;
 
     collabTareos.forEach(t => {
       if (t.status === 'oficina') {
+        totalOficina += t.daysWorked;
         generatedRest += t.daysWorked * (2 / 5);
         continuousFieldDays = 0;
       } else if (t.status === 'campo') {
+        totalCampo += t.daysWorked;
         continuousFieldDays += t.daysWorked;
         if (t.daysWorked >= 14) {
           generatedRest += t.daysWorked * 0.5; // Atípico 2x1
         } else {
           generatedRest += t.daysWorked * (2 / 5);
         }
+      } else if (t.status === 'tardanza') {
+        totalTardanzas += t.daysWorked;
+      } else if (t.status === 'falto') {
+        totalFaltas += t.daysWorked;
       } else if (t.status === 'descanso') {
         continuousFieldDays = 0;
       }
     });
 
     const takenRest = collabTareos.filter(t => t.status === 'descanso').reduce((acc, t) => acc + t.daysWorked, 0);
-    const totalFaltas = collabTareos.filter(t => t.status === 'falto').reduce((acc, t) => acc + t.daysWorked, 0);
     const netRest = Math.max(0, initialRest + generatedRest - takenRest - totalFaltas);
 
     return {
+      totalOficina,
+      totalCampo,
+      totalTardanzas,
+      totalFaltas,
       generatedRest: Number(generatedRest.toFixed(1)),
       takenRest,
-      totalFaltas,
       netRest: Number(netRest.toFixed(1)),
       continuousFieldDays
     };
@@ -273,7 +285,33 @@ export default function TareoPage() {
     if (editingFatigueId === id) handleCancelEditFatigue();
   };
 
-  // --- EXPORTAR HISTORIAL DE FATIGA A EXCEL ---
+  // --- EXPORTAR REPORTE COMPLETO A EXCEL ---
+  const handleExportExcel = () => {
+    const targetCollabs = selectedDni ? collaborators.filter(c => c.dni === selectedDni) : collaborators;
+    const summaryData = targetCollabs.map(c => {
+      const cTareos = tareos.filter(t => t.dni === c.dni);
+      const rest = calculateRestBalance(cTareos, c.initialRestDays || 0);
+      const vac = calculateVacationStatus(c.startDate, c.mypeRegime, c.initialVacationDays || 0, cTareos.filter(t => t.status === 'vacaciones').reduce((acc, t) => acc + t.daysWorked, 0));
+      return {
+        'DNI': c.dni,
+        'Colaborador': c.name,
+        'Cargo': c.cargo,
+        'Ingreso': c.startDate,
+        'Días Oficina': rest.totalOficina,
+        'Días Campo': rest.totalCampo,
+        'Días Acumulados Campo': rest.continuousFieldDays,
+        'Alerta Fatiga (>28d)': rest.continuousFieldDays >= 28 ? '⚠️ REQUIERE TEST OBLIGATORIO' : 'Normal',
+        'Descansos Netos (d)': rest.netRest,
+        'Bolsa Vacacional (d)': vac.netDays,
+        'Total Faltas': rest.totalFaltas,
+        'Total Tardanzas': rest.totalTardanzas
+      };
+    });
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(summaryData), 'Control Operativo & Fatiga');
+    XLSX.writeFile(wb, 'Reporte_Tareo_Fatiga_VA_Consulting.xlsx');
+  };
+
   const handleExportFatigueExcel = () => {
     if (fatigueRecords.length === 0) {
       alert('No hay registros de fatiga para exportar.');
@@ -379,24 +417,6 @@ export default function TareoPage() {
     const updated = collaborators.filter(c => c.dni !== dni);
     setCollaborators(updated);
     localStorage.setItem('vya_collabs_permanent', JSON.stringify(updated));
-  };
-
-  const handleExportExcel = () => {
-    const targetCollabs = selectedDni ? collaborators.filter(c => c.dni === selectedDni) : collaborators;
-    const summaryData = targetCollabs.map(c => {
-      const cTareos = tareos.filter(t => t.dni === c.dni);
-      const rest = calculateRestBalance(cTareos, c.initialRestDays || 0);
-      const vac = calculateVacationStatus(c.startDate, c.mypeRegime, c.initialVacationDays || 0, cTareos.filter(t => t.status === 'vacaciones').reduce((acc, t) => acc + t.daysWorked, 0));
-      return {
-        'DNI': c.dni, 'Colaborador': c.name, 'Cargo': c.cargo, 'Ingreso': c.startDate,
-        'Días Acumulados Campo': rest.continuousFieldDays,
-        'Alerta Fatiga (>28d)': rest.continuousFieldDays >= 28 ? '⚠️ REQUIERE TEST OBLIGATORIO' : 'Normal',
-        'Descansos Netos (d)': rest.netRest, 'Bolsa Vacacional (d)': vac.netDays
-      };
-    });
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(summaryData), 'Control Operativo & Fatiga');
-    XLSX.writeFile(wb, 'Reporte_Tareo_Fatiga_VA_Consulting.xlsx');
   };
 
   const displayedCollaborators = selectedDni ? collaborators.filter(c => c.dni === selectedDni) : collaborators;
@@ -636,7 +656,7 @@ export default function TareoPage() {
               <div>
                 <label className="block text-[11px] font-semibold text-emerald-300 uppercase mb-1">📊 Reportes Excel</label>
                 <button onClick={handleExportExcel} className="bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black text-xs px-5 py-2.5 rounded-xl shadow-lg flex items-center gap-2">
-                  📥 Exportar a Excel con Alertas de Fatiga
+                  📥 Exportar Reporte Completo (Oficina, Campo, Descansos, Faltas, Tardanzas)
                 </button>
               </div>
             </div>
@@ -699,9 +719,11 @@ export default function TareoPage() {
                   <thead className="bg-indigo-950/80 text-purple-300 uppercase text-xs border-b border-purple-500/30">
                     <tr>
                       <th className="px-3 py-3">Colaborador</th>
+                      <th className="px-3 py-3 text-center">Oficina / Campo</th>
                       <th className="px-3 py-3 text-center">Días Cont. en Campo</th>
                       <th className="px-3 py-3 text-center">Alerta Fatiga (&gt;28d)</th>
                       <th className="px-3 py-3 text-center text-teal-300">Descansos Netos</th>
+                      <th className="px-3 py-3 text-center text-rose-300">Faltas / Tardanzas</th>
                       <th className="px-3 py-3 text-right">Bolsa Vacacional (Neto)</th>
                     </tr>
                   </thead>
@@ -717,6 +739,9 @@ export default function TareoPage() {
                             {c.name}
                             <div className="text-[10px] text-purple-300/60 font-mono">DNI: {c.dni}</div>
                           </td>
+                          <td className="px-3 py-3 text-center text-purple-200">
+                            Of: {restBalance.totalOficina}d | Cmp: {restBalance.totalCampo}d
+                          </td>
                           <td className="px-3 py-3 text-center font-bold text-cyan-300">{restBalance.continuousFieldDays} días</td>
                           <td className="px-3 py-3 text-center">
                             {restBalance.continuousFieldDays >= 28 ? (
@@ -728,6 +753,9 @@ export default function TareoPage() {
                             )}
                           </td>
                           <td className="px-3 py-3 text-center text-teal-200 font-bold">{restBalance.netRest} d</td>
+                          <td className="px-3 py-3 text-center text-rose-300 font-bold">
+                            F: {restBalance.totalFaltas} | T: {restBalance.totalTardanzas}
+                          </td>
                           <td className="px-3 py-3 text-right text-fuchsia-300 font-bold">{vac.netDays} d</td>
                         </tr>
                       );
