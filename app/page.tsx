@@ -14,7 +14,7 @@ interface Transaction {
   description: string;
   amount: number;
   type: 'income' | 'expense';
-  nature?: 'fixed' | 'variable';
+  nature?: 'fixed' | 'variable' | null;
   category: string;
   date: string;
   month: string;
@@ -120,34 +120,33 @@ export default function HomePage() {
     setLoading(true);
     try {
       // 1. Cargar Transacciones
-      const { data: txData, error: txError } = await supabase
+      const { data: txData } = await supabase
         .from('finanzas_transacciones')
         .select('*')
         .eq('user_email', email)
         .order('created_at', { ascending: false });
 
-      if (!txError && txData) {
-        setTransactions(
-          txData.map((t: any) => ({
-            id: t.id,
-            description: t.description,
-            amount: Number(t.amount),
-            type: t.type,
-            nature: t.nature,
-            category: t.category,
-            date: t.date,
-            month: t.month,
-          }))
-        );
+      if (txData) {
+        const formattedTxs: Transaction[] = txData.map((t: any) => ({
+          id: t.id,
+          description: t.description,
+          amount: Number(t.amount),
+          type: t.type,
+          nature: t.nature || null,
+          category: t.category,
+          date: t.date,
+          month: t.month,
+        }));
+        setTransactions(formattedTxs);
       }
 
       // 2. Cargar Metas
-      const { data: goalsData, error: goalsError } = await supabase
+      const { data: goalsData } = await supabase
         .from('finanzas_metas')
         .select('*')
         .eq('user_email', email);
 
-      if (!goalsError && goalsData) {
+      if (goalsData) {
         setGoals(
           goalsData.map((g: any) => ({
             id: g.id,
@@ -158,13 +157,13 @@ export default function HomePage() {
         );
       }
 
-      // 3. Cargar Configuración de Porcentajes Mensuales
-      const { data: configData, error: configError } = await supabase
+      // 3. Cargar Configuración de Porcentajes por Mes
+      const { data: configData } = await supabase
         .from('finanzas_config')
         .select('*')
         .eq('user_email', email);
 
-      if (!configError && configData) {
+      if (configData) {
         const mapConfig: Record<string, number> = {};
         configData.forEach((c: any) => {
           mapConfig[c.month] = Number(c.savings_percent);
@@ -172,7 +171,7 @@ export default function HomePage() {
         setMonthlySavingsPercentages(mapConfig);
       }
     } catch (err) {
-      console.error('Error general cargando datos:', err);
+      console.error('Error cargando datos:', err);
     } finally {
       setLoading(false);
     }
@@ -183,7 +182,6 @@ export default function HomePage() {
     localStorage.setItem(`fin_currency_${userEmail}`, newCurr);
   };
 
-  // Obtiene el porcentaje del mes seleccionado actualmente (por defecto 20%)
   const currentSavingsPercent = monthlySavingsPercentages[selectedMonth] ?? 20;
 
   const handleSavingsPercentChange = async (newPercent: number) => {
@@ -193,7 +191,6 @@ export default function HomePage() {
     };
     setMonthlySavingsPercentages(updated);
 
-    // Guardado robusto en Supabase asegurando la combinación de usuario y mes
     const { error } = await supabase
       .from('finanzas_config')
       .upsert(
@@ -202,7 +199,7 @@ export default function HomePage() {
       );
 
     if (error) {
-      console.error('Error al guardar porcentaje de ahorro en Supabase:', error.message);
+      console.error('Error al actualizar el porcentaje de ahorro:', error.message);
     }
   };
 
@@ -291,7 +288,7 @@ export default function HomePage() {
     setEditingTxId(tx.id);
     setDescription(tx.description);
     setAmount(tx.amount.toString());
-    setExpenseNature(tx.nature || 'variable');
+    setExpenseNature(tx.nature === 'fixed' ? 'fixed' : 'variable');
     setCategory(tx.category);
     setBudgetError(null);
     setShowModal(true);
@@ -389,7 +386,7 @@ export default function HomePage() {
       }
 
       setTransactions(
-        transactions.map((t) => (t.id === editingTxId ? { ...t, ...payload, amount: val } : t))
+        transactions.map((t) => (t.id === editingTxId ? { ...t, ...payload, amount: val, nature: payload.nature } : t))
       );
     } else {
       const payload = {
