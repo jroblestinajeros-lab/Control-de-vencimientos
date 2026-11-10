@@ -143,7 +143,6 @@ export default function CajaChicaHome() {
     }
   };
 
-  // SUBIDA DE EVIDENCIA (Apuntando a la subcarpeta comprobantes/ dentro de caja_chica_evidencias)
   const subirComprobanteStorage = async (file: File): Promise<string | null> => {
     try {
       setSubiendoArchivo(true);
@@ -465,6 +464,56 @@ export default function CajaChicaHome() {
     });
   }, [registrosFiltrados, saldoInicialCalculado, totalGastosRendidos]);
 
+  // DESCARGA MASIVA GLOBAL DE EVIDENCIAS SEGÚN EL PROYECTO FILTRADO
+  const descargarEvidenciasGlobales = async () => {
+    if (!proyectoSeleccionado) {
+      alert('Por favor especifica o selecciona un Código de Proyecto para descargar sus evidencias.');
+      return;
+    }
+
+    const evidenciasProyecto = registrosFiltrados.filter((r) => r.url_comprobante);
+
+    if (evidenciasProyecto.length === 0) {
+      alert(`No hay comprobantes con archivos adjuntos para el proyecto ${proyectoSeleccionado}.`);
+      return;
+    }
+
+    if (!confirm(`Se procederá a descargar automáticamente ${evidenciasProyecto.length} archivos de evidencia del proyecto ${proyectoSeleccionado}. ¿Deseas continuar?`)) {
+      return;
+    }
+
+    alert('Iniciando descarga en lote de las evidencias. Por favor permite las descargas múltiples en tu navegador si se solicita.');
+
+    for (let i = 0; i < evidenciasProyecto.length; i++) {
+      const item = evidenciasProyecto[i];
+      const url = item.url_comprobante;
+      if (!url) continue;
+
+      try {
+        const response = await fetch(url);
+        const blob = await response.blob();
+        const extension = url.split('.').pop()?.split('?')[0] || 'jpg';
+        const nombreArchivo = `${item.codigo_proyecto}_${item.numero_caja}_${item.tipo_gasto}_${item.numero_documento || i}.${extension}`;
+
+        const blobUrl = window.URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = blobUrl;
+        link.download = nombreArchivo;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        window.URL.revokeObjectURL(blobUrl);
+
+        // Pequeña pausa para evitar bloqueo del navegador por descargas simultáneas masivas
+        await new Promise((resolve) => setTimeout(resolve, 400));
+      } catch (error) {
+        console.error(`Error al descargar archivo ${url}:`, error);
+      }
+    }
+
+    alert('✅ Descarga masiva de evidencias finalizada.');
+  };
+
   const exportarAExcel = () => {
     if (!registrosFiltrados || registrosFiltrados.length === 0) {
       alert('No hay comprobantes para exportar.');
@@ -513,6 +562,21 @@ export default function CajaChicaHome() {
       };
     });
 
+    const archivoGlobalEvidencias = registrosFiltrados
+      .filter((r) => r.url_comprobante)
+      .map((r) => ({
+        'Código Proyecto': r.codigo_proyecto,
+        'N° Caja': r.numero_caja,
+        'Responsable': r.responsable,
+        'Fecha Doc.': r.fecha_documento || '-',
+        'Tipo Doc.': r.tipo_documento,
+        'N° Comprobante': r.numero_documento || 'S/N',
+        'Tipo Gasto': r.tipo_gasto,
+        'Proveedor': r.proveedor_detalle,
+        'Monto (S/)': r.monto_gasto || 0,
+        'Enlace Directo Evidencia (URL)': r.url_comprobante,
+      }));
+
     const workbook = XLSX.utils.book_new();
 
     const sheetResumen = XLSX.utils.json_to_sheet(resumenExcel);
@@ -521,7 +585,10 @@ export default function CajaChicaHome() {
     const sheetDetalle = XLSX.utils.json_to_sheet(detalleExcel);
     XLSX.utils.book_append_sheet(workbook, sheetDetalle, 'Detalle Liquidacion');
 
-    XLSX.writeFile(workbook, `Rendicion_${proyectoSeleccionado}_${cajaSeleccionada}.xlsx`);
+    const sheetEvidencias = XLSX.utils.json_to_sheet(archivoGlobalEvidencias);
+    XLSX.utils.book_append_sheet(workbook, sheetEvidencias, 'Archivo Global Evidencias');
+
+    XLSX.writeFile(workbook, `Rendicion_Y_Evidencias_${proyectoSeleccionado || 'General'}_${cajaSeleccionada}.xlsx`);
   };
 
   const registroCajaActiva = registros.find(
@@ -613,7 +680,7 @@ export default function CajaChicaHome() {
             </div>
           </div>
 
-          <div className="flex items-center gap-2 w-full lg:w-auto justify-end">
+          <div className="flex flex-wrap items-center gap-2 w-full lg:w-auto justify-end">
             {proyectoSeleccionado && cajaActivaFiltro && cajaActivaFiltro !== 'TODAS' && (
               cajaEstaCerrada ? (
                 <span className="px-3 py-1.5 rounded-full text-xs font-extrabold bg-red-100 text-red-700">🔒 CERRADA</span>
@@ -642,8 +709,12 @@ export default function CajaChicaHome() {
               )
             )}
 
+            <button type="button" onClick={descargarEvidenciasGlobales} className="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-2 px-3 rounded-lg text-xs shadow cursor-pointer transition-colors">
+              📦 Descargar Evidencias (Proyecto)
+            </button>
+
             <button type="button" onClick={exportarAExcel} className="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold py-2 px-3 rounded-lg text-xs shadow cursor-pointer transition-colors">
-              📊 Exportar Excel
+              📊 Exportar Excel + Global Evidencias
             </button>
           </div>
         </div>
