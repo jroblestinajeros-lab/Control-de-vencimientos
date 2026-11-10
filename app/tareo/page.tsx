@@ -31,8 +31,10 @@ interface FatigueRecord {
   name: string;
   date: string;
   score: number;
+  sleepHours: number;
+  physicalFatigue: 'Leve' | 'Moderada' | 'Extrema';
   riskLevel: 'APTO (Bajo Riesgo)' | 'ATENCIÓN (Riesgo Moderado)' | 'NO APTO (Alto Riesgo - Descanso Inmediato)';
-  answers: number[];
+  declarationAccepted: boolean;
 }
 
 export default function TareoPage() {
@@ -54,19 +56,20 @@ export default function TareoPage() {
   const [initialVacInput, setInitialVacInput] = useState('0');
   const [isEditingCollab, setIsEditingCollab] = useState(false);
 
-  // Inputs Tareo Diario y Filtro / Edición de Tareo
+  // Inputs Tareo Diario y Edición
   const [selectedDni, setSelectedDni] = useState('');
   const [tareoDni, setTareoDni] = useState('');
   const [projectCode, setProjectCode] = useState('PRJ-01');
   const [tareoStatus, setTareoStatus] = useState<'campo' | 'oficina' | 'tardanza' | 'falto' | 'descanso_medico' | 'descanso' | 'vacaciones'>('campo');
   const [daysWorkedInput, setDaysWorkedInput] = useState('1');
   const [tareoDateInput, setTareoDateInput] = useState(new Date().toISOString().slice(0, 10));
-  
-  // Estado para Edición de Registro de Tareo
   const [editingTareoId, setEditingTareoId] = useState<string | null>(null);
 
-  // Estados Test de Fatiga
+  // Estados Test de Fatiga (Contexto + Escala Epworth + Jurada)
   const [fatigueDni, setFatigueDni] = useState('');
+  const [sleepHoursInput, setSleepHoursInput] = useState('7');
+  const [physicalFatigueInput, setPhysicalFatigueInput] = useState<'Leve' | 'Moderada' | 'Extrema'>('Leve');
+  const [declarationAccepted, setDeclarationAccepted] = useState(false);
   const [q1, setQ1] = useState(0);
   const [q2, setQ2] = useState(0);
   const [q3, setQ3] = useState(0);
@@ -77,11 +80,11 @@ export default function TareoPage() {
   const [q8, setQ8] = useState(0);
 
   useEffect(() => {
-    document.title = "Módulo Operativo Tareo & Test de Fatiga POL-RH-004 | V&A Consulting";
+    document.title = "Módulo Operativo POL-RH-004 & Test de Fatiga | V&A Consulting";
     
-    const savedCollabs = localStorage.getItem('vya_collabs_v13');
-    const savedTareos = localStorage.getItem('vya_tareos_v13');
-    const savedFatigue = localStorage.getItem('vya_fatigue_v13');
+    const savedCollabs = localStorage.getItem('vya_collabs_v14');
+    const savedTareos = localStorage.getItem('vya_tareos_v14');
+    const savedFatigue = localStorage.getItem('vya_fatigue_v14');
 
     if (savedCollabs) { try { setCollaborators(JSON.parse(savedCollabs)); } catch (e) { setCollaborators([]); } }
     if (savedTareos) { try { setTareos(JSON.parse(savedTareos)); } catch (e) { setTareos([]); } }
@@ -133,7 +136,47 @@ export default function TareoPage() {
     };
   };
 
-  // --- GUARDAR O ACTUALIZAR TAREO ---
+  // --- GUARDAR TEST DE FATIGA (MEJORADO) ---
+  const handleSaveFatigueTest = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!fatigueDni) { alert('Seleccione un colaborador.'); return; }
+    if (!declarationAccepted) { alert('Debe aceptar la declaración jurada de veracidad.'); return; }
+
+    const collab = collaborators.find(c => c.dni === fatigueDni);
+    if (!collab) return;
+
+    const answers = [q1, q2, q3, q4, q5, q6, q7, q8];
+    const totalScore = answers.reduce((a, b) => a + b, 0);
+    const sleepHours = parseFloat(sleepHoursInput) || 7;
+
+    let riskLevel: FatigueRecord['riskLevel'] = 'APTO (Bajo Riesgo)';
+    if (totalScore >= 11 && totalScore <= 15 || sleepHours < 5) {
+      riskLevel = 'ATENCIÓN (Riesgo Moderado)';
+    }
+    if (totalScore >= 16 || physicalFatigueInput === 'Extrema' || sleepHours < 4) {
+      riskLevel = 'NO APTO (Alto Riesgo - Descanso Inmediato)';
+    }
+
+    const newRecord: FatigueRecord = {
+      id: Date.now().toString(),
+      dni: collab.dni,
+      name: collab.name,
+      date: new Date().toISOString().slice(0, 10),
+      score: totalScore,
+      sleepHours,
+      physicalFatigue: physicalFatigueInput,
+      riskLevel,
+      declarationAccepted
+    };
+
+    const updated = [newRecord, ...fatigueRecords];
+    setFatigueRecords(updated);
+    localStorage.setItem('vya_fatigue_v14', JSON.stringify(updated));
+
+    alert(`Test Registrado.\nPuntaje Somnolencia: ${totalScore} pts\nSueño previo: ${sleepHours}h\nDictamen Ocupacional: ${riskLevel}`);
+    setDeclarationAccepted(false);
+  };
+
   const handleSaveTareo = (e: React.FormEvent) => {
     e.preventDefault();
     if (!tareoDni) { alert('Seleccione un colaborador.'); return; }
@@ -141,46 +184,24 @@ export default function TareoPage() {
     if (!collab) return;
 
     if (editingTareoId) {
-      // Modo Edición de Tareo Existente
-      const updated = tareos.map(t => {
-        if (t.id === editingTareoId) {
-          return {
-            ...t,
-            dni: collab.dni,
-            name: collab.name,
-            cargo: collab.cargo,
-            projectCode,
-            status: tareoStatus,
-            daysWorked: parseFloat(daysWorkedInput) || 1,
-            date: tareoDateInput
-          };
-        }
-        return t;
-      });
+      const updated = tareos.map(t => t.id === editingTareoId ? {
+        ...t, dni: collab.dni, name: collab.name, cargo: collab.cargo,
+        projectCode, status: tareoStatus, daysWorked: parseFloat(daysWorkedInput) || 1, date: tareoDateInput
+      } : t);
       setTareos(updated);
-      localStorage.setItem('vya_tareos_v13', JSON.stringify(updated));
+      localStorage.setItem('vya_tareos_v14', JSON.stringify(updated));
       setEditingTareoId(null);
-      alert('Registro de tareo actualizado correctamente.');
+      alert('Tareo actualizado con éxito.');
     } else {
-      // Nuevo Registro
       const newRecord: TareoRecord = {
-        id: Date.now().toString(),
-        dni: collab.dni,
-        name: collab.name,
-        cargo: collab.cargo,
-        projectCode,
-        status: tareoStatus,
-        daysWorked: parseFloat(daysWorkedInput) || 1,
-        date: tareoDateInput,
+        id: Date.now().toString(), dni: collab.dni, name: collab.name, cargo: collab.cargo,
+        projectCode, status: tareoStatus, daysWorked: parseFloat(daysWorkedInput) || 1, date: tareoDateInput,
       };
       const updated = [newRecord, ...tareos];
       setTareos(updated);
-      localStorage.setItem('vya_tareos_v13', JSON.stringify(updated));
+      localStorage.setItem('vya_tareos_v14', JSON.stringify(updated));
     }
-
-    // Reset de campos de formulario
     setDaysWorkedInput('1');
-    setProjectCode('PRJ-01');
   };
 
   const handleEditTareo = (t: TareoRecord) => {
@@ -196,48 +217,14 @@ export default function TareoPage() {
   const handleCancelEditTareo = () => {
     setEditingTareoId(null);
     setDaysWorkedInput('1');
-    setProjectCode('PRJ-01');
   };
 
   const handleDeleteTareo = (id: string) => {
-    if (!confirm('¿Deseas eliminar este registro de tareo?')) return;
+    if (!confirm('¿Eliminar este registro de tareo?')) return;
     const updated = tareos.filter(t => t.id !== id);
     setTareos(updated);
-    localStorage.setItem('vya_tareos_v13', JSON.stringify(updated));
+    localStorage.setItem('vya_tareos_v14', JSON.stringify(updated));
     if (editingTareoId === id) handleCancelEditTareo();
-  };
-
-  // --- GUARDAR TEST DE FATIGA ---
-  const handleSaveFatigueTest = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!fatigueDni) { alert('Seleccione un colaborador.'); return; }
-    const collab = collaborators.find(c => c.dni === fatigueDni);
-    if (!collab) return;
-
-    const answers = [q1, q2, q3, q4, q5, q6, q7, q8];
-    const totalScore = answers.reduce((a, b) => a + b, 0);
-
-    let riskLevel: FatigueRecord['riskLevel'] = 'APTO (Bajo Riesgo)';
-    if (totalScore >= 11 && totalScore <= 15) {
-      riskLevel = 'ATENCIÓN (Riesgo Moderado)';
-    } else if (totalScore >= 16) {
-      riskLevel = 'NO APTO (Alto Riesgo - Descanso Inmediato)';
-    }
-
-    const newRecord: FatigueRecord = {
-      id: Date.now().toString(),
-      dni: collab.dni,
-      name: collab.name,
-      date: new Date().toISOString().slice(0, 10),
-      score: totalScore,
-      riskLevel,
-      answers
-    };
-
-    const updated = [newRecord, ...fatigueRecords];
-    setFatigueRecords(updated);
-    localStorage.setItem('vya_fatigue_v13', JSON.stringify(updated));
-    alert(`Test Registrado. Puntaje Total: ${totalScore} - Estado: ${riskLevel}`);
   };
 
   const handleSaveCollaborator = (e: React.FormEvent) => {
@@ -258,7 +245,7 @@ export default function TareoPage() {
       updated = [newCollab, ...collaborators];
     }
     setCollaborators(updated);
-    localStorage.setItem('vya_collabs_v13', JSON.stringify(updated));
+    localStorage.setItem('vya_collabs_v14', JSON.stringify(updated));
     setDniInput(''); setNameInput(''); setCargoInput(''); setStartDateInput(''); setInitialRestInput('0'); setInitialVacInput('0'); setIsEditingCollab(false);
   };
 
@@ -270,10 +257,10 @@ export default function TareoPage() {
   };
 
   const handleDeleteCollaborator = (dni: string) => {
-    if (!confirm('¿Eliminar colaborador del maestro?')) return;
+    if (!confirm('¿Eliminar colaborador?')) return;
     const updated = collaborators.filter(c => c.dni !== dni);
     setCollaborators(updated);
-    localStorage.setItem('vya_collabs_v13', JSON.stringify(updated));
+    localStorage.setItem('vya_collabs_v14', JSON.stringify(updated));
   };
 
   const handleExportExcel = () => {
@@ -291,7 +278,7 @@ export default function TareoPage() {
     });
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(summaryData), 'Control Operativo & Fatiga');
-    XLSX.writeFile(wb, 'Reporte_Tareo_VA_Consulting.xlsx');
+    XLSX.writeFile(wb, 'Reporte_Tareo_Fatiga_VA_Consulting.xlsx');
   };
 
   const displayedCollaborators = selectedDni ? collaborators.filter(c => c.dni === selectedDni) : collaborators;
@@ -304,9 +291,9 @@ export default function TareoPage() {
       <header className="max-w-7xl mx-auto flex flex-col md:flex-row justify-between items-start md:items-center pb-6 border-b border-purple-500/30 mb-8 gap-4">
         <div>
           <h1 className="text-2xl font-black text-transparent bg-clip-text bg-gradient-to-r from-teal-300 via-fuchsia-400 to-cyan-300">
-            Módulo Operativo POL-RH-004 & Edición de Tareos
+            Módulo POL-RH-004 & Test de Fatiga Industrial Avanzado
           </h1>
-          <p className="text-xs text-purple-200 mt-1">V&A Consulting S.A.C. — Control de Asistencia, Ajustes Operativos en Campo & Fatiga</p>
+          <p className="text-xs text-purple-200 mt-1">V&A Consulting S.A.C. — Control Operativo, Edición de Tareos & Protocolo SSOMA</p>
         </div>
 
         <div className="flex items-center gap-2 flex-wrap">
@@ -391,14 +378,31 @@ export default function TareoPage() {
           <div className="space-y-6">
             <div className="rounded-3xl p-6 shadow-2xl border bg-indigo-950/90 border-rose-500/40 space-y-4">
               <h2 className="text-sm font-bold text-rose-300 uppercase tracking-wider">🚨 Test de Evaluación de Fatiga y Somnolencia (Regímenes Atípicos &gt;28 Días)</h2>
+              <p className="text-xs text-purple-200">Evaluación obligatoria con validación de contexto físico, horas de sueño y escala Epworth.</p>
+              
               <form onSubmit={handleSaveFatigueTest} className="space-y-4">
-                <div>
-                  <label className="block text-[11px] font-semibold text-rose-200 uppercase mb-1">Seleccionar Colaborador *</label>
-                  <select value={fatigueDni} onChange={(e) => setFatigueDni(e.target.value)} required className="w-full md:w-1/2 bg-indigo-950 border border-rose-500/50 rounded-xl px-3 py-2 text-white text-xs">
-                    <option value="">-- Seleccionar Trabajador --</option>
-                    {collaborators.map(c => <option key={c.dni} value={c.dni}>{c.name}</option>)}
-                  </select>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div>
+                    <label className="block text-[11px] font-semibold text-rose-200 uppercase mb-1">Seleccionar Colaborador *</label>
+                    <select value={fatigueDni} onChange={(e) => setFatigueDni(e.target.value)} required className="w-full bg-indigo-950 border border-rose-500/50 rounded-xl px-3 py-2 text-white text-xs">
+                      <option value="">-- Seleccionar Trabajador --</option>
+                      {collaborators.map(c => <option key={c.dni} value={c.dni}>{c.name}</option>)}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-[11px] font-semibold text-cyan-200 uppercase mb-1">Horas de Sueño Noche Anterior *</label>
+                    <input type="number" step="0.5" value={sleepHoursInput} onChange={(e) => setSleepHoursInput(e.target.value)} required className="w-full bg-indigo-950 border border-rose-500/50 rounded-xl px-3 py-2 text-white text-xs font-mono" />
+                  </div>
+                  <div>
+                    <label className="block text-[11px] font-semibold text-amber-200 uppercase mb-1">Fatiga Física / Muscular *</label>
+                    <select value={physicalFatigueInput} onChange={(e) => setPhysicalFatigueInput(e.target.value as any)} className="w-full bg-indigo-950 border border-rose-500/50 rounded-xl px-3 py-2 text-white text-xs">
+                      <option value="Leve">Leve</option>
+                      <option value="Moderada">Moderada</option>
+                      <option value="Extrema">Extrema (Riesgo Crítico)</option>
+                    </select>
+                  </div>
                 </div>
+
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs font-sans">
                   {[
                     { label: '1. Sentado y leyendo', val: q1, setVal: setQ1 },
@@ -418,8 +422,16 @@ export default function TareoPage() {
                     </div>
                   ))}
                 </div>
+
+                <div className="bg-indigo-900/50 p-4 rounded-xl border border-rose-500/30 flex items-center gap-3">
+                  <input type="checkbox" checked={declarationAccepted} onChange={(e) => setDeclarationAccepted(e.target.checked)} id="decl" className="w-4 h-4 accent-rose-500" />
+                  <label htmlFor="decl" className="text-xs text-purple-200 cursor-pointer">
+                    Declaro bajo juramento que la información proporcionada sobre mi estado de alerta y descanso es verídica y conforme a los protocolos de seguridad industrial de V&A Consulting S.A.C.
+                  </label>
+                </div>
+
                 <button type="submit" className="w-full bg-rose-500 hover:bg-rose-400 text-slate-950 font-black text-xs py-3 rounded-xl shadow-lg uppercase">
-                  📥 Registrar Dictamen de Fatiga
+                  📥 Registrar Dictamen de Aptitud Ocupacional
                 </button>
               </form>
             </div>
@@ -433,6 +445,7 @@ export default function TareoPage() {
                       <th className="px-4 py-3">Fecha</th>
                       <th className="px-4 py-3">Colaborador</th>
                       <th className="px-4 py-3 text-center">Puntaje</th>
+                      <th className="px-4 py-3 text-center">Sueño / Fatiga Físcia</th>
                       <th className="px-4 py-3 text-center">Dictamen</th>
                     </tr>
                   </thead>
@@ -442,6 +455,7 @@ export default function TareoPage() {
                         <td className="px-4 py-3 text-purple-300">{f.date}</td>
                         <td className="px-4 py-3 text-white font-sans font-medium">{f.name}</td>
                         <td className="px-4 py-3 text-center text-cyan-300">{f.score} pts</td>
+                        <td className="px-4 py-3 text-center text-purple-200">{f.sleepHours}h / {f.physicalFatigue}</td>
                         <td className="px-4 py-3 text-center font-bold text-rose-300">{f.riskLevel}</td>
                       </tr>
                     ))}
