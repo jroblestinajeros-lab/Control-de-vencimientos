@@ -293,7 +293,6 @@ export default function HomePage() {
     return { month: m, income: inc, expense: exp, savings: sav, balance: bal, percent: mPct };
   });
 
-  // Totales globales para interfaz y Excel
   const sumGlobalIncome = monthlyHistory.reduce((acc, h) => acc + h.income, 0);
   const sumGlobalExpense = monthlyHistory.reduce((acc, h) => acc + h.expense, 0);
   const sumGlobalSavings = monthlyHistory.reduce((acc, h) => acc + h.savings, 0);
@@ -453,7 +452,6 @@ export default function HomePage() {
     setShowModal(false);
   };
 
-  // EXPORTACIÓN A EXCEL: OPCIÓN GLOBAL O ESPECÍFICA DEL MES CON TOTALES
   const exportToExcel = (tipo: 'mes' | 'global') => {
     const wb = XLSX.utils.book_new();
 
@@ -584,15 +582,18 @@ export default function HomePage() {
     <main 
       className="min-h-screen text-slate-100 p-6"
       style={{ 
-        backgroundColor: '#130826', 
-        backgroundImage: 'linear-gradient(135deg, #130826 0%, #1e1b4b 50%, #0f172a 100%)' 
+        backgroundColor: '#0c071d', 
+        backgroundImage: 'radial-gradient(circle at 15% 15%, rgba(147, 51, 234, 0.15) 0%, transparent 40%), radial-gradient(circle at 85% 85%, rgba(20, 184, 166, 0.12) 0%, transparent 40%), linear-gradient(135deg, #0c071d 0%, #171033 50%, #090d16 100%)' 
       }}
     >
       <header className="max-w-7xl mx-auto flex flex-col md:flex-row justify-between items-start md:items-center pb-6 border-b border-purple-500/30 mb-8 gap-4">
         <div>
-          <h1 className="text-3xl font-black text-transparent bg-clip-text bg-gradient-to-r from-teal-300 via-fuchsia-400 to-cyan-300 tracking-tight">
-            Gestión de Finanzas Personales
-          </h1>
+          <div className="flex items-center gap-2">
+            <span className="w-3 h-3 rounded-full bg-teal-400 animate-pulse"></span>
+            <h1 className="text-3xl font-black text-transparent bg-clip-text bg-gradient-to-r from-teal-300 via-fuchsia-400 to-cyan-300 tracking-tight">
+              Gestión de Finanzas Personales
+            </h1>
+          </div>
           <p className="text-xs text-purple-200 mt-1">
             Usuario: <span className="text-teal-300 font-semibold">{userEmail}</span> (Privado y Seguro 🔒)
           </p>
@@ -648,7 +649,7 @@ export default function HomePage() {
         <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
           <div 
             className="p-6 rounded-3xl shadow-2xl border transition-all"
-            style={{ backgroundColor: 'rgba(30, 27, 75, 0.75)', borderColor: 'rgba(217, 70, 239, 0.3)', backdropFilter: 'blur(16px)' }}
+            style={{ backgroundColor: 'rgba(23, 16, 51, 0.75)', borderColor: 'rgba(217, 70, 239, 0.3)', backdropFilter: 'blur(16px)' }}
           >
             <h3 className="text-xs font-semibold text-purple-300 uppercase tracking-wider mb-2">Ingresos del Mes</h3>
             <p className="text-3xl font-black text-cyan-300 font-mono tracking-tight">{currSymbol} {totalIncome.toFixed(2)}</p>
@@ -657,7 +658,7 @@ export default function HomePage() {
 
           <div 
             className="p-6 rounded-3xl shadow-2xl border border-t-4 border-t-fuchsia-400 transition-all space-y-2"
-            style={{ backgroundColor: 'rgba(30, 27, 75, 0.75)', borderColor: 'rgba(217, 70, 239, 0.3)', backdropFilter: 'blur(16px)' }}
+            style={{ backgroundColor: 'rgba(23, 16, 51, 0.75)', borderColor: 'rgba(217, 70, 239, 0.3)', backdropFilter: 'blur(16px)' }}
           >
             <div className="flex justify-between items-center">
               <h3 className="text-xs font-semibold text-fuchsia-300 uppercase tracking-wider">Meta Ahorro ({selectedMonth})</h3>
@@ -682,7 +683,7 @@ export default function HomePage() {
 
           <div 
             className="p-6 rounded-3xl shadow-2xl border border-t-4 border-t-teal-400 transition-all"
-            style={{ backgroundColor: 'rgba(30, 27, 75, 0.75)', borderColor: 'rgba(217, 70, 239, 0.3)', backdropFilter: 'blur(16px)' }}
+            style={{ backgroundColor: 'rgba(23, 16, 51, 0.75)', borderColor: 'rgba(217, 70, 239, 0.3)', backdropFilter: 'blur(16px)' }}
           >
             <h3 className="text-xs font-semibold text-teal-300 uppercase tracking-wider mb-2">Presupuesto Gastos</h3>
             <p className="text-3xl font-black text-teal-300 font-mono tracking-tight">{currSymbol} {availableExpenseBudget.toFixed(2)}</p>
@@ -691,7 +692,7 @@ export default function HomePage() {
 
           <div 
             className="p-6 rounded-3xl shadow-2xl border transition-all"
-            style={{ backgroundColor: 'rgba(30, 27, 75, 0.75)', borderColor: 'rgba(217, 70, 239, 0.3)', backdropFilter: 'blur(16px)' }}
+            style={{ backgroundColor: 'rgba(23, 16, 51, 0.75)', borderColor: 'rgba(217, 70, 239, 0.3)', backdropFilter: 'blur(16px)' }}
           >
             <h3 className="text-xs font-semibold text-rose-300 uppercase tracking-wider mb-2">Gastos Ejecutados</h3>
             <p className="text-3xl font-black text-rose-400 font-mono tracking-tight">{currSymbol} {totalExpense.toFixed(2)}</p>
@@ -702,7 +703,7 @@ export default function HomePage() {
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           <div 
             className="p-6 rounded-3xl shadow-2xl border flex flex-col justify-between transition-all"
-            style={{ backgroundColor: 'rgba(30, 27, 75, 0.75)', borderColor: 'rgba(217, 70, 239, 0.3)', backdropFilter: 'blur(16px)' }}
+            style={{ backgroundColor: 'rgba(23, 16, 51, 0.75)', borderColor: 'rgba(217, 70, 239, 0.3)', backdropFilter: 'blur(16px)' }}
           >
             <h4 className="text-xs font-semibold text-amber-300 uppercase tracking-wider mb-2">Gastos Fijos (Obligatorios)</h4>
             <p className="text-2xl font-bold text-amber-400 font-mono">{currSymbol} {fixedExpenses.toFixed(2)}</p>
@@ -711,7 +712,7 @@ export default function HomePage() {
 
           <div 
             className="p-6 rounded-3xl shadow-2xl border flex flex-col justify-between transition-all"
-            style={{ backgroundColor: 'rgba(30, 27, 75, 0.75)', borderColor: 'rgba(217, 70, 239, 0.3)', backdropFilter: 'blur(16px)' }}
+            style={{ backgroundColor: 'rgba(23, 16, 51, 0.75)', borderColor: 'rgba(217, 70, 239, 0.3)', backdropFilter: 'blur(16px)' }}
           >
             <h4 className="text-xs font-semibold text-fuchsia-300 uppercase tracking-wider mb-2">Gastos Variables</h4>
             <p className="text-2xl font-bold text-fuchsia-200 font-mono">{currSymbol} {variableExpenses.toFixed(2)}</p>
@@ -720,7 +721,7 @@ export default function HomePage() {
 
           <div 
             className="p-6 rounded-3xl shadow-2xl border flex flex-col justify-between transition-all"
-            style={{ backgroundColor: 'rgba(30, 27, 75, 0.75)', borderColor: 'rgba(217, 70, 239, 0.3)', backdropFilter: 'blur(16px)' }}
+            style={{ backgroundColor: 'rgba(23, 16, 51, 0.75)', borderColor: 'rgba(217, 70, 239, 0.3)', backdropFilter: 'blur(16px)' }}
           >
             <h4 className="text-xs font-semibold text-emerald-300 uppercase tracking-wider mb-2">Salud Financiera (Fondo)</h4>
             <p className="text-2xl font-bold text-emerald-400 font-mono">{emergencyCoverageMonths} meses</p>
@@ -728,10 +729,10 @@ export default function HomePage() {
           </div>
         </div>
 
-        {/* MATRIZ SUPERIOR CON ACUMULADO */}
+        {/* MATRIZ DE GASTOS CON ACUMULADO */}
         <div 
           className="rounded-3xl p-6 shadow-2xl border space-y-4"
-          style={{ backgroundColor: 'rgba(30, 27, 75, 0.75)', borderColor: 'rgba(217, 70, 239, 0.3)', backdropFilter: 'blur(16px)' }}
+          style={{ backgroundColor: 'rgba(23, 16, 51, 0.75)', borderColor: 'rgba(217, 70, 239, 0.3)', backdropFilter: 'blur(16px)' }}
         >
           <div className="flex justify-between items-center text-sm pb-2 border-b border-purple-500/30">
             <span className="font-bold text-white uppercase tracking-wider">
@@ -783,7 +784,7 @@ export default function HomePage() {
 
         <div 
           className="rounded-3xl p-6 shadow-2xl border"
-          style={{ backgroundColor: 'rgba(30, 27, 75, 0.75)', borderColor: 'rgba(217, 70, 239, 0.3)', backdropFilter: 'blur(16px)' }}
+          style={{ backgroundColor: 'rgba(23, 16, 51, 0.75)', borderColor: 'rgba(217, 70, 239, 0.3)', backdropFilter: 'blur(16px)' }}
         >
           <h2 className="text-sm font-semibold text-purple-200 uppercase tracking-wider mb-4">Acciones Rápidas ({selectedMonth})</h2>
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
@@ -814,7 +815,7 @@ export default function HomePage() {
           {/* METAS & PROYECCIÓN CON TOTALES */}
           <div 
             className="lg:col-span-1 rounded-3xl p-6 shadow-2xl border space-y-4 flex flex-col justify-between"
-            style={{ backgroundColor: 'rgba(30, 27, 75, 0.75)', borderColor: 'rgba(217, 70, 239, 0.3)', backdropFilter: 'blur(16px)' }}
+            style={{ backgroundColor: 'rgba(23, 16, 51, 0.75)', borderColor: 'rgba(217, 70, 239, 0.3)', backdropFilter: 'blur(16px)' }}
           >
             <div>
               <div className="flex justify-between items-center mb-4">
@@ -897,7 +898,7 @@ export default function HomePage() {
           {/* COMPARATIVA Y TENDENCIA MES A MES CON TOTALES */}
           <div 
             className="lg:col-span-2 rounded-3xl p-6 shadow-2xl border space-y-4 flex flex-col justify-between"
-            style={{ backgroundColor: 'rgba(30, 27, 75, 0.75)', borderColor: 'rgba(217, 70, 239, 0.3)', backdropFilter: 'blur(16px)' }}
+            style={{ backgroundColor: 'rgba(23, 16, 51, 0.75)', borderColor: 'rgba(217, 70, 239, 0.3)', backdropFilter: 'blur(16px)' }}
           >
             <div>
               <h2 className="text-lg font-semibold text-white mb-4">Comparativa y Tendencia Mes a Mes</h2>
@@ -974,7 +975,7 @@ export default function HomePage() {
         {/* TABLA DE TRANSACCIONES */}
         <div 
           className="rounded-3xl p-6 shadow-2xl border space-y-4"
-          style={{ backgroundColor: 'rgba(30, 27, 75, 0.75)', borderColor: 'rgba(217, 70, 239, 0.3)', backdropFilter: 'blur(16px)' }}
+          style={{ backgroundColor: 'rgba(23, 16, 51, 0.75)', borderColor: 'rgba(217, 70, 239, 0.3)', backdropFilter: 'blur(16px)' }}
         >
           <h2 className="text-lg font-semibold text-white">Transacciones e Impacto en Presupuesto ({selectedMonth})</h2>
           {monthTransactions.length === 0 ? (
