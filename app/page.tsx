@@ -188,17 +188,18 @@ export default function HomePage() {
     localStorage.setItem(`fin_currency_${userEmail}`, newCurr);
   };
 
-  // Porcentaje estrictamente independiente para el mes seleccionado actual (por defecto 15% o 20%)
-  const currentSavingsPercent = monthlySavingsPercentages[selectedMonth] ?? 15;
+  // Porcentaje estrictamente independiente para el mes seleccionado actual (por defecto 20%)
+  const currentSavingsPercent = monthlySavingsPercentages[selectedMonth] ?? 20;
 
   const handleSavingsPercentChange = async (newPercent: number) => {
+    // Actualizamos el estado local de forma inmutable para el mes activo
     const updated = {
       ...monthlySavingsPercentages,
       [selectedMonth]: newPercent,
     };
     setMonthlySavingsPercentages(updated);
 
-    // Guardado y actualización con upsert utilizando user_email y month como restricciones
+    // Guardado y actualización en Supabase por usuario y mes
     const { error } = await supabase
       .from('finanzas_config')
       .upsert(
@@ -283,8 +284,8 @@ export default function HomePage() {
     const inc = mTx.filter((t) => t.type === 'income').reduce((a, t) => a + t.amount, 0);
     const exp = mTx.filter((t) => t.type === 'expense').reduce((a, t) => a + t.amount, 0);
     
-    // Asigna rigurosamente el porcentaje configurado para cada mes específico en la tabla histórica
-    const mPct = monthlySavingsPercentages[m] ?? 15;
+    // Obtiene rigurosamente el porcentaje configurado para el mes 'm' exacto de la fila
+    const mPct = monthlySavingsPercentages[m] ?? 20;
     const sav = (inc * mPct) / 100;
     return { month: m, income: inc, expense: exp, savings: sav, percent: mPct };
   });
