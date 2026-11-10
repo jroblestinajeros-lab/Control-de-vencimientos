@@ -120,29 +120,21 @@ export default function HomePage() {
       setCurrency(savedCurrency);
     }
 
-    cargarDatosRemotos(cleanEmail);
+    cargarDatosPrivados(cleanEmail);
   }, [router]);
 
-  // CARGA INTELIGENTE MULTI-USUARIO (Filtra por usuario, o trae datos generales si el usuario es nuevo para evitar pantallas en ceros)
-  const cargarDatosRemotos = async (email: string) => {
+  // CARGA PRIVADA Y AISLADA: Solo filtra y trae los datos correspondientes al usuario autenticado
+  const cargarDatosPrivados = async (email: string) => {
     setLoading(true);
     try {
-      const cleanEmail = email ? email.trim().toLowerCase() : '';
+      const cleanEmail = email.trim().toLowerCase();
 
-      // 1. Cargar Transacciones
-      let txQuery = supabase.from('finanzas_transacciones').select('*');
-      if (cleanEmail) {
-        // Intentamos filtrar por usuario
-        const { data: userTx } = await supabase
-          .from('finanzas_transacciones')
-          .select('*')
-          .ilike('user_email', cleanEmail);
-
-        if (userTx && userTx.length > 0) {
-          txQuery = txQuery.ilike('user_email', cleanEmail);
-        }
-      }
-      const { data: txData, error: txError } = await txQuery.order('created_at', { ascending: false });
+      // 1. Cargar Transacciones estrictamente del usuario actual
+      const { data: txData, error: txError } = await supabase
+        .from('finanzas_transacciones')
+        .select('*')
+        .ilike('user_email', cleanEmail)
+        .order('created_at', { ascending: false });
 
       if (txError) {
         console.error('Error al cargar transacciones:', txError.message);
@@ -162,19 +154,11 @@ export default function HomePage() {
         setTransactions(formattedTxs);
       }
 
-      // 2. Cargar Metas
-      let goalsQuery = supabase.from('finanzas_metas').select('*');
-      if (cleanEmail) {
-        const { data: userGoals } = await supabase
-          .from('finanzas_metas')
-          .select('*')
-          .ilike('user_email', cleanEmail);
-
-        if (userGoals && userGoals.length > 0) {
-          goalsQuery = goalsQuery.ilike('user_email', cleanEmail);
-        }
-      }
-      const { data: goalsData, error: goalsError } = await goalsQuery;
+      // 2. Cargar Metas estrictamente del usuario actual
+      const { data: goalsData, error: goalsError } = await supabase
+        .from('finanzas_metas')
+        .select('*')
+        .ilike('user_email', cleanEmail);
 
       if (goalsError) {
         console.error('Error al cargar metas:', goalsError.message);
@@ -191,10 +175,11 @@ export default function HomePage() {
         );
       }
 
-      // 3. Cargar Configuración de Porcentajes por Mes
+      // 3. Cargar Configuración de Porcentajes del usuario actual
       const { data: configData, error: configError } = await supabase
         .from('finanzas_config')
-        .select('*');
+        .select('*')
+        .ilike('user_email', cleanEmail);
 
       if (configError) {
         console.error('Error al cargar config:', configError.message);
@@ -210,7 +195,7 @@ export default function HomePage() {
         setMonthlySavingsPercentages(mapConfig);
       }
     } catch (err) {
-      console.error('Error general cargando datos:', err);
+      console.error('Error general cargando datos privados:', err);
     } finally {
       setLoading(false);
     }
@@ -554,7 +539,7 @@ export default function HomePage() {
             Gestión de Finanzas Personales
           </h1>
           <p className="text-xs text-purple-200 mt-1">
-            Usuario: <span className="text-teal-300 font-semibold">{userEmail}</span> (Sincronizado en la Nube ☁️)
+            Usuario: <span className="text-teal-300 font-semibold">{userEmail}</span> (Privado y Seguro 🔒)
           </p>
         </div>
         
@@ -791,305 +776,4 @@ export default function HomePage() {
                       <button
                         onClick={() => handleDeleteGoal(g.id)}
                         title="Eliminar Meta"
-                        className="absolute top-3 right-3 text-xs text-rose-400 hover:text-rose-300 bg-rose-950/80 border border-rose-500/40 px-2 py-0.5 rounded-lg transition-colors"
-                      >
-                        🗑️
-                      </button>
-
-                      <div className="flex justify-between items-center pr-8">
-                        <h3 className="font-semibold text-white text-xs">{g.title}</h3>
-                        <span className="text-[10px] font-mono bg-indigo-900 text-cyan-300 px-2 py-0.5 rounded-lg border border-purple-500/30">
-                          {pct}%
-                        </span>
-                      </div>
-
-                      <div className="flex justify-between text-[11px] text-purple-200 font-mono">
-                        <span>{currSymbol} {g.currentAmount.toFixed(2)}</span>
-                        <span>{currSymbol} {g.targetAmount.toFixed(2)}</span>
-                      </div>
-
-                      <div className="w-full bg-indigo-950 h-2 rounded-full overflow-hidden border border-purple-500/30">
-                        <div
-                          className="bg-gradient-to-r from-cyan-400 to-fuchsia-400 h-full transition-all duration-500"
-                          style={{ width: `${pct}%` }}
-                        ></div>
-                      </div>
-
-                      <p className="text-[10px] text-purple-300/70 font-mono pt-1">
-                        {monthsToTarget > 0 
-                          ? `⏱ Tiempo est. para completar: ~${monthsToTarget} mes(es)`
-                          : '🎉 Meta alcanzada o lista'}
-                      </p>
-                    </div>
-                  );
-                })
-              )}
-            </div>
-          </div>
-
-          <div 
-            className="lg:col-span-2 rounded-3xl p-6 shadow-2xl border space-y-4"
-            style={{ backgroundColor: 'rgba(30, 27, 75, 0.75)', borderColor: 'rgba(217, 70, 239, 0.3)', backdropFilter: 'blur(16px)' }}
-          >
-            <h2 className="text-lg font-semibold text-white">Comparativa y Tendencia Mes a Mes</h2>
-            {monthlyHistory.length === 0 ? (
-              <p className="text-sm text-purple-300/60 py-6 text-center">Registra ingresos y gastos para generar la tendencia histórica.</p>
-            ) : (
-              <div className="overflow-x-auto">
-                <table className="w-full text-left text-sm text-purple-200">
-                  <thead className="bg-indigo-950/60 text-purple-300 uppercase text-xs border-b border-purple-500/30">
-                    <tr>
-                      <th className="px-4 py-3 rounded-l-xl">Mes</th>
-                      <th className="px-4 py-3 text-center">% Ahorro Configurable</th>
-                      <th className="px-4 py-3 text-right">Ingresos</th>
-                      <th className="px-4 py-3 text-right">Gastos</th>
-                      <th className="px-4 py-3 text-right rounded-r-xl">Ahorro Reservado</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-purple-500/20 font-mono">
-                    {monthlyHistory.map((h) => (
-                      <tr key={h.month} className="hover:bg-indigo-900/30">
-                        <td className="px-4 py-3 text-xs text-white font-medium">{h.month}</td>
-                        <td className="px-4 py-3 text-center">
-                          <select
-                            value={h.percent}
-                            onChange={(e) => handleSavingsPercentChange(Number(e.target.value), h.month)}
-                            className="bg-indigo-950 border border-purple-500 text-fuchsia-300 text-xs font-bold rounded-lg px-2 py-1 focus:outline-none"
-                          >
-                            {Array.from({ length: 18 }, (_, i) => (i + 2) * 5)
-                              .concat(95)
-                              .map((pct) => (
-                                <option key={pct} value={pct} style={{ backgroundColor: '#1e1b4b', color: '#fff' }}>
-                                  {pct}%
-                                </option>
-                              ))}
-                          </select>
-                        </td>
-                        <td className="px-4 py-3 text-right text-cyan-300">{currSymbol} {h.income.toFixed(2)}</td>
-                        <td className="px-4 py-3 text-right text-rose-400">{currSymbol} {h.expense.toFixed(2)}</td>
-                        <td className="px-4 py-3 text-right text-fuchsia-400 font-bold">{currSymbol} {h.savings.toFixed(2)}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
-          </div>
-        </div>
-
-        {/* TABLA DE TRANSACCIONES CON EL % DEL PRESUPUESTO INCLUIDO */}
-        <div 
-          className="rounded-3xl p-6 shadow-2xl border space-y-4"
-          style={{ backgroundColor: 'rgba(30, 27, 75, 0.75)', borderColor: 'rgba(217, 70, 239, 0.3)', backdropFilter: 'blur(16px)' }}
-        >
-          <h2 className="text-lg font-semibold text-white">Transacciones e Impacto en Presupuesto ({selectedMonth})</h2>
-          {monthTransactions.length === 0 ? (
-            <p className="text-sm text-purple-300/60 py-6 text-center">No hay registros para este mes. Registra tus ingresos o gastos arriba.</p>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-left text-sm text-purple-200">
-                <thead className="bg-indigo-950/60 text-purple-300 uppercase text-xs border-b border-purple-500/30">
-                  <tr>
-                    <th className="px-4 py-3 rounded-l-xl">Fecha</th>
-                    <th className="px-4 py-3">Tipo / Naturaleza</th>
-                    <th className="px-4 py-3">Descripción</th>
-                    <th className="px-4 py-3">Categoría</th>
-                    <th className="px-4 py-3 text-right">Monto</th>
-                    <th className="px-4 py-3 text-right">% Presupuesto</th>
-                    <th className="px-4 py-3 text-center rounded-r-xl">Acciones</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-purple-500/20 font-mono text-xs">
-                  {monthTransactions.map((t) => {
-                    const txPct = availableExpenseBudget > 0 && t.type === 'expense' 
-                      ? Math.round((t.amount / availableExpenseBudget) * 100) 
-                      : 0;
-
-                    return (
-                      <tr key={t.id} className="hover:bg-indigo-900/30">
-                        <td className="px-4 py-3 text-purple-300">{t.date}</td>
-                        <td className="px-4 py-3">
-                          <span className={`px-2 py-0.5 rounded-lg text-[10px] border ${
-                            t.type === 'income' 
-                              ? 'bg-cyan-950 border-cyan-400 text-cyan-300' 
-                              : t.nature === 'fixed'
-                              ? 'bg-amber-950 border-amber-400 text-amber-300'
-                              : 'bg-indigo-900 border-indigo-400 text-indigo-200'
-                          }`}>
-                            {t.type === 'income' ? 'Ingreso' : t.nature === 'fixed' ? 'Gasto Fijo' : 'Gasto Variable'}
-                          </span>
-                        </td>
-                        <td className="px-4 py-3 font-medium text-white font-sans">{t.description}</td>
-                        <td className="px-4 py-3 text-purple-300 font-sans">{t.category}</td>
-                        <td className={`px-4 py-3 text-right font-bold ${t.type === 'income' ? 'text-cyan-300' : 'text-rose-400'}`}>
-                          {t.type === 'income' ? '+' : '-'} {currSymbol} {t.amount.toFixed(2)}
-                        </td>
-                        <td className="px-4 py-3 text-right text-fuchsia-300 font-bold">
-                          {t.type === 'expense' ? `${txPct}%` : '-'}
-                        </td>
-                        <td className="px-4 py-3 text-center space-x-2">
-                          <button
-                            onClick={() => handleEditTransaction(t)}
-                            title="Editar Registro"
-                            className="text-xs bg-indigo-900 hover:bg-indigo-800 border border-indigo-400 text-indigo-200 px-2.5 py-1 rounded-lg transition-colors"
-                          >
-                            ✏️
-                          </button>
-                          <button
-                            onClick={() => handleDeleteTransaction(t.id)}
-                            title="Eliminar Registro"
-                            className="text-xs bg-rose-950 hover:bg-rose-900 border border-rose-500 text-rose-300 px-2.5 py-1 rounded-lg transition-colors"
-                          >
-                            🗑️
-                          </button>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </div>
-      </section>
-
-      {showModal && (
-        <div className="fixed inset-0 bg-slate-950/85 backdrop-blur-xl flex items-center justify-center p-4 z-50">
-          <div 
-            className="border rounded-3xl w-full max-w-md p-6 shadow-2xl space-y-4"
-            style={{ backgroundColor: '#1e1b4b', borderColor: 'rgba(217, 70, 239, 0.4)' }}
-          >
-            <h3 className="text-lg font-bold text-white capitalize">
-              {modalType === 'goal'
-                ? 'Crear Meta de Ahorro'
-                : editingTxId
-                ? `Editar ${modalType === 'income' ? 'Ingreso' : 'Gasto'}`
-                : `Registrar ${modalType === 'income' ? 'Ingreso Variable' : 'Gasto'}`}
-            </h3>
-
-            {budgetError && (
-              <div className="p-3 bg-rose-950 border border-rose-600 text-rose-300 rounded-xl text-xs font-medium">
-                {budgetError}
-              </div>
-            )}
-
-            <form onSubmit={handleSave} className="space-y-4">
-              {modalType === 'goal' ? (
-                <>
-                  <div>
-                    <label className="block text-xs font-semibold text-purple-200 uppercase mb-1">Nombre de la Meta</label>
-                    <input
-                      type="text"
-                      placeholder="Ej. Viaje, Fondo de Emergencia"
-                      value={goalTitle}
-                      onChange={(e) => setGoalTitle(e.target.value)}
-                      required
-                      className="w-full bg-indigo-950 border border-purple-500/50 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-teal-300 text-sm"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-xs font-semibold text-purple-200 uppercase mb-1">Monto Objetivo ({currSymbol})</label>
-                    <input
-                      type="number"
-                      step="0.01"
-                      placeholder="10000.00"
-                      value={goalTarget}
-                      onChange={(e) => setGoalTarget(e.target.value)}
-                      required
-                      className="w-full bg-indigo-950 border border-purple-500/50 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-teal-300 font-mono text-sm"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-xs font-semibold text-purple-200 uppercase mb-1">Ahorro Inicial ({currSymbol})</label>
-                    <input
-                      type="number"
-                      step="0.01"
-                      placeholder="0.00"
-                      value={goalCurrent}
-                      onChange={(e) => setGoalCurrent(e.target.value)}
-                      className="w-full bg-indigo-950 border border-purple-500/50 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-teal-300 font-mono text-sm"
-                    />
-                  </div>
-                </>
-              ) : (
-                <>
-                  <div>
-                    <label className="block text-xs font-semibold text-purple-200 uppercase mb-1">Descripción</label>
-                    <input
-                      type="text"
-                      placeholder="Ej. Alquiler, Consultoría, Supermercado"
-                      value={description}
-                      onChange={(e) => setDescription(e.target.value)}
-                      required
-                      className="w-full bg-indigo-950 border border-purple-500/50 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-teal-300 text-sm"
-                    />
-                  </div>
-
-                  {modalType === 'expense' && (
-                    <div>
-                      <label className="block text-xs font-semibold text-purple-200 uppercase mb-1">Naturaleza del Gasto</label>
-                      <select
-                        value={expenseNature}
-                        onChange={(e) => setExpenseNature(e.target.value as 'fixed' | 'variable')}
-                        className="w-full bg-indigo-950 border border-purple-500/50 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-teal-300 text-sm"
-                      >
-                        <option value="variable">Variable (Discrecional / Opcional)</option>
-                        <option value="fixed">Fijo (Obligatorio / Inflexible)</option>
-                      </select>
-                    </div>
-                  )}
-
-                  <div>
-                    <label className="block text-xs font-semibold text-purple-200 uppercase mb-1">Monto ({currSymbol})</label>
-                    <input
-                      type="number"
-                      step="0.01"
-                      placeholder="0.00"
-                      value={amount}
-                      onChange={(e) => setAmount(e.target.value)}
-                      required
-                      className="w-full bg-indigo-950 border border-purple-500/50 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-teal-300 font-mono text-sm"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-xs font-semibold text-purple-200 uppercase mb-1">Categoría</label>
-                    <select
-                      value={category}
-                      onChange={(e) => setCategory(e.target.value)}
-                      className="w-full bg-indigo-950 border border-purple-500/50 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-teal-300 text-sm"
-                    >
-                      {(modalType === 'income' ? INCOME_CATEGORIES : EXPENSE_CATEGORIES).map((cat) => (
-                        <option key={cat} value={cat} style={{ backgroundColor: '#1e1b4b', color: '#fff' }}>
-                          {cat}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                </>
-              )}
-
-              <div className="flex justify-end space-x-3 pt-2">
-                <button
-                  type="button"
-                  onClick={() => setShowModal(false)}
-                  className="px-4 py-2 bg-indigo-900 hover:bg-indigo-800 text-indigo-200 rounded-xl text-sm transition-colors"
-                >
-                  Cancelar
-                </button>
-                <button
-                  type="submit"
-                  className="px-4 py-2 bg-teal-500 hover:bg-teal-400 text-slate-950 font-bold rounded-xl text-sm transition-colors shadow-lg"
-                >
-                  {editingTxId ? 'Actualizar' : 'Guardar'}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-    </main>
-  );
-}
+                        className="absolute top-3 right-3 text-xs text-rose-400 hover:text-rose-300 bg-rose-950/80 border border-rose-500/40 px-2 py-0
