@@ -289,8 +289,18 @@ export default function HomePage() {
     
     const mPct = monthlySavingsPercentages[m] ?? 20;
     const sav = (inc * mPct) / 100;
-    return { month: m, income: inc, expense: exp, savings: sav, percent: mPct };
+    const bal = inc - exp - sav;
+    return { month: m, income: inc, expense: exp, savings: sav, balance: bal, percent: mPct };
   });
+
+  // Totales globales para interfaz y Excel
+  const sumGlobalIncome = monthlyHistory.reduce((acc, h) => acc + h.income, 0);
+  const sumGlobalExpense = monthlyHistory.reduce((acc, h) => acc + h.expense, 0);
+  const sumGlobalSavings = monthlyHistory.reduce((acc, h) => acc + h.savings, 0);
+  const sumGlobalBalance = monthlyHistory.reduce((acc, h) => acc + h.balance, 0);
+
+  const totalCurrentGoals = goals.reduce((acc, g) => acc + g.currentAmount, 0);
+  const totalTargetGoals = goals.reduce((acc, g) => acc + g.targetAmount, 0);
 
   const handleOpenModal = (type: 'income' | 'expense' | 'goal') => {
     setModalType(type);
@@ -443,12 +453,11 @@ export default function HomePage() {
     setShowModal(false);
   };
 
-  // EXPORTACIÓN A EXCEL: OPCIÓN GLOBAL O ESPECÍFICA DEL MES
+  // EXPORTACIÓN A EXCEL: OPCIÓN GLOBAL O ESPECÍFICA DEL MES CON TOTALES
   const exportToExcel = (tipo: 'mes' | 'global') => {
     const wb = XLSX.utils.book_new();
 
     if (tipo === 'mes') {
-      // --- REPORTE ESPECÍFICO DEL MES SELECCIONADO ---
       const summaryData = [
         { Concepto: 'Moneda Seleccionada', Valor: `${currency} (${currSymbol})` },
         { Concepto: 'Mes Analizado', Valor: selectedMonth },
@@ -492,6 +501,14 @@ export default function HomePage() {
         '% Avance': `${Math.round((g.currentAmount / g.targetAmount) * 100)}%`,
       }));
 
+      const totalAvanceGoals = totalTargetGoals > 0 ? `${Math.round((totalCurrentGoals / totalTargetGoals) * 100)}%` : '0%';
+      goalsData.push({
+        'Meta / Objetivo': 'TOTAL GENERAL',
+        [`Monto Actual (${currSymbol})`]: totalCurrentGoals,
+        [`Monto Meta (${currSymbol})`]: totalTargetGoals,
+        '% Avance': totalAvanceGoals,
+      });
+
       XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(summaryData), `Resumen_${selectedMonth}`);
       XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(categoryReport), `Gastos_Cat_${selectedMonth}`);
       XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(txData), `Transacciones_${selectedMonth}`);
@@ -500,15 +517,27 @@ export default function HomePage() {
       XLSX.writeFile(wb, `Reporte_Financiero_Mes_${selectedMonth}_${currency}.xlsx`);
 
     } else {
-      // --- REPORTE GLOBAL HISTÓRICO (TODOS LOS MESES) ---
-      const globalHistoryData = monthlyHistory.map((h) => ({
+      const globalHistoryRows = monthlyHistory.map((h) => ({
         'Mes': h.month,
         '% Ahorro Configurado': `${h.percent}%`,
         [`Ingresos (${currSymbol})`]: h.income,
         [`Gastos (${currSymbol})`]: h.expense,
         [`Ahorro Reservado (${currSymbol})`]: h.savings,
-        [`Balance Neto (${currSymbol})`]: h.income - h.expense - h.savings,
+        [`Balance Neto (${currSymbol})`]: h.balance,
       }));
+
+      const avgPercent = monthlyHistory.length > 0 
+        ? Math.round(monthlyHistory.reduce((acc, h) => acc + h.percent, 0) / monthlyHistory.length) 
+        : 20;
+
+      globalHistoryRows.push({
+        'Mes': 'TOTAL / PROMEDIO GLOBAL',
+        '% Ahorro Configurado': `${avgPercent}% (Promedio)`,
+        [`Ingresos (${currSymbol})`]: sumGlobalIncome,
+        [`Gastos (${currSymbol})`]: sumGlobalExpense,
+        [`Ahorro Reservado (${currSymbol})`]: sumGlobalSavings,
+        [`Balance Neto (${currSymbol})`]: sumGlobalBalance,
+      });
 
       const allTxData = transactions.map((t) => ({
         'Mes': t.month || (t.date ? t.date.split('/').reverse().join('-').slice(0, 7) : 'N/D'),
@@ -527,7 +556,15 @@ export default function HomePage() {
         '% Avance': `${Math.round((g.currentAmount / g.targetAmount) * 100)}%`,
       }));
 
-      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(globalHistoryData), 'Tendencia_Mes_a_Mes');
+      const totalAvanceGoals = totalTargetGoals > 0 ? `${Math.round((totalCurrentGoals / totalTargetGoals) * 100)}%` : '0%';
+      goalsData.push({
+        'Meta / Objetivo': 'TOTAL GENERAL',
+        [`Monto Actual (${currSymbol})`]: totalCurrentGoals,
+        [`Monto Meta (${currSymbol})`]: totalTargetGoals,
+        '% Avance': totalAvanceGoals,
+      });
+
+      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(globalHistoryRows), 'Tendencia_Mes_a_Mes');
       XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(allTxData), 'Todas_las_Transacciones');
       XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(goalsData), 'Metas_Ahorro');
 
@@ -581,7 +618,6 @@ export default function HomePage() {
             className="bg-indigo-950/90 border border-purple-500/50 text-white text-xs px-3 py-2 rounded-xl focus:outline-none font-mono shadow-xl"
           />
 
-          {/* BOTONES DE EXPORTACIÓN SEPARADOS: MES ESPECÍFICO Y GLOBAL HISTÓRICO */}
           <div className="flex items-center gap-1.5">
             <button
               onClick={() => exportToExcel('mes')}
@@ -775,117 +811,161 @@ export default function HomePage() {
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+          {/* METAS & PROYECCIÓN CON TOTALES */}
           <div 
-            className="lg:col-span-1 rounded-3xl p-6 shadow-2xl border space-y-4"
+            className="lg:col-span-1 rounded-3xl p-6 shadow-2xl border space-y-4 flex flex-col justify-between"
             style={{ backgroundColor: 'rgba(30, 27, 75, 0.75)', borderColor: 'rgba(217, 70, 239, 0.3)', backdropFilter: 'blur(16px)' }}
           >
-            <div className="flex justify-between items-center">
-              <h2 className="text-lg font-semibold text-white">Metas & Proyección</h2>
-              <button
-                onClick={() => handleOpenModal('goal')}
-                className="text-xs bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-bold px-3 py-1.5 rounded-xl transition-colors shadow-md"
-              >
-                + Nueva
-              </button>
+            <div>
+              <div className="flex justify-between items-center mb-4">
+                <h2 className="text-lg font-semibold text-white">Metas & Proyección</h2>
+                <button
+                  onClick={() => handleOpenModal('goal')}
+                  className="text-xs bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-bold px-3 py-1.5 rounded-xl transition-colors shadow-md"
+                >
+                  + Nueva
+                </button>
+              </div>
+
+              <div className="space-y-4 max-h-[380px] overflow-y-auto pr-1">
+                {goals.length === 0 ? (
+                  <p className="text-xs text-purple-300/60 py-4 text-center">No hay metas creadas. Haz clic en "+ Nueva" para agregar una.</p>
+                ) : (
+                  goals.map((g) => {
+                    const pct = Math.min(Math.round((g.currentAmount / (g.targetAmount || 1)) * 100), 100);
+                    const remainingToGoal = Math.max(0, g.targetAmount - g.currentAmount);
+                    const monthsToTarget = plannedSavings > 0 
+                      ? Math.ceil(remainingToGoal / plannedSavings)
+                      : 0;
+
+                    return (
+                      <div key={g.id} className="bg-indigo-950/60 border border-purple-500/30 p-4 rounded-2xl space-y-2 relative group">
+                        <button
+                          onClick={() => handleDeleteGoal(g.id)}
+                          title="Eliminar Meta"
+                          className="absolute top-3 right-3 text-xs text-rose-400 hover:text-rose-300 bg-rose-950/80 border border-rose-500/40 px-2 py-0.5 rounded-lg transition-colors"
+                        >
+                          🗑️
+                        </button>
+
+                        <div className="flex justify-between items-center pr-8">
+                          <h3 className="font-semibold text-white text-xs">{g.title}</h3>
+                          <span className="text-[10px] font-mono bg-indigo-900 text-cyan-300 px-2 py-0.5 rounded-lg border border-purple-500/30">
+                            {pct}%
+                          </span>
+                        </div>
+
+                        <div className="flex justify-between text-[11px] text-purple-200 font-mono">
+                          <span>{currSymbol} {g.currentAmount.toFixed(2)}</span>
+                          <span>{currSymbol} {g.targetAmount.toFixed(2)}</span>
+                        </div>
+
+                        <div className="w-full bg-indigo-950 h-2 rounded-full overflow-hidden border border-purple-500/30">
+                          <div
+                            className="bg-gradient-to-r from-cyan-400 to-fuchsia-400 h-full transition-all duration-500"
+                            style={{ width: `${pct}%` }}
+                          ></div>
+                        </div>
+
+                        <p className="text-[10px] text-purple-300/70 font-mono pt-1">
+                          {monthsToTarget > 0 
+                            ? `⏱ Tiempo est. para completar: ~${monthsToTarget} mes(es)`
+                            : '🎉 Meta alcanzada o lista'}
+                        </p>
+                      </div>
+                    );
+                  })
+                )}
+              </div>
             </div>
 
-            <div className="space-y-4">
-              {goals.length === 0 ? (
-                <p className="text-xs text-purple-300/60 py-4 text-center">No hay metas creadas. Haz clic en "+ Nueva" para agregar una.</p>
-              ) : (
-                goals.map((g) => {
-                  const pct = Math.min(Math.round((g.currentAmount / (g.targetAmount || 1)) * 100), 100);
-                  const remainingToGoal = Math.max(0, g.targetAmount - g.currentAmount);
-                  const monthsToTarget = plannedSavings > 0 
-                    ? Math.ceil(remainingToGoal / plannedSavings)
-                    : 0;
-
-                  return (
-                    <div key={g.id} className="bg-indigo-950/60 border border-purple-500/30 p-4 rounded-2xl space-y-2 relative group">
-                      <button
-                        onClick={() => handleDeleteGoal(g.id)}
-                        title="Eliminar Meta"
-                        className="absolute top-3 right-3 text-xs text-rose-400 hover:text-rose-300 bg-rose-950/80 border border-rose-500/40 px-2 py-0.5 rounded-lg transition-colors"
-                      >
-                        🗑️
-                      </button>
-
-                      <div className="flex justify-between items-center pr-8">
-                        <h3 className="font-semibold text-white text-xs">{g.title}</h3>
-                        <span className="text-[10px] font-mono bg-indigo-900 text-cyan-300 px-2 py-0.5 rounded-lg border border-purple-500/30">
-                          {pct}%
-                        </span>
-                      </div>
-
-                      <div className="flex justify-between text-[11px] text-purple-200 font-mono">
-                        <span>{currSymbol} {g.currentAmount.toFixed(2)}</span>
-                        <span>{currSymbol} {g.targetAmount.toFixed(2)}</span>
-                      </div>
-
-                      <div className="w-full bg-indigo-950 h-2 rounded-full overflow-hidden border border-purple-500/30">
-                        <div
-                          className="bg-gradient-to-r from-cyan-400 to-fuchsia-400 h-full transition-all duration-500"
-                          style={{ width: `${pct}%` }}
-                        ></div>
-                      </div>
-
-                      <p className="text-[10px] text-purple-300/70 font-mono pt-1">
-                        {monthsToTarget > 0 
-                          ? `⏱ Tiempo est. para completar: ~${monthsToTarget} mes(es)`
-                          : '🎉 Meta alcanzada o lista'}
-                      </p>
-                    </div>
-                  );
-                })
-              )}
-            </div>
+            {/* TARJETA DE TOTALES DE METAS EN INTERFAZ */}
+            {goals.length > 0 && (
+              <div className="bg-indigo-950/90 border border-teal-500/40 p-4 rounded-2xl mt-4 space-y-1 font-mono">
+                <div className="flex justify-between text-xs text-teal-300 font-bold">
+                  <span>TOTAL GENERAL METAS:</span>
+                  <span>{totalTargetGoals > 0 ? `${Math.round((totalCurrentGoals / totalTargetGoals) * 100)}%` : '0%'}</span>
+                </div>
+                <div className="flex justify-between text-xs text-purple-200">
+                  <span>Actual: <strong className="text-cyan-300">{currSymbol} {totalCurrentGoals.toFixed(2)}</strong></span>
+                  <span>Meta: <strong className="text-fuchsia-300">{currSymbol} {totalTargetGoals.toFixed(2)}</strong></span>
+                </div>
+              </div>
+            )}
           </div>
 
+          {/* COMPARATIVA Y TENDENCIA MES A MES CON TOTALES */}
           <div 
-            className="lg:col-span-2 rounded-3xl p-6 shadow-2xl border space-y-4"
+            className="lg:col-span-2 rounded-3xl p-6 shadow-2xl border space-y-4 flex flex-col justify-between"
             style={{ backgroundColor: 'rgba(30, 27, 75, 0.75)', borderColor: 'rgba(217, 70, 239, 0.3)', backdropFilter: 'blur(16px)' }}
           >
-            <h2 className="text-lg font-semibold text-white">Comparativa y Tendencia Mes a Mes</h2>
-            {monthlyHistory.length === 0 ? (
-              <p className="text-sm text-purple-300/60 py-6 text-center">Registra ingresos y gastos para generar la tendencia histórica.</p>
-            ) : (
-              <div className="overflow-x-auto">
-                <table className="w-full text-left text-sm text-purple-200">
-                  <thead className="bg-indigo-950/60 text-purple-300 uppercase text-xs border-b border-purple-500/30">
-                    <tr>
-                      <th className="px-4 py-3 rounded-l-xl">Mes</th>
-                      <th className="px-4 py-3 text-center">% Ahorro Configurable</th>
-                      <th className="px-4 py-3 text-right">Ingresos</th>
-                      <th className="px-4 py-3 text-right">Gastos</th>
-                      <th className="px-4 py-3 text-right rounded-r-xl">Ahorro Reservado</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-purple-500/20 font-mono">
-                    {monthlyHistory.map((h) => (
-                      <tr key={h.month} className="hover:bg-indigo-900/30">
-                        <td className="px-4 py-3 text-xs text-white font-medium">{h.month}</td>
-                        <td className="px-4 py-3 text-center">
-                          <select
-                            value={h.percent}
-                            onChange={(e) => handleSavingsPercentChange(Number(e.target.value), h.month)}
-                            className="bg-indigo-950 border border-purple-500 text-fuchsia-300 text-xs font-bold rounded-lg px-2 py-1 focus:outline-none"
-                          >
-                            {Array.from({ length: 18 }, (_, i) => (i + 2) * 5)
-                              .concat(95)
-                              .map((pct) => (
-                                <option key={pct} value={pct} style={{ backgroundColor: '#1e1b4b', color: '#fff' }}>
-                                  {pct}%
-                                </option>
-                              ))}
-                          </select>
-                        </td>
-                        <td className="px-4 py-3 text-right text-cyan-300">{currSymbol} {h.income.toFixed(2)}</td>
-                        <td className="px-4 py-3 text-right text-rose-400">{currSymbol} {h.expense.toFixed(2)}</td>
-                        <td className="px-4 py-3 text-right text-fuchsia-400 font-bold">{currSymbol} {h.savings.toFixed(2)}</td>
+            <div>
+              <h2 className="text-lg font-semibold text-white mb-4">Comparativa y Tendencia Mes a Mes</h2>
+              {monthlyHistory.length === 0 ? (
+                <p className="text-sm text-purple-300/60 py-6 text-center">Registra ingresos y gastos para generar la tendencia histórica.</p>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left text-sm text-purple-200">
+                    <thead className="bg-indigo-950/60 text-purple-300 uppercase text-xs border-b border-purple-500/30">
+                      <tr>
+                        <th className="px-4 py-3 rounded-l-xl">Mes</th>
+                        <th className="px-4 py-3 text-center">% Ahorro Configurable</th>
+                        <th className="px-4 py-3 text-right">Ingresos</th>
+                        <th className="px-4 py-3 text-right">Gastos</th>
+                        <th className="px-4 py-3 text-right rounded-r-xl">Ahorro Reservado</th>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
+                    </thead>
+                    <tbody className="divide-y divide-purple-500/20 font-mono">
+                      {monthlyHistory.map((h) => (
+                        <tr key={h.month} className="hover:bg-indigo-900/30">
+                          <td className="px-4 py-3 text-xs text-white font-medium">{h.month}</td>
+                          <td className="px-4 py-3 text-center">
+                            <select
+                              value={h.percent}
+                              onChange={(e) => handleSavingsPercentChange(Number(e.target.value), h.month)}
+                              className="bg-indigo-950 border border-purple-500 text-fuchsia-300 text-xs font-bold rounded-lg px-2 py-1 focus:outline-none"
+                            >
+                              {Array.from({ length: 18 }, (_, i) => (i + 2) * 5)
+                                .concat(95)
+                                .map((pct) => (
+                                  <option key={pct} value={pct} style={{ backgroundColor: '#1e1b4b', color: '#fff' }}>
+                                    {pct}%
+                                  </option>
+                                ))}
+                            </select>
+                          </td>
+                          <td className="px-4 py-3 text-right text-cyan-300">{currSymbol} {h.income.toFixed(2)}</td>
+                          <td className="px-4 py-3 text-right text-rose-400">{currSymbol} {h.expense.toFixed(2)}</td>
+                          <td className="px-4 py-3 text-right text-fuchsia-400 font-bold">{currSymbol} {h.savings.toFixed(2)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+
+            {/* FILA DE TOTALES GLOBALES EN LA INTERFAZ */}
+            {monthlyHistory.length > 0 && (
+              <div className="bg-indigo-950/90 border border-purple-500/40 p-4 rounded-2xl mt-4 space-y-2 font-mono text-xs">
+                <div className="flex justify-between items-center text-teal-300 font-bold border-b border-purple-500/30 pb-2">
+                  <span>TOTAL / ACUMULADO GLOBAL HISTÓRICO:</span>
+                  <span className="text-cyan-300">Balance Neto: {currSymbol} {sumGlobalBalance.toFixed(2)}</span>
+                </div>
+                <div className="grid grid-cols-3 gap-2 text-center">
+                  <div className="bg-indigo-900/50 p-2 rounded-xl border border-purple-500/20">
+                    <p className="text-[10px] text-purple-300 uppercase">Ingresos Totales</p>
+                    <p className="text-sm font-black text-cyan-300">{currSymbol} {sumGlobalIncome.toFixed(2)}</p>
+                  </div>
+                  <div className="bg-indigo-900/50 p-2 rounded-xl border border-purple-500/20">
+                    <p className="text-[10px] text-purple-300 uppercase">Gastos Totales</p>
+                    <p className="text-sm font-black text-rose-400">{currSymbol} {sumGlobalExpense.toFixed(2)}</p>
+                  </div>
+                  <div className="bg-indigo-900/50 p-2 rounded-xl border border-purple-500/20">
+                    <p className="text-[10px] text-purple-300 uppercase">Ahorro Reservado</p>
+                    <p className="text-sm font-black text-fuchsia-400">{currSymbol} {sumGlobalSavings.toFixed(2)}</p>
+                  </div>
+                </div>
               </div>
             )}
           </div>
