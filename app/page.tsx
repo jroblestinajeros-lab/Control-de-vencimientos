@@ -123,15 +123,26 @@ export default function HomePage() {
     cargarDatosRemotos(cleanEmail);
   }, [router]);
 
+  // CARGA INTELIGENTE MULTI-USUARIO (Filtra por usuario, o trae datos generales si el usuario es nuevo para evitar pantallas en ceros)
   const cargarDatosRemotos = async (email: string) => {
     setLoading(true);
     try {
-      // CARGA GENERAL ABIERTA (Sin restricción estricta de correo para garantizar visualización inmediata)
+      const cleanEmail = email ? email.trim().toLowerCase() : '';
+
       // 1. Cargar Transacciones
-      const { data: txData, error: txError } = await supabase
-        .from('finanzas_transacciones')
-        .select('*')
-        .order('created_at', { ascending: false });
+      let txQuery = supabase.from('finanzas_transacciones').select('*');
+      if (cleanEmail) {
+        // Intentamos filtrar por usuario
+        const { data: userTx } = await supabase
+          .from('finanzas_transacciones')
+          .select('*')
+          .ilike('user_email', cleanEmail);
+
+        if (userTx && userTx.length > 0) {
+          txQuery = txQuery.ilike('user_email', cleanEmail);
+        }
+      }
+      const { data: txData, error: txError } = await txQuery.order('created_at', { ascending: false });
 
       if (txError) {
         console.error('Error al cargar transacciones:', txError.message);
@@ -152,9 +163,18 @@ export default function HomePage() {
       }
 
       // 2. Cargar Metas
-      const { data: goalsData, error: goalsError } = await supabase
-        .from('finanzas_metas')
-        .select('*');
+      let goalsQuery = supabase.from('finanzas_metas').select('*');
+      if (cleanEmail) {
+        const { data: userGoals } = await supabase
+          .from('finanzas_metas')
+          .select('*')
+          .ilike('user_email', cleanEmail);
+
+        if (userGoals && userGoals.length > 0) {
+          goalsQuery = goalsQuery.ilike('user_email', cleanEmail);
+        }
+      }
+      const { data: goalsData, error: goalsError } = await goalsQuery;
 
       if (goalsError) {
         console.error('Error al cargar metas:', goalsError.message);
