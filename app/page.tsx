@@ -97,33 +97,42 @@ export default function HomePage() {
       return;
     }
 
-    let currentEmail = 'jroblestinajeros@gmail.com';
+    let currentEmail = '';
     if (sessionData) {
       try {
         const parsed = JSON.parse(sessionData);
-        currentEmail = parsed?.user?.email || 'jroblestinajeros@gmail.com';
+        currentEmail = parsed?.user?.email || parsed?.email || '';
       } catch (e) {
-        currentEmail = 'jroblestinajeros@gmail.com';
+        currentEmail = '';
       }
     }
-    setUserEmail(currentEmail);
 
-    const savedCurrency = localStorage.getItem(`fin_currency_${currentEmail}`) as CurrencyCode;
+    if (!currentEmail) {
+      router.push('/login');
+      return;
+    }
+
+    const cleanEmail = currentEmail.trim().toLowerCase();
+    setUserEmail(cleanEmail);
+
+    const savedCurrency = localStorage.getItem(`fin_currency_${cleanEmail}`) as CurrencyCode;
     if (savedCurrency && CURRENCIES[savedCurrency]) {
       setCurrency(savedCurrency);
     }
 
-    cargarDatosRemotos(currentEmail);
+    cargarDatosRemotos(cleanEmail);
   }, [router]);
 
   const cargarDatosRemotos = async (email: string) => {
     setLoading(true);
     try {
-      // 1. Cargar Transacciones
+      const cleanEmail = email.trim().toLowerCase();
+
+      // 1. Cargar Transacciones exclusivamente del usuario autenticado actual
       const { data: txData } = await supabase
         .from('finanzas_transacciones')
         .select('*')
-        .eq('user_email', email)
+        .ilike('user_email', cleanEmail)
         .order('created_at', { ascending: false });
 
       if (txData) {
@@ -140,11 +149,11 @@ export default function HomePage() {
         setTransactions(formattedTxs);
       }
 
-      // 2. Cargar Metas
+      // 2. Cargar Metas exclusivamente del usuario autenticado actual
       const { data: goalsData } = await supabase
         .from('finanzas_metas')
         .select('*')
-        .eq('user_email', email);
+        .ilike('user_email', cleanEmail);
 
       if (goalsData) {
         setGoals(
@@ -157,11 +166,11 @@ export default function HomePage() {
         );
       }
 
-      // 3. Cargar Configuración de Porcentajes por Mes desde Supabase
+      // 3. Cargar Configuración de Porcentajes por Mes exclusivamente del usuario actual
       const { data: configData, error: configError } = await supabase
         .from('finanzas_config')
         .select('*')
-        .eq('user_email', email);
+        .ilike('user_email', cleanEmail);
 
       if (configError) {
         console.error('Error al cargar config:', configError.message);
@@ -188,10 +197,8 @@ export default function HomePage() {
     localStorage.setItem(`fin_currency_${userEmail}`, newCurr);
   };
 
-  // Porcentaje estrictamente independiente para el mes seleccionado actual (por defecto 20%)
   const currentSavingsPercent = monthlySavingsPercentages[selectedMonth] ?? 20;
 
-  // Función mejorada para actualizar el porcentaje de ahorro de cualquier mes (por defecto el activo)
   const handleSavingsPercentChange = async (newPercent: number, targetMonth: string = selectedMonth) => {
     const updated = {
       ...monthlySavingsPercentages,
@@ -820,7 +827,6 @@ export default function HomePage() {
                       <tr key={h.month} className="hover:bg-indigo-900/30">
                         <td className="px-4 py-3 text-xs text-white font-medium">{h.month}</td>
                         <td className="px-4 py-3 text-center">
-                          {/* SELECTOR INDEPENDIENTE DIRECTO EN CADA FILA DEL HISTORIAL */}
                           <select
                             value={h.percent}
                             onChange={(e) => handleSavingsPercentChange(Number(e.target.value), h.month)}
