@@ -81,7 +81,7 @@ export default function TareoPage() {
 
   // --- CARGA INICIAL CON RECUPERACIÓN Y PERSISTENCIA PERMANENTE ---
   useEffect(() => {
-    document.title = "Módulo POL-RH-004 & Test de Fatiga | V&A Consulting";
+    document.title = "Tareos | V&A Consulting";
     
     try {
       let savedCollabs = localStorage.getItem('vya_collabs_permanent');
@@ -336,7 +336,7 @@ export default function TareoPage() {
       <header className="max-w-7xl mx-auto flex flex-col md:flex-row justify-between items-start md:items-center pb-6 border-b border-purple-500/30 mb-8 gap-4">
         <div>
           <h1 className="text-2xl font-black text-transparent bg-clip-text bg-gradient-to-r from-teal-300 via-fuchsia-400 to-cyan-300">
-            Módulo POL-RH-004 & Test de Fatiga Industrial Avanzado
+            Tareos
           </h1>
           <p className="text-xs text-purple-200 mt-1">V&A Consulting S.A.C. — Control Operativo, Edición de Tareos & Protocolo SSOMA</p>
         </div>
