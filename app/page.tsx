@@ -2,7 +2,12 @@
 
 import React, { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { createClient } from '@supabase/supabase-js';
 import * as XLSX from 'xlsx';
+
+const supabaseUrl = 'https://cxqwzbfbffarrlgbhtuv.supabase.co';
+const supabaseAnonKey = 'sb_publishable_tLRrpt_XooefWWZp-xXDaQ_eNyXO_zE';
+const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
 interface Transaction {
   id: string;
@@ -62,7 +67,7 @@ export default function HomePage() {
   );
 
   const [transactions, setTransactions] = useState<Transaction[]>([]);
-  const [savingsTargetPercent, setSavingsTargetPercent] = useState<number>(20);
+  const [monthlySavingsPercentages, setMonthlySavingsPercentages] = useState<Record<string, number>>({});
   const [goals, setGoals] = useState<SavingsGoal[]>([]);
   
   const [showModal, setShowModal] = useState<boolean>(false);
@@ -103,140 +108,96 @@ export default function HomePage() {
     }
     setUserEmail(currentEmail);
 
-    const txKey = `fin_transactions_${currentEmail}`;
-    const goalsKey = `fin_goals_${currentEmail}`;
-    const percentKey = `fin_savings_percent_${currentEmail}`;
-    const currencyKey = `fin_currency_${currentEmail}`;
-
-    const savedTx = localStorage.getItem(txKey);
-    const savedGoals = localStorage.getItem(goalsKey);
-    const savedSavingsPercent = localStorage.getItem(percentKey);
-    const savedCurrency = localStorage.getItem(currencyKey) as CurrencyCode;
-
-    if (savedSavingsPercent !== null && !isNaN(Number(savedSavingsPercent))) {
-      setSavingsTargetPercent(Number(savedSavingsPercent));
-    } else {
-      setSavingsTargetPercent(20);
-      localStorage.setItem(percentKey, '20');
-    }
-
+    const savedCurrency = localStorage.getItem(`fin_currency_${currentEmail}`) as CurrencyCode;
     if (savedCurrency && CURRENCIES[savedCurrency]) {
       setCurrency(savedCurrency);
     }
 
-    // SI NO ES EL USUARIO PRINCIPAL, FORZAMOS QUE ARRANQUE VACÍO (IGNORANDO CUALQUIER CACHÉ ANTERIOR)
-    if (currentEmail === 'jroblestinajeros@gmail.com') {
-      if (savedTx) {
-        try {
-          setTransactions(JSON.parse(savedTx));
-        } catch (e) {
-          setTransactions([]);
-        }
-      } else {
-        const defaultTransactions: Transaction[] = [
-          {
-            id: '1731100001',
-            description: 'Sueldo Principal',
-            amount: 2500,
-            type: 'income',
-            category: 'Sueldo / Salario Principal',
-            date: '09/11/2026',
-            month: '2026-11',
-          },
-          {
-            id: '1731100002',
-            description: 'menu',
-            amount: 350,
-            type: 'expense',
-            nature: 'fixed',
-            category: 'Alimentación / Supermercado',
-            date: '09/11/2026',
-            month: '2026-11',
-          },
-          {
-            id: '1731100003',
-            description: 'pasaje',
-            amount: 150,
-            type: 'expense',
-            nature: 'fixed',
-            category: 'Transporte / Combustible / Pasajes',
-            date: '09/11/2026',
-            month: '2026-11',
-          },
-          {
-            id: '1731100004',
-            description: 'celular y disney',
-            amount: 130,
-            type: 'expense',
-            nature: 'fixed',
-            category: 'Servicios (Luz, Agua, Internet, Celular)',
-            date: '09/11/2026',
-            month: '2026-11',
-          },
-          {
-            id: '1731100005',
-            description: 'deuda banco',
-            amount: 300,
-            type: 'expense',
-            nature: 'fixed',
-            category: 'Otros / Varios',
-            date: '09/11/2026',
-            month: '2026-11',
-          },
-          {
-            id: '1731100006',
-            description: 'deuda',
-            amount: 1000,
-            type: 'expense',
-            nature: 'fixed',
-            category: 'Otros / Varios',
-            date: '09/11/2026',
-            month: '2026-11',
-          },
-        ];
-        setTransactions(defaultTransactions);
-        localStorage.setItem(txKey, JSON.stringify(defaultTransactions));
-      }
-    } else {
-      // Usuario nuevo o secundario: SIEMPRE limpio en 0
-      setTransactions([]);
-      localStorage.setItem(txKey, JSON.stringify([]));
-    }
-
-    if (currentEmail === 'jroblestinajeros@gmail.com') {
-      if (savedGoals) {
-        try {
-          const parsedGoals = JSON.parse(savedGoals);
-          if (Array.isArray(parsedGoals)) {
-            setGoals(parsedGoals);
-          }
-        } catch (err) {
-          setGoals([]);
-        }
-      } else {
-        const defaultGoals: SavingsGoal[] = [
-          { id: '1', title: 'Fondo de Emergencia Operativa', targetAmount: 10000, currentAmount: 3500 },
-          { id: '2', title: 'Renovación de Equipos / ROV', targetAmount: 5000, currentAmount: 1200 },
-        ];
-        setGoals(defaultGoals);
-        localStorage.setItem(goalsKey, JSON.stringify(defaultGoals));
-      }
-    } else {
-      setGoals([]);
-      localStorage.setItem(goalsKey, JSON.stringify([]));
-    }
-
-    setLoading(false);
+    cargarDatosRemotos(currentEmail);
   }, [router]);
+
+  const cargarDatosRemotos = async (email: string) => {
+    setLoading(true);
+    try {
+      // 1. Cargar Transacciones desde Supabase
+      const { data: txData, error: txError } = await supabase
+        .from('finanzas_transacciones')
+        .select('*')
+        .eq('user_email', email)
+        .order('created_at', { ascending: false });
+
+      if (txError) console.error('Error al cargar transacciones:', txError);
+      else if (txData) {
+        setTransactions(
+          txData.map((t: any) => ({
+            id: t.id,
+            description: t.description,
+            amount: Number(t.amount),
+            type: t.type,
+            nature: t.nature,
+            category: t.category,
+            date: t.date,
+            month: t.month,
+          }))
+        );
+      }
+
+      // 2. Cargar Metas desde Supabase
+      const { data: goalsData, error: goalsError } = await supabase
+        .from('finanzas_metas')
+        .select('*')
+        .eq('user_email', email);
+
+      if (goalsError) console.error('Error al cargar metas:', goalsError);
+      else if (goalsData) {
+        setGoals(
+          goalsData.map((g: any) => ({
+            id: g.id,
+            title: g.title,
+            targetAmount: Number(g.target_amount),
+            currentAmount: Number(g.current_amount),
+          }))
+        );
+      }
+
+      // 3. Cargar Porcentajes de Ahorro por Mes desde Supabase
+      const { data: configData, error: configError } = await supabase
+        .from('finanzas_config')
+        .select('*')
+        .eq('user_email', email);
+
+      if (!configError && configData) {
+        const mapConfig: Record<string, number> = {};
+        configData.forEach((c: any) => {
+          mapConfig[c.month] = Number(c.savings_percent);
+        });
+        setMonthlySavingsPercentages(mapConfig);
+      }
+    } catch (err) {
+      console.error('Error general cargando datos:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleCurrencyChange = (newCurr: CurrencyCode) => {
     setCurrency(newCurr);
     localStorage.setItem(`fin_currency_${userEmail}`, newCurr);
   };
 
-  const handleSavingsPercentChange = (newPercent: number) => {
-    setSavingsTargetPercent(newPercent);
-    localStorage.setItem(`fin_savings_percent_${userEmail}`, newPercent.toString());
+  const currentSavingsPercent = monthlySavingsPercentages[selectedMonth] ?? 20;
+
+  const handleSavingsPercentChange = async (newPercent: number) => {
+    const updated = {
+      ...monthlySavingsPercentages,
+      [selectedMonth]: newPercent,
+    };
+    setMonthlySavingsPercentages(updated);
+
+    // Guardar en Supabase para que no se pierda
+    await supabase
+      .from('finanzas_config')
+      .upsert({ user_email: userEmail, month: selectedMonth, savings_percent: newPercent }, { onConflict: 'user_email,month' });
   };
 
   const monthTransactions = transactions.filter((t) => {
@@ -260,7 +221,7 @@ export default function HomePage() {
     .filter((t) => t.type === 'expense' && t.nature === 'variable')
     .reduce((acc, t) => acc + t.amount, 0);
 
-  const plannedSavings = (totalIncome * savingsTargetPercent) / 100;
+  const plannedSavings = (totalIncome * currentSavingsPercent) / 100;
   const availableExpenseBudget = Math.max(0, totalIncome - plannedSavings);
   const budgetRemaining = availableExpenseBudget - totalExpense;
 
@@ -300,8 +261,9 @@ export default function HomePage() {
     const mTx = transactions.filter((t) => t.month === m);
     const inc = mTx.filter((t) => t.type === 'income').reduce((a, t) => a + t.amount, 0);
     const exp = mTx.filter((t) => t.type === 'expense').reduce((a, t) => a + t.amount, 0);
-    const sav = (inc * savingsTargetPercent) / 100;
-    return { month: m, income: inc, expense: exp, savings: sav };
+    const mPct = monthlySavingsPercentages[m] ?? 20;
+    const sav = (inc * mPct) / 100;
+    return { month: m, income: inc, expense: exp, savings: sav, percent: mPct };
   });
 
   const handleOpenModal = (type: 'income' | 'expense' | 'goal') => {
@@ -329,21 +291,31 @@ export default function HomePage() {
     setShowModal(true);
   };
 
-  const handleDeleteTransaction = (id: string) => {
+  const handleDeleteTransaction = async (id: string) => {
     if (!confirm('¿Estás seguro de que deseas eliminar este registro?')) return;
-    const updated = transactions.filter((t) => t.id !== id);
-    setTransactions(updated);
-    localStorage.setItem(`fin_transactions_${userEmail}`, JSON.stringify(updated));
+    
+    const { error } = await supabase.from('finanzas_transacciones').delete().eq('id', id);
+    if (error) {
+      alert('Error al eliminar: ' + error.message);
+      return;
+    }
+
+    setTransactions(transactions.filter((t) => t.id !== id));
   };
 
-  const handleDeleteGoal = (id: string) => {
+  const handleDeleteGoal = async (id: string) => {
     if (!confirm('¿Estás seguro de que deseas eliminar esta meta de ahorro?')) return;
-    const updatedGoals = goals.filter((g) => g.id !== id);
-    setGoals(updatedGoals);
-    localStorage.setItem(`fin_goals_${userEmail}`, JSON.stringify(updatedGoals));
+
+    const { error } = await supabase.from('finanzas_metas').delete().eq('id', id);
+    if (error) {
+      alert('Error al eliminar meta: ' + error.message);
+      return;
+    }
+
+    setGoals(goals.filter((g) => g.id !== id));
   };
 
-  const handleSave = (e: React.FormEvent) => {
+  const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     setBudgetError(null);
 
@@ -352,16 +324,29 @@ export default function HomePage() {
       const currentVal = parseFloat(goalCurrent) || 0;
       if (isNaN(targetVal) || targetVal <= 0) return;
 
-      const newGoal: SavingsGoal = {
-        id: Date.now().toString(),
+      const payload = {
+        user_email: userEmail,
         title: goalTitle || 'Nueva Meta',
-        targetAmount: targetVal,
-        currentAmount: currentVal,
+        target_amount: targetVal,
+        current_amount: currentVal,
       };
 
-      const updatedGoals = [...goals, newGoal];
-      setGoals(updatedGoals);
-      localStorage.setItem(`fin_goals_${userEmail}`, JSON.stringify(updatedGoals));
+      const { data, error } = await supabase.from('finanzas_metas').insert([payload]).select();
+      if (error) {
+        alert('Error al guardar meta: ' + error.message);
+        return;
+      }
+
+      if (data && data[0]) {
+        const newGoal: SavingsGoal = {
+          id: data[0].id,
+          title: data[0].title,
+          targetAmount: Number(data[0].target_amount),
+          currentAmount: Number(data[0].current_amount),
+        };
+        setGoals([...goals, newGoal]);
+      }
+
       setShowModal(false);
       return;
     }
@@ -377,42 +362,62 @@ export default function HomePage() {
 
       if (availableExpenseBudget > 0 && val > adjustedRemaining) {
         setBudgetError(
-          `¡Atención! Este gasto (${currSymbol} ${val.toFixed(2)}) supera el presupuesto disponible para gastos (${currSymbol} ${adjustedRemaining.toFixed(2)}). Preserva tu cuota de ahorro del ${savingsTargetPercent}%.`
+          `¡Atención! Este gasto (${currSymbol} ${val.toFixed(2)}) supera el presupuesto disponible para gastos (${currSymbol} ${adjustedRemaining.toFixed(2)}). Preserva tu cuota de ahorro del ${currentSavingsPercent}%.`
         );
         return;
       }
     }
 
-    let updated: Transaction[];
     if (editingTxId) {
-      updated = transactions.map((t) => {
-        if (t.id === editingTxId) {
-          return {
-            ...t,
-            description: description || t.description,
-            amount: val,
-            nature: modalType === 'expense' ? expenseNature : undefined,
-            category,
-          };
-        }
-        return t;
-      });
+      const payload = {
+        description: description || 'Sin descripción',
+        amount: val,
+        nature: modalType === 'expense' ? expenseNature : null,
+        category,
+      };
+
+      const { error } = await supabase.from('finanzas_transacciones').update(payload).eq('id', editingTxId);
+      if (error) {
+        alert('Error al actualizar: ' + error.message);
+        return;
+      }
+
+      setTransactions(
+        transactions.map((t) => (t.id === editingTxId ? { ...t, ...payload, amount: val } : t))
+      );
     } else {
-      const newTx: Transaction = {
-        id: Date.now().toString(),
+      const payload = {
+        user_email: userEmail,
         description: description || (modalType === 'income' ? 'Ingreso Variable' : 'Gasto'),
         amount: val,
         type: modalType,
-        nature: modalType === 'expense' ? expenseNature : undefined,
+        nature: modalType === 'expense' ? expenseNature : null,
         category,
         date: new Date().toLocaleDateString('es-PE'),
         month: selectedMonth,
       };
-      updated = [newTx, ...transactions];
+
+      const { data, error } = await supabase.from('finanzas_transacciones').insert([payload]).select();
+      if (error) {
+        alert('Error al registrar: ' + error.message);
+        return;
+      }
+
+      if (data && data[0]) {
+        const newTx: Transaction = {
+          id: data[0].id,
+          description: data[0].description,
+          amount: Number(data[0].amount),
+          type: data[0].type,
+          nature: data[0].nature,
+          category: data[0].category,
+          date: data[0].date,
+          month: data[0].month,
+        };
+        setTransactions([newTx, ...transactions]);
+      }
     }
 
-    setTransactions(updated);
-    localStorage.setItem(`fin_transactions_${userEmail}`, JSON.stringify(updated));
     setShowModal(false);
   };
 
@@ -420,8 +425,9 @@ export default function HomePage() {
     const summaryData = [
       { Concepto: 'Moneda Seleccionada', Valor: `${currency} (${currSymbol})` },
       { Concepto: 'Mes Seleccionado', Valor: selectedMonth },
+      { Concepto: 'Porcentaje de Ahorro del Mes', Valor: `${currentSavingsPercent}%` },
       { Concepto: `Ingresos Totales (${currSymbol})`, Valor: totalIncome },
-      { Concepto: `Ahorro Reservado (${savingsTargetPercent}%) (${currSymbol})`, Valor: plannedSavings },
+      { Concepto: `Ahorro Reservado (${currentSavingsPercent}%) (${currSymbol})`, Valor: plannedSavings },
       { Concepto: `Presupuesto Límite para Gastos (${currSymbol})`, Valor: availableExpenseBudget },
       { Concepto: `Gastos Fijos (${currSymbol})`, Valor: fixedExpenses },
       { Concepto: `Gastos Variables (${currSymbol})`, Valor: variableExpenses },
@@ -495,7 +501,7 @@ export default function HomePage() {
             Gestión de Finanzas Personales
           </h1>
           <p className="text-xs text-purple-200 mt-1">
-            Usuario: <span className="text-teal-300 font-semibold">{userEmail}</span>
+            Usuario: <span className="text-teal-300 font-semibold">{userEmail}</span> (Sincronizado en la Nube ☁️)
           </p>
         </div>
         
@@ -551,9 +557,9 @@ export default function HomePage() {
             style={{ backgroundColor: 'rgba(30, 27, 75, 0.75)', borderColor: 'rgba(217, 70, 239, 0.3)', backdropFilter: 'blur(16px)' }}
           >
             <div className="flex justify-between items-center">
-              <h3 className="text-xs font-semibold text-fuchsia-300 uppercase tracking-wider">Meta Ahorro</h3>
+              <h3 className="text-xs font-semibold text-fuchsia-300 uppercase tracking-wider">Meta Ahorro ({selectedMonth})</h3>
               <select
-                value={savingsTargetPercent}
+                value={currentSavingsPercent}
                 onChange={(e) => handleSavingsPercentChange(Number(e.target.value))}
                 className="bg-indigo-950 border border-purple-500 text-fuchsia-300 text-xs font-bold rounded-lg px-2 py-0.5 focus:outline-none"
               >
@@ -567,7 +573,7 @@ export default function HomePage() {
               </select>
             </div>
             <p className="text-3xl font-black text-fuchsia-300 font-mono tracking-tight">{currSymbol} {plannedSavings.toFixed(2)}</p>
-            <p className="text-[11px] text-purple-300/70">Cuota reservada</p>
+            <p className="text-[11px] text-purple-300/70">Cuota reservada este mes</p>
           </div>
 
           <div 
@@ -780,6 +786,7 @@ export default function HomePage() {
                   <thead className="bg-indigo-950/60 text-purple-300 uppercase text-xs border-b border-purple-500/30">
                     <tr>
                       <th className="px-4 py-3 rounded-l-xl">Mes</th>
+                      <th className="px-4 py-3 text-center">% Ahorro</th>
                       <th className="px-4 py-3 text-right">Ingresos</th>
                       <th className="px-4 py-3 text-right">Gastos</th>
                       <th className="px-4 py-3 text-right rounded-r-xl">Ahorro Reservado</th>
@@ -789,6 +796,7 @@ export default function HomePage() {
                     {monthlyHistory.map((h) => (
                       <tr key={h.month} className="hover:bg-indigo-900/30">
                         <td className="px-4 py-3 text-xs text-white font-medium">{h.month}</td>
+                        <td className="px-4 py-3 text-xs text-center text-fuchsia-300 font-bold">{h.percent}%</td>
                         <td className="px-4 py-3 text-right text-cyan-300">{currSymbol} {h.income.toFixed(2)}</td>
                         <td className="px-4 py-3 text-right text-rose-400">{currSymbol} {h.expense.toFixed(2)}</td>
                         <td className="px-4 py-3 text-right text-fuchsia-400">{currSymbol} {h.savings.toFixed(2)}</td>
