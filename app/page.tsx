@@ -191,21 +191,20 @@ export default function HomePage() {
   // Porcentaje estrictamente independiente para el mes seleccionado actual (por defecto 20%)
   const currentSavingsPercent = monthlySavingsPercentages[selectedMonth] ?? 20;
 
-  const handleSavingsPercentChange = async (newPercent: number) => {
-    // Actualizamos el estado local de forma inmutable para el mes activo
+  // Función mejorada para actualizar el porcentaje de ahorro de cualquier mes (por defecto el activo)
+  const handleSavingsPercentChange = async (newPercent: number, targetMonth: string = selectedMonth) => {
     const updated = {
       ...monthlySavingsPercentages,
-      [selectedMonth]: newPercent,
+      [targetMonth]: newPercent,
     };
     setMonthlySavingsPercentages(updated);
 
-    // Guardado y actualización en Supabase por usuario y mes
     const { error } = await supabase
       .from('finanzas_config')
       .upsert(
         { 
           user_email: userEmail, 
-          month: selectedMonth, 
+          month: targetMonth, 
           savings_percent: newPercent 
         },
         { onConflict: 'user_email,month' }
@@ -284,7 +283,6 @@ export default function HomePage() {
     const inc = mTx.filter((t) => t.type === 'income').reduce((a, t) => a + t.amount, 0);
     const exp = mTx.filter((t) => t.type === 'expense').reduce((a, t) => a + t.amount, 0);
     
-    // Obtiene rigurosamente el porcentaje configurado para el mes 'm' exacto de la fila
     const mPct = monthlySavingsPercentages[m] ?? 20;
     const sav = (inc * mPct) / 100;
     return { month: m, income: inc, expense: exp, savings: sav, percent: mPct };
@@ -585,7 +583,7 @@ export default function HomePage() {
               <select
                 key={selectedMonth}
                 value={currentSavingsPercent}
-                onChange={(e) => handleSavingsPercentChange(Number(e.target.value))}
+                onChange={(e) => handleSavingsPercentChange(Number(e.target.value), selectedMonth)}
                 className="bg-indigo-950 border border-purple-500 text-fuchsia-300 text-xs font-bold rounded-lg px-2 py-0.5 focus:outline-none"
               >
                 {Array.from({ length: 18 }, (_, i) => (i + 2) * 5)
@@ -811,7 +809,7 @@ export default function HomePage() {
                   <thead className="bg-indigo-950/60 text-purple-300 uppercase text-xs border-b border-purple-500/30">
                     <tr>
                       <th className="px-4 py-3 rounded-l-xl">Mes</th>
-                      <th className="px-4 py-3 text-center">% Ahorro</th>
+                      <th className="px-4 py-3 text-center">% Ahorro Configurable</th>
                       <th className="px-4 py-3 text-right">Ingresos</th>
                       <th className="px-4 py-3 text-right">Gastos</th>
                       <th className="px-4 py-3 text-right rounded-r-xl">Ahorro Reservado</th>
@@ -821,10 +819,25 @@ export default function HomePage() {
                     {monthlyHistory.map((h) => (
                       <tr key={h.month} className="hover:bg-indigo-900/30">
                         <td className="px-4 py-3 text-xs text-white font-medium">{h.month}</td>
-                        <td className="px-4 py-3 text-xs text-center text-fuchsia-300 font-bold">{h.percent}%</td>
+                        <td className="px-4 py-3 text-center">
+                          {/* SELECTOR INDEPENDIENTE DIRECTO EN CADA FILA DEL HISTORIAL */}
+                          <select
+                            value={h.percent}
+                            onChange={(e) => handleSavingsPercentChange(Number(e.target.value), h.month)}
+                            className="bg-indigo-950 border border-purple-500 text-fuchsia-300 text-xs font-bold rounded-lg px-2 py-1 focus:outline-none"
+                          >
+                            {Array.from({ length: 18 }, (_, i) => (i + 2) * 5)
+                              .concat(95)
+                              .map((pct) => (
+                                <option key={pct} value={pct} style={{ backgroundColor: '#1e1b4b', color: '#fff' }}>
+                                  {pct}%
+                                </option>
+                              ))}
+                          </select>
+                        </td>
                         <td className="px-4 py-3 text-right text-cyan-300">{currSymbol} {h.income.toFixed(2)}</td>
                         <td className="px-4 py-3 text-right text-rose-400">{currSymbol} {h.expense.toFixed(2)}</td>
-                        <td className="px-4 py-3 text-right text-fuchsia-400">{currSymbol} {h.savings.toFixed(2)}</td>
+                        <td className="px-4 py-3 text-right text-fuchsia-400 font-bold">{currSymbol} {h.savings.toFixed(2)}</td>
                       </tr>
                     ))}
                   </tbody>
