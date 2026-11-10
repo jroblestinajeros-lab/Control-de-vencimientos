@@ -123,22 +123,18 @@ export default function HomePage() {
     cargarDatosPrivados(cleanEmail);
   }, [router]);
 
-  // CARGA PRIVADA Y AISLADA: Solo filtra y trae los datos correspondientes al usuario autenticado
   const cargarDatosPrivados = async (email: string) => {
     setLoading(true);
     try {
       const cleanEmail = email.trim().toLowerCase();
 
-      // 1. Cargar Transacciones estrictamente del usuario actual
       const { data: txData, error: txError } = await supabase
         .from('finanzas_transacciones')
         .select('*')
         .ilike('user_email', cleanEmail)
         .order('created_at', { ascending: false });
 
-      if (txError) {
-        console.error('Error al cargar transacciones:', txError.message);
-      }
+      if (txError) console.error('Error al cargar transacciones:', txError.message);
 
       if (txData) {
         const formattedTxs: Transaction[] = txData.map((t: any) => ({
@@ -154,15 +150,12 @@ export default function HomePage() {
         setTransactions(formattedTxs);
       }
 
-      // 2. Cargar Metas estrictamente del usuario actual
       const { data: goalsData, error: goalsError } = await supabase
         .from('finanzas_metas')
         .select('*')
         .ilike('user_email', cleanEmail);
 
-      if (goalsError) {
-        console.error('Error al cargar metas:', goalsError.message);
-      }
+      if (goalsError) console.error('Error al cargar metas:', goalsError.message);
 
       if (goalsData) {
         setGoals(
@@ -175,15 +168,12 @@ export default function HomePage() {
         );
       }
 
-      // 3. Cargar Configuración de Porcentajes del usuario actual
       const { data: configData, error: configError } = await supabase
         .from('finanzas_config')
         .select('*')
         .ilike('user_email', cleanEmail);
 
-      if (configError) {
-        console.error('Error al cargar config:', configError.message);
-      }
+      if (configError) console.error('Error al cargar config:', configError.message);
 
       if (configData) {
         const mapConfig: Record<string, number> = {};
@@ -226,9 +216,7 @@ export default function HomePage() {
         { onConflict: 'user_email,month' }
       );
 
-    if (error) {
-      console.error('Error al guardar el porcentaje de ahorro en Supabase:', error.message);
-    }
+    if (error) console.error('Error al guardar porcentaje en Supabase:', error.message);
   };
 
   const monthTransactions = transactions.filter((t) => {
@@ -289,7 +277,7 @@ export default function HomePage() {
     ...transactions.map((t) => t.month || (t.date ? t.date.split('/').reverse().join('-').slice(0, 7) : selectedMonth)),
     ...Object.keys(monthlySavingsPercentages)
   ]);
-  const availableMonths = Array.from(allMonthsSet).sort().reverse().slice(0, 4);
+  const availableMonths = Array.from(allMonthsSet).sort().reverse();
 
   const monthlyHistory = availableMonths.map((m) => {
     const mTx = transactions.filter((t) => {
@@ -337,7 +325,6 @@ export default function HomePage() {
       alert('Error al eliminar: ' + error.message);
       return;
     }
-
     setTransactions(transactions.filter((t) => t.id !== id));
   };
 
@@ -349,7 +336,6 @@ export default function HomePage() {
       alert('Error al eliminar meta: ' + error.message);
       return;
     }
-
     setGoals(goals.filter((g) => g.id !== id));
   };
 
@@ -384,7 +370,6 @@ export default function HomePage() {
         };
         setGoals([...goals, newGoal]);
       }
-
       setShowModal(false);
       return;
     }
@@ -400,7 +385,7 @@ export default function HomePage() {
 
       if (availableExpenseBudget > 0 && val > adjustedRemaining) {
         setBudgetError(
-          `¡Atención! Este gasto (${currSymbol} ${val.toFixed(2)}) supera el presupuesto disponible para gastos (${currSymbol} ${adjustedRemaining.toFixed(2)}). Preserva tu cuota de ahorro del ${currentSavingsPercent}%.`
+          `¡Atención! Este gasto (${currSymbol} ${val.toFixed(2)}) supera el presupuesto disponible (${currSymbol} ${adjustedRemaining.toFixed(2)}).`
         );
         return;
       }
@@ -455,66 +440,99 @@ export default function HomePage() {
         setTransactions([newTx, ...transactions]);
       }
     }
-
     setShowModal(false);
   };
 
-  const exportToExcel = () => {
-    const summaryData = [
-      { Concepto: 'Moneda Seleccionada', Valor: `${currency} (${currSymbol})` },
-      { Concepto: 'Mes Seleccionado', Valor: selectedMonth },
-      { Concepto: 'Porcentaje de Ahorro del Mes', Valor: `${currentSavingsPercent}%` },
-      { Concepto: `Ingresos Totales (${currSymbol})`, Valor: totalIncome },
-      { Concepto: `Ahorro Reservado (${currentSavingsPercent}%) (${currSymbol})`, Valor: plannedSavings },
-      { Concepto: `Presupuesto Límite para Gastos (${currSymbol})`, Valor: availableExpenseBudget },
-      { Concepto: `Gastos Fijos (${currSymbol})`, Valor: fixedExpenses },
-      { Concepto: `Gastos Variables (${currSymbol})`, Valor: variableExpenses },
-      { Concepto: `Gastos Ejecutados Totales (${currSymbol})`, Valor: totalExpense },
-      { Concepto: `Saldo Restante para Gastos (${currSymbol})`, Valor: budgetRemaining },
-    ];
+  // EXPORTACIÓN A EXCEL: OPCIÓN GLOBAL O ESPECÍFICA DEL MES
+  const exportToExcel = (tipo: 'mes' | 'global') => {
+    const wb = XLSX.utils.book_new();
 
-    const categoryReport = expensesWithCumulative.map((item) => ({
-      'Categoría de Gasto': item.category,
-      [`Monto (${currSymbol})`]: item.amount,
-      '% Presupuesto': `${item.categoryPct}%`,
-      '% Gasto Total': `${item.shareOfTotal}%`,
-      [`Acumulado (${currSymbol})`]: item.cumulative,
-    }));
+    if (tipo === 'mes') {
+      // --- REPORTE ESPECÍFICO DEL MES SELECCIONADO ---
+      const summaryData = [
+        { Concepto: 'Moneda Seleccionada', Valor: `${currency} (${currSymbol})` },
+        { Concepto: 'Mes Analizado', Valor: selectedMonth },
+        { Concepto: 'Porcentaje de Ahorro Configurado', Valor: `${currentSavingsPercent}%` },
+        { Concepto: `Ingresos Totales (${currSymbol})`, Valor: totalIncome },
+        { Concepto: `Ahorro Reservado (${currentSavingsPercent}%) (${currSymbol})`, Valor: plannedSavings },
+        { Concepto: `Presupuesto Límite para Gastos (${currSymbol})`, Valor: availableExpenseBudget },
+        { Concepto: `Gastos Fijos (${currSymbol})`, Valor: fixedExpenses },
+        { Concepto: `Gastos Variables (${currSymbol})`, Valor: variableExpenses },
+        { Concepto: `Gastos Ejecutados Totales (${currSymbol})`, Valor: totalExpense },
+        { Concepto: `Saldo Restante para Gastos (${currSymbol})`, Valor: budgetRemaining },
+      ];
 
-    const txData = monthTransactions.map((t) => {
-      const txPct = availableExpenseBudget > 0 && t.type === 'expense' 
-        ? `${Math.round((t.amount / availableExpenseBudget) * 100)}%` 
-        : '-';
-      return {
+      const categoryReport = expensesWithCumulative.map((item) => ({
+        'Categoría de Gasto': item.category,
+        [`Monto (${currSymbol})`]: item.amount,
+        '% Presupuesto': `${item.categoryPct}%`,
+        '% Gasto Total': `${item.shareOfTotal}%`,
+        [`Acumulado (${currSymbol})`]: item.cumulative,
+      }));
+
+      const txData = monthTransactions.map((t) => {
+        const txPct = availableExpenseBudget > 0 && t.type === 'expense' 
+          ? `${Math.round((t.amount / availableExpenseBudget) * 100)}%` 
+          : '-';
+        return {
+          Fecha: t.date,
+          Tipo: t.type === 'income' ? 'Ingreso' : 'Gasto',
+          Naturaleza: t.nature === 'fixed' ? 'Fijo (Obligatorio)' : t.nature === 'variable' ? 'Variable' : '-',
+          Descripción: t.description,
+          Categoría: t.category,
+          [`Monto (${currSymbol})`]: t.amount,
+          '% Presupuesto Mensual': txPct,
+        };
+      });
+
+      const goalsData = goals.map((g) => ({
+        'Meta / Objetivo': g.title,
+        [`Monto Actual (${currSymbol})`]: g.currentAmount,
+        [`Monto Meta (${currSymbol})`]: g.targetAmount,
+        '% Avance': `${Math.round((g.currentAmount / g.targetAmount) * 100)}%`,
+      }));
+
+      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(summaryData), `Resumen_${selectedMonth}`);
+      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(categoryReport), `Gastos_Cat_${selectedMonth}`);
+      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(txData), `Transacciones_${selectedMonth}`);
+      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(goalsData), 'Metas_Ahorro');
+
+      XLSX.writeFile(wb, `Reporte_Financiero_Mes_${selectedMonth}_${currency}.xlsx`);
+
+    } else {
+      // --- REPORTE GLOBAL HISTÓRICO (TODOS LOS MESES) ---
+      const globalHistoryData = monthlyHistory.map((h) => ({
+        'Mes': h.month,
+        '% Ahorro Configurado': `${h.percent}%`,
+        [`Ingresos (${currSymbol})`]: h.income,
+        [`Gastos (${currSymbol})`]: h.expense,
+        [`Ahorro Reservado (${currSymbol})`]: h.savings,
+        [`Balance Neto (${currSymbol})`]: h.income - h.expense - h.savings,
+      }));
+
+      const allTxData = transactions.map((t) => ({
+        'Mes': t.month || (t.date ? t.date.split('/').reverse().join('-').slice(0, 7) : 'N/D'),
         Fecha: t.date,
         Tipo: t.type === 'income' ? 'Ingreso' : 'Gasto',
-        Naturaleza: t.nature === 'fixed' ? 'Fijo (Obligatorio)' : t.nature === 'variable' ? 'Variable' : '-',
+        Naturaleza: t.nature === 'fixed' ? 'Fijo' : t.nature === 'variable' ? 'Variable' : '-',
         Descripción: t.description,
         Categoría: t.category,
         [`Monto (${currSymbol})`]: t.amount,
-        '% Presupuesto Mensual': txPct,
-      };
-    });
+      }));
 
-    const goalsData = goals.map((g) => ({
-      'Meta / Objetivo': g.title,
-      [`Monto Actual (${currSymbol})`]: g.currentAmount,
-      [`Monto Meta (${currSymbol})`]: g.targetAmount,
-      '% Avance': `${Math.round((g.currentAmount / g.targetAmount) * 100)}%`,
-    }));
+      const goalsData = goals.map((g) => ({
+        'Meta / Objetivo': g.title,
+        [`Monto Actual (${currSymbol})`]: g.currentAmount,
+        [`Monto Meta (${currSymbol})`]: g.targetAmount,
+        '% Avance': `${Math.round((g.currentAmount / g.targetAmount) * 100)}%`,
+      }));
 
-    const wb = XLSX.utils.book_new();
-    const wsSummary = XLSX.utils.json_to_sheet(summaryData);
-    const wsCat = XLSX.utils.json_to_sheet(categoryReport);
-    const wsTx = XLSX.utils.json_to_sheet(txData);
-    const wsGoals = XLSX.utils.json_to_sheet(goalsData);
+      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(globalHistoryData), 'Tendencia_Mes_a_Mes');
+      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(allTxData), 'Todas_las_Transacciones');
+      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(goalsData), 'Metas_Ahorro');
 
-    XLSX.utils.book_append_sheet(wb, wsSummary, 'Resumen General');
-    XLSX.utils.book_append_sheet(wb, wsCat, 'Gastos por Categoría');
-    XLSX.utils.book_append_sheet(wb, wsTx, 'Transacciones con %');
-    XLSX.utils.book_append_sheet(wb, wsGoals, 'Metas de Ahorro');
-
-    XLSX.writeFile(wb, `Reporte_Finanzas_${currency}_${selectedMonth}.xlsx`);
+      XLSX.writeFile(wb, `Reporte_Financiero_Global_Historico_${currency}.xlsx`);
+    }
   };
 
   function handleSignOut() {
@@ -563,12 +581,23 @@ export default function HomePage() {
             className="bg-indigo-950/90 border border-purple-500/50 text-white text-xs px-3 py-2 rounded-xl focus:outline-none font-mono shadow-xl"
           />
 
-          <button
-            onClick={exportToExcel}
-            className="bg-gradient-to-r from-teal-400 to-emerald-500 hover:from-teal-300 hover:to-emerald-400 text-slate-950 font-bold text-xs px-4 py-2.5 rounded-xl transition-all shadow-lg shadow-teal-950/60"
-          >
-            <span>📊 Exportar Excel</span>
-          </button>
+          {/* BOTONES DE EXPORTACIÓN SEPARADOS: MES ESPECÍFICO Y GLOBAL HISTÓRICO */}
+          <div className="flex items-center gap-1.5">
+            <button
+              onClick={() => exportToExcel('mes')}
+              className="bg-gradient-to-r from-teal-400 to-emerald-500 hover:from-teal-300 hover:to-emerald-400 text-slate-950 font-bold text-xs px-3 py-2.5 rounded-xl transition-all shadow-lg shadow-teal-950/60"
+              title="Exportar reporte detallado del mes seleccionado"
+            >
+              <span>📊 Excel (Mes)</span>
+            </button>
+            <button
+              onClick={() => exportToExcel('global')}
+              className="bg-gradient-to-r from-cyan-400 to-blue-500 hover:from-cyan-300 hover:to-blue-400 text-slate-950 font-bold text-xs px-3 py-2.5 rounded-xl transition-all shadow-lg shadow-blue-950/60"
+              title="Exportar reporte global con historial de todos los meses"
+            >
+              <span>📈 Excel (Global)</span>
+            </button>
+          </div>
 
           <button
             onClick={handleSignOut}
@@ -862,7 +891,7 @@ export default function HomePage() {
           </div>
         </div>
 
-        {/* TABLA DE TRANSACCIONES CON EL % DEL PRESUPUESTO INCLUIDO */}
+        {/* TABLA DE TRANSACCIONES */}
         <div 
           className="rounded-3xl p-6 shadow-2xl border space-y-4"
           style={{ backgroundColor: 'rgba(30, 27, 75, 0.75)', borderColor: 'rgba(217, 70, 239, 0.3)', backdropFilter: 'blur(16px)' }}
