@@ -29,7 +29,9 @@ interface FatigueRecord {
   id: string;
   dni: string;
   name: string;
+  cargo: string;
   date: string;
+  projectCode: string;
   score: number;
   sleepHours: number;
   physicalFatigue: 'Leve' | 'Moderada' | 'Extrema';
@@ -65,8 +67,10 @@ export default function TareoPage() {
   const [tareoDateInput, setTareoDateInput] = useState(new Date().toISOString().slice(0, 10));
   const [editingTareoId, setEditingTareoId] = useState<string | null>(null);
 
-  // Estados Test de Fatiga (Contexto + Escala Epworth + Jurada)
+  // Estados Test de Fatiga (Fecha, Proyecto, Contexto + Escala Epworth + Jurada)
   const [fatigueDni, setFatigueDni] = useState('');
+  const [fatigueDateInput, setFatigueDateInput] = useState(new Date().toISOString().slice(0, 10));
+  const [fatigueProjectCode, setFatigueProjectCode] = useState('PRJ-01');
   const [sleepHoursInput, setSleepHoursInput] = useState('7');
   const [physicalFatigueInput, setPhysicalFatigueInput] = useState<'Leve' | 'Moderada' | 'Extrema'>('Leve');
   const [declarationAccepted, setDeclarationAccepted] = useState(false);
@@ -88,7 +92,6 @@ export default function TareoPage() {
       let savedTareos = localStorage.getItem('vya_tareos_permanent');
       let savedFatigue = localStorage.getItem('vya_fatigue_permanent');
 
-      // Rescate automático de versiones anteriores por si acaso
       if (!savedCollabs) {
         for (let i = 20; i >= 1; i--) {
           const old = localStorage.getItem(`vya_collabs_v${i}`);
@@ -182,7 +185,7 @@ export default function TareoPage() {
     };
   };
 
-  // --- GUARDAR TEST DE FATIGA ---
+  // --- GUARDAR TEST DE FATIGA CON FECHA Y PROYECTO ---
   const handleSaveFatigueTest = (e: React.FormEvent) => {
     e.preventDefault();
     if (!fatigueDni) { alert('Seleccione un colaborador.'); return; }
@@ -207,7 +210,9 @@ export default function TareoPage() {
       id: Date.now().toString(),
       dni: collab.dni,
       name: collab.name,
-      date: new Date().toISOString().slice(0, 10),
+      cargo: collab.cargo,
+      date: fatigueDateInput,
+      projectCode: fatigueProjectCode,
       score: totalScore,
       sleepHours,
       physicalFatigue: physicalFatigueInput,
@@ -219,8 +224,31 @@ export default function TareoPage() {
     setFatigueRecords(updated);
     localStorage.setItem('vya_fatigue_permanent', JSON.stringify(updated));
 
-    alert(`Test Registrado.\nPuntaje Somnolencia: ${totalScore} pts\nSueño previo: ${sleepHours}h\nDictamen Ocupacional: ${riskLevel}`);
+    alert(`Test Registrado para el Proyecto ${fatigueProjectCode}.\nFecha: ${fatigueDateInput}\nPuntaje Somnolencia: ${totalScore} pts\nDictamen Ocupacional: ${riskLevel}`);
     setDeclarationAccepted(false);
+  };
+
+  // --- EXPORTAR HISTORIAL DE FATIGA A EXCEL ---
+  const handleExportFatigueExcel = () => {
+    if (fatigueRecords.length === 0) {
+      alert('No hay registros de fatiga para exportar.');
+      return;
+    }
+    const dataToExport = fatigueRecords.map(f => ({
+      'Fecha': f.date,
+      'Proyecto': f.projectCode,
+      'DNI': f.dni,
+      'Colaborador': f.name,
+      'Cargo': f.cargo,
+      'Horas Sueño': f.sleepHours,
+      'Fatiga Física': f.physicalFatigue,
+      'Puntaje Epworth': f.score,
+      'Dictamen Ocupacional': f.riskLevel
+    }));
+
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(dataToExport), 'Reporte Fatiga SSOMA');
+    XLSX.writeFile(wb, 'Reporte_Test_Fatiga_SSOMA_VA_Consulting.xlsx');
   };
 
   const handleSaveTareo = (e: React.FormEvent) => {
@@ -423,11 +451,11 @@ export default function TareoPage() {
           <div className="space-y-6">
             <div className="rounded-3xl p-6 shadow-2xl border bg-indigo-950/90 border-rose-500/40 space-y-4">
               <h2 className="text-sm font-bold text-rose-300 uppercase tracking-wider">🚨 Test de Evaluación de Fatiga y Somnolencia (Regímenes Atípicos &gt;28 Días)</h2>
-              <p className="text-xs text-purple-200">Evaluación obligatoria con validación de contexto físico, horas de sueño y escala Epworth.</p>
+              <p className="text-xs text-purple-200">Evaluación obligatoria con fecha, código de proyecto, validación de contexto físico y escala Epworth.</p>
               
               <form onSubmit={handleSaveFatigueTest} className="space-y-4">
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  <div>
+                <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+                  <div className="md:col-span-2">
                     <label className="block text-[11px] font-semibold text-rose-200 uppercase mb-1">Seleccionar Colaborador *</label>
                     <select value={fatigueDni} onChange={(e) => setFatigueDni(e.target.value)} required className="w-full bg-indigo-950 border border-rose-500/50 rounded-xl px-3 py-2 text-white text-xs">
                       <option value="">-- Seleccionar Trabajador --</option>
@@ -435,9 +463,20 @@ export default function TareoPage() {
                     </select>
                   </div>
                   <div>
-                    <label className="block text-[11px] font-semibold text-cyan-200 uppercase mb-1">Horas de Sueño Noche Anterior *</label>
+                    <label className="block text-[11px] font-semibold text-purple-200 uppercase mb-1">Fecha de Test *</label>
+                    <input type="date" value={fatigueDateInput} onChange={(e) => setFatigueDateInput(e.target.value)} required className="w-full bg-indigo-950 border border-rose-500/50 rounded-xl px-3 py-2 text-white text-xs font-mono" />
+                  </div>
+                  <div>
+                    <label className="block text-[11px] font-semibold text-purple-200 uppercase mb-1">Código Proyecto *</label>
+                    <input type="text" value={fatigueProjectCode} onChange={(e) => setFatigueProjectCode(e.target.value)} required className="w-full bg-indigo-950 border border-rose-500/50 rounded-xl px-3 py-2 text-white text-xs font-mono" />
+                  </div>
+                  <div>
+                    <label className="block text-[11px] font-semibold text-cyan-200 uppercase mb-1">Horas Sueño Anterior *</label>
                     <input type="number" step="0.5" value={sleepHoursInput} onChange={(e) => setSleepHoursInput(e.target.value)} required className="w-full bg-indigo-950 border border-rose-500/50 rounded-xl px-3 py-2 text-white text-xs font-mono" />
                   </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   <div>
                     <label className="block text-[11px] font-semibold text-amber-200 uppercase mb-1">Fatiga Física / Muscular *</label>
                     <select value={physicalFatigueInput} onChange={(e) => setPhysicalFatigueInput(e.target.value as any)} className="w-full bg-indigo-950 border border-rose-500/50 rounded-xl px-3 py-2 text-white text-xs">
@@ -482,28 +521,39 @@ export default function TareoPage() {
             </div>
 
             <div className="rounded-3xl p-6 shadow-2xl border bg-indigo-950/75 border-purple-500/30 space-y-4">
-              <h2 className="text-sm font-bold text-white uppercase tracking-wider">Historial de Evaluaciones de Fatiga</h2>
+              <div className="flex justify-between items-center">
+                <h2 className="text-sm font-bold text-white uppercase tracking-wider">Historial de Evaluaciones de Fatiga & Dictámenes</h2>
+                <button onClick={handleExportFatigueExcel} className="bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black text-xs px-4 py-2 rounded-xl shadow-lg flex items-center gap-2">
+                  📥 Descargar Reporte Fatiga (Excel)
+                </button>
+              </div>
               <div className="overflow-x-auto">
                 <table className="w-full text-left text-sm text-purple-200">
                   <thead className="bg-indigo-950/80 text-purple-300 uppercase text-xs border-b border-purple-500/30">
                     <tr>
                       <th className="px-4 py-3">Fecha</th>
+                      <th className="px-4 py-3">Proyecto</th>
                       <th className="px-4 py-3">Colaborador</th>
                       <th className="px-4 py-3 text-center">Puntaje</th>
-                      <th className="px-4 py-3 text-center">Sueño / Fatiga Física</th>
+                      <th className="px-4 py-3 text-center">Sueño / Fatiga</th>
                       <th className="px-4 py-3 text-center">Dictamen</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-purple-500/20 font-mono text-xs">
-                    {fatigueRecords.map(f => (
-                      <tr key={f.id} className="hover:bg-indigo-900/30">
-                        <td className="px-4 py-3 text-purple-300">{f.date}</td>
-                        <td className="px-4 py-3 text-white font-sans font-medium">{f.name}</td>
-                        <td className="px-4 py-3 text-center text-cyan-300">{f.score} pts</td>
-                        <td className="px-4 py-3 text-center text-purple-200">{f.sleepHours}h / {f.physicalFatigue}</td>
-                        <td className="px-4 py-3 text-center font-bold text-rose-300">{f.riskLevel}</td>
-                      </tr>
-                    ))}
+                    {fatigueRecords.length === 0 ? (
+                      <tr><td colSpan={6} className="text-center py-4 text-purple-300/50">No hay registros de fatiga.</td></tr>
+                    ) : (
+                      fatigueRecords.map(f => (
+                        <tr key={f.id} className="hover:bg-indigo-900/30">
+                          <td className="px-4 py-3 text-purple-300">{f.date}</td>
+                          <td className="px-4 py-3 text-cyan-300">{f.projectCode}</td>
+                          <td className="px-4 py-3 text-white font-sans font-medium">{f.name}</td>
+                          <td className="px-4 py-3 text-center text-cyan-300">{f.score} pts</td>
+                          <td className="px-4 py-3 text-center text-purple-200">{f.sleepHours}h / {f.physicalFatigue}</td>
+                          <td className="px-4 py-3 text-center font-bold text-rose-300">{f.riskLevel}</td>
+                        </tr>
+                      ))
+                    )}
                   </tbody>
                 </table>
               </div>
