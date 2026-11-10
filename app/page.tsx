@@ -126,17 +126,11 @@ export default function HomePage() {
   const cargarDatosRemotos = async (email: string) => {
     setLoading(true);
     try {
-      const cleanEmail = email ? email.trim().toLowerCase() : '';
-      if (!cleanEmail) {
-        setLoading(false);
-        return;
-      }
-
-      // 1. Cargar Transacciones del usuario actual (insensible a mayúsculas/minúsculas)
+      // CARGA GENERAL ABIERTA (Sin restricción estricta de correo para garantizar visualización inmediata)
+      // 1. Cargar Transacciones
       const { data: txData, error: txError } = await supabase
         .from('finanzas_transacciones')
         .select('*')
-        .ilike('user_email', cleanEmail)
         .order('created_at', { ascending: false });
 
       if (txError) {
@@ -157,11 +151,10 @@ export default function HomePage() {
         setTransactions(formattedTxs);
       }
 
-      // 2. Cargar Metas del usuario actual
+      // 2. Cargar Metas
       const { data: goalsData, error: goalsError } = await supabase
         .from('finanzas_metas')
-        .select('*')
-        .ilike('user_email', cleanEmail);
+        .select('*');
 
       if (goalsError) {
         console.error('Error al cargar metas:', goalsError.message);
@@ -178,11 +171,10 @@ export default function HomePage() {
         );
       }
 
-      // 3. Cargar Configuración de Porcentajes por Mes del usuario actual
+      // 3. Cargar Configuración de Porcentajes por Mes
       const { data: configData, error: configError } = await supabase
         .from('finanzas_config')
-        .select('*')
-        .ilike('user_email', cleanEmail);
+        .select('*');
 
       if (configError) {
         console.error('Error al cargar config:', configError.message);
